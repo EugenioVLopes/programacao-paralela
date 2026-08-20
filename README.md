@@ -18,12 +18,12 @@ Os materiais de estudo podem ser acessados diretamente no GitHub Pages:
 
 Cada tarefa tem lição prática, teoria dedicada, guia de consulta rápida, código C e relatório em LaTeX.
 
-| Tarefa | Tema | Lição prática | Teoria | Referência rápida | Código e relatório |
+| Tarefa | Tema | Lição prática (Pages) | Teoria (Pages) | Referência rápida (Pages) | Código e relatório (Repo) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| Geral | Fundamentos de HPC e taxonomia | — | [Fundamentos gerais](reference/00-fundamentos-programacao-paralela.html) | — | — |
-| 01 | Série de Leibniz e precisão numérica | [Lição 01](lessons/0001-tarefa01-leibniz-pi.html) | [Teoria 01](reference/01-teoria-ponto-flutuante-hardware.html) | [Referência 01](reference/01-ponto-flutuante-e-leibniz.html) | [`tarefa01/`](tarefa01/) e [PDF](tarefa01/relatorio.pdf) |
-| 02 | Multiplicação matriz-vetor e cache | [Lição 02](lessons/0002-tarefa02-mxv-cache.html) | [Teoria 02](reference/02-teoria-hierarquia-memoria-cache.html) | [Referência 02](reference/02-mxv-cache-localidade.html) | [`tarefa02/`](tarefa02/) e [PDF](tarefa02/relatorio.pdf) |
-| 03 | Paralelismo em nível de instrução (ILP) | [Lição 03](lessons/0003-tarefa03-ilp-acumuladores.html) | [Teoria 03](reference/03-teoria-ilp-pipeline-superscalar.html) | [Referência 03](reference/03-ilp-acumuladores-otimizacao.html) | [`tarefa03/`](tarefa03/) e [PDF](tarefa03/relatorio.pdf) |
+| Geral | Fundamentos de HPC e taxonomia | — | [Fundamentos gerais](https://eugeniovlopes.github.io/programacao-paralela/reference/00-fundamentos-programacao-paralela.html) | — | — |
+| 01 | Série de Leibniz e precisão numérica | [Lição 01](https://eugeniovlopes.github.io/programacao-paralela/lessons/0001-tarefa01-leibniz-pi.html) | [Teoria 01](https://eugeniovlopes.github.io/programacao-paralela/reference/01-teoria-ponto-flutuante-hardware.html) | [Referência 01](https://eugeniovlopes.github.io/programacao-paralela/reference/01-ponto-flutuante-e-leibniz.html) | [`tarefa01/`](tarefa01/) e [PDF](tarefa01/relatorio.pdf) |
+| 02 | Multiplicação matriz-vetor e cache | [Lição 02](https://eugeniovlopes.github.io/programacao-paralela/lessons/0002-tarefa02-mxv-cache.html) | [Teoria 02](https://eugeniovlopes.github.io/programacao-paralela/reference/02-teoria-hierarquia-memoria-cache.html) | [Referência 02](https://eugeniovlopes.github.io/programacao-paralela/reference/02-mxv-cache-localidade.html) | [`tarefa02/`](tarefa02/) e [PDF](tarefa02/relatorio.pdf) |
+| 03 | Paralelismo em nível de instrução (ILP) | [Lição 03](https://eugeniovlopes.github.io/programacao-paralela/lessons/0003-tarefa03-ilp-acumuladores.html) | [Teoria 03](https://eugeniovlopes.github.io/programacao-paralela/reference/03-teoria-ilp-pipeline-superscalar.html) | [Referência 03](https://eugeniovlopes.github.io/programacao-paralela/reference/03-ilp-acumuladores-otimizacao.html) | [`tarefa03/`](tarefa03/) e [PDF](tarefa03/relatorio.pdf) |
 
 ---
 
