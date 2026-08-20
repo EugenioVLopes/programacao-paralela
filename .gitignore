@@ -1,0 +1,54 @@
+# Agent & Environment configurations
+.agents/
+.codebase-memory/
+skills-lock.json
+
+# Binaries and Object files
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.a
+*.exe
+
+# Compiled course task binaries
+tarefa01/tarefa01
+tarefa02/row_major*
+tarefa02/*column_major*
+tarefa02/*collum_major*
+tarefa03/tarefa03
+tarefa03/tarefa03_*
+
+*roteiro*.md
+*podcast*.md
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.nav
+*.snm
+*.vrb
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+texput.log
+
+# Python cache & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Operating System & IDE junk
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+.vscode/
+.idea/

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conceitos de programação paralela e HPC</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function applyMath(el = document.body) {
+      if (window.renderMathInElement) {
+        renderMathInElement(el, {
+          delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: '$', right: '$', display: false },
+            { left: '\\(', right: '\\)', display: false },
+            { left: '\\[', right: '\\]', display: true }
+          ],
+          throwOnError: false
+        });
+      }
+    }
+    document.addEventListener("DOMContentLoaded", () => applyMath());
+    window.addEventListener("load", () => applyMath());
+  </script>
+</head>
+
+<body>
+  <nav class="top-nav">
+    <a href="../lessons/0001-tarefa01-leibniz-pi.html">&larr; Lição 01</a>
+    <span>DCA3703 &bull; Visão geral teórica</span>
+    <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+  </nav>
+
+  <header>
+    <div class="lesson-badge">Referência 00</div>
+    <h1>Conceitos de programação paralela e arquitetura</h1>
+    <div class="metadata">
+      Documento base para a disciplina DCA3703 (UFRN)
+    </div>
+  </header>
+
+  <main>
+    <p>
+      Este documento reúne a fundamentação teórica geral da disciplina. Cada tarefa individual possui um trio de
+      arquivos integrados em <code>lessons/</code> e <code>reference/</code>.
+    </p>
+
+    <div class="callout" style="border-left-color: var(--accent); background-color: var(--card-bg);">
+      <div class="callout-title">Índice</div>
+      <ol style="margin-bottom: 0;">
+        <li><a href="#crise-silicio">Fim da escala de Dennard e limites físicos</a></li>
+        <li><a href="#taxonomia-flynn">Taxonomia de Flynn</a></li>
+        <li><a href="#hierarquia-memoria">Hierarquia de memória, UMA e NUMA</a></li>
+        <li><a href="#modelos-desempenho">Métricas de desempenho: speedup, Amdahl e Gustafson</a></li>
+        <li><a href="#patologias-concorrencia">Problemas de concorrência: condições de corrida e cache</a></li>
+        <li><a href="#mapeamento-tarefas">Estrutura de 3 documentos por tarefa</a></li>
+      </ol>
+    </div>
+
+    <!-- Seção 1 -->
+    <section id="crise-silicio">
+      <h2>1. Fim da escala de Dennard e limites físicos</h2>
+      <p>
+        Entre 1970 e 2005, processadores aumentavam a frequência de clock mantendo a densidade de potência constante
+        (Escala de Dennard). Com o surgimento das correntes de fuga em escala nanométrica, a voltagem não pôde mais
+        cair, gerando a barreira térmica (Power Wall) e forçando a transição para múltiplos núcleos em um único chip.
+      </p>
+
+      <div class="math-block">
+        $$P_{\text{dinâmica}} \approx C \cdot V^2 \cdot f$$
+      </div>
+    </section>
+
+    <!-- Seção 2 -->
+    <section id="taxonomia-flynn">
+      <h2>2. Taxonomia de Flynn</h2>
+      <ul>
+        <li><strong>SISD</strong>: Processador sequencial clássico.</li>
+        <li><strong>SIMD</strong>: Uma instrução aplicada a vetores de dados (AVX, GPUs).</li>
+        <li><strong>MISD</strong>: Múltiplas instruções em um mesmo dado (sistemas tolerantes a falhas).</li>
+        <li><strong>MIMD</strong>: Múltiplos núcleos executando instruções independentes (CPUs multicore, OpenMP, MPI).
+        </li>
+      </ul>
+    </section>
+
+    <!-- Seção 3 -->
+    <section id="hierarquia-memoria">
+      <h2>3. Hierarquia de memória, UMA e NUMA</h2>
+      <p>
+        A hierarquia (L1, L2, L3, RAM) reduz a latência através dos princípios de localidade temporal e espacial. A
+        memória carrega blocos contíguos chamados <strong>linhas de cache</strong> de 64 bytes. Em nós de
+        supercomputação (como o NPAD), a arquitetura <strong>NUMA</strong> faz com que o acesso ao soquete local seja
+        mais rápido que o acesso ao soquete remoto.
+      </p>
+    </section>
+
+    <!-- Seção 4 -->
+    <section id="modelos-desempenho">
+      <h2>4. Métricas de desempenho</h2>
+      <div class="math-block">
+        $$\text{Speedup: } S(p) = \frac{T(1)}{T(p)} \qquad\qquad \text{Eficiência: } E(p) = \frac{S(p)}{p}$$
+      </div>
+      <p>
+        A <strong>Lei de Amdahl</strong> limita o speedup em escalabilidade forte (tamanho fixo de problema). A
+        <strong>Lei de Gustafson</strong> avalia a escalabilidade fraca (tamanho do problema cresce proporcionalmente a
+        $p$).
+      </p>
+    </section>
+
+    <!-- Seção 5 -->
+    <section id="patologias-concorrencia">
+      <h2>5. Problemas de concorrência</h2>
+      <ul>
+        <li><strong>Condição de corrida</strong>: Acessos não sincronizados onde pelo menos uma thread escreve.</li>
+        <li><strong>Falso compartilhamento</strong>: Threads distintas alteram variáveis diferentes situadas na mesma
+          linha de cache de 64 bytes, provocando invalidações constantes.</li>
+        <li><strong>Sincronização</strong>: Comparação de custo entre <code>critical</code> (bloqueio pesado),
+          <code>atomic</code> (instruções atômicas de CPU) e <code>reduction</code> (variáveis privadas locais).</li>
+      </ul>
+    </section>
+
+    <!-- Seção 6 -->
+    <section id="mapeamento-tarefas">
+      <h2>6. Estrutura de 3 documentos por tarefa</h2>
+      <p>
+        Cada tarefa da disciplina possui 3 documentos integrados no repositório:
+      </p>
+
+      <table
+        style="width: 100%; border-collapse: collapse; margin: 1.5em 0; font-family: 'Inter', sans-serif; font-size: 0.9rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+            <th style="padding: 8px;">Tarefa</th>
+            <th style="padding: 8px;">Documento 1: Teoria Aprofundada</th>
+            <th style="padding: 8px;">Documento 2: Referência Rápida</th>
+            <th style="padding: 8px;">Documento 3: Lição Prática</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><strong>T01 (Leibniz)</strong></td>
+            <td style="padding: 8px;"><a href="01-teoria-ponto-flutuante-hardware.html">Teoria 01</a></td>
+            <td style="padding: 8px;"><a href="01-ponto-flutuante-e-leibniz.html">Referência 01</a></td>
+            <td style="padding: 8px;"><a href="../lessons/0001-tarefa01-leibniz-pi.html">Lição 01</a></td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><strong>T02 (MxV)</strong></td>
+            <td style="padding: 8px;"><a href="02-teoria-hierarquia-memoria-cache.html">Teoria 02</a></td>
+            <td style="padding: 8px;"><a href="02-mxv-cache-localidade.html">Referência 02</a></td>
+            <td style="padding: 8px;"><a href="../lessons/0002-tarefa02-mxv-cache.html">Lição 02</a></td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><strong>T03 (ILP)</strong></td>
+            <td style="padding: 8px;"><a href="03-teoria-ilp-pipeline-superscalar.html">Teoria 03</a></td>
+            <td style="padding: 8px;"><a href="03-ilp-acumuladores-otimizacao.html">Referência 03</a></td>
+            <td style="padding: 8px;"><a href="../lessons/0003-tarefa03-ilp-acumuladores.html">Lição 03</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer class="footer-nav">
+    <a href="../lessons/0001-tarefa01-leibniz-pi.html">&larr; Ir para a Lição 01</a>
+    <a href="01-teoria-ponto-flutuante-hardware.html">Teoria da Tarefa 01 &rarr;</a>
+  </footer>
+
+  <script>
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('theme', target);
+    }
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+  </script>
+</body>
+
+</html>
