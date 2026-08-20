@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Portal de estudos da disciplina DCA3703 - Programação Paralela (UFRN). Aulas interativas, teoria física de hardware, guias de referência rápida e relatórios de experimentos.">
+  <title>DCA3703 — Programação Paralela (UFRN)</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function applyMath(el = document.body) {
+      if (window.renderMathInElement) {
+        renderMathInElement(el, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+    document.addEventListener("DOMContentLoaded", () => applyMath());
+    window.addEventListener("load", () => applyMath());
+  </script>
+</head>
+<body>
+  <nav class="top-nav">
+    <div style="display: flex; gap: 16px; align-items: center;">
+      <strong>DCA3703 &bull; Programação Paralela</strong>
+      <a href="reference/00-fundamentos-programacao-paralela.html">Fundamentos Teóricos</a>
+    </div>
+    <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+  </nav>
+
+  <header>
+    <div class="lesson-badge">UFRN &bull; DCA3703</div>
+    <h1>Programação Paralela e Computação de Alto Desempenho</h1>
+    <div class="metadata">
+      Implementações, lições interativas, modelagem teórica e relatórios técnicos &bull; Prof. Samuel Xavier de Souza
+    </div>
+  </header>
+
+  <main>
+    <section id="sobre">
+      <p>
+        Este portal reúne o material pedagógico e técnico desenvolvido para as atividades práticas da disciplina <strong>DCA3703 (Programação Paralela)</strong> do Departamento de Engenharia de Computação e Automação da Universidade Federal do Rio Grande do Norte (UFRN).
+      </p>
+      <p>
+        Cada tarefa conta com uma <strong>tríade documental integrada</strong>:
+      </p>
+      <ul>
+        <li><strong>Lição Prática</strong>: Dissecção linha a linha do código C, contextualização em HPC/IA, análise experimental e quizzes interativos simétricos.</li>
+        <li><strong>Teoria Aprofundada</strong>: Modelagem matemática, fundamentos físicos de hardware (Memory Wall, Power Wall, hierarquia de cache, ILP, NUMA).</li>
+        <li><strong>Referência Rápida</strong>: Tabelas de sintaxe, flags de compilação GCC, pragmas OpenMP e resumo de fórmulas.</li>
+      </ul>
+    </section>
+
+    <section id="tarefas">
+      <h2>Tarefas e Materiais Interativos</h2>
+
+      <div style="display: flex; flex-direction: column; gap: 20px; margin-top: 1.5em;">
+
+        <!-- Tarefa 01 -->
+        <div class="source-card" style="margin: 0;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h3 style="margin: 0; font-size: 1.25rem;">Tarefa 01: Série de Leibniz e Precisão Numérica</h3>
+            <span class="lesson-badge" style="margin: 0; background-color: var(--success-bg); color: var(--success);">Concluída</span>
+          </div>
+          <p style="margin-bottom: 12px; font-size: 0.95rem; color: var(--text-muted);">
+            Aproximação de $\pi$ via série de Leibniz, análise de erro de truncamento, representação IEEE 754 (float vs. double) e limites de convergência assintótica.
+          </p>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.88rem;">
+            <a href="lessons/0001-tarefa01-leibniz-pi.html"><strong>Lição 01</strong> &rarr;</a>
+            <a href="reference/01-teoria-ponto-flutuante-hardware.html">Teoria 01 &rarr;</a>
+            <a href="reference/01-ponto-flutuante-e-leibniz.html">Referência 01 &rarr;</a>
+            <a href="tarefa01/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a>
+          </div>
+        </div>
+
+        <!-- Tarefa 02 -->
+        <div class="source-card" style="margin: 0;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h3 style="margin: 0; font-size: 1.25rem;">Tarefa 02: Multiplicação Matriz-Vetor e Cache</h3>
+            <span class="lesson-badge" style="margin: 0; background-color: var(--success-bg); color: var(--success);">Concluída</span>
+          </div>
+          <p style="margin-bottom: 12px; font-size: 0.95rem; color: var(--text-muted);">
+            Impacto da hierarquia de memória (L1/L2/L3), localidade espacial/temporal, linhas de 64 bytes, saturação de barramento e comparação row-major vs. column-major.
+          </p>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.88rem;">
+            <a href="lessons/0002-tarefa02-mxv-cache.html"><strong>Lição 02</strong> &rarr;</a>
+            <a href="reference/02-teoria-hierarquia-memoria-cache.html">Teoria 02 &rarr;</a>
+            <a href="reference/02-mxv-cache-localidade.html">Referência 02 &rarr;</a>
+            <a href="tarefa02/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a>
+          </div>
+        </div>
+
+        <!-- Tarefa 03 -->
+        <div class="source-card" style="margin: 0;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h3 style="margin: 0; font-size: 1.25rem;">Tarefa 03: Paralelismo ao Nível de Instrução (ILP)</h3>
+            <span class="lesson-badge" style="margin: 0; background-color: var(--success-bg); color: var(--success);">Concluída</span>
+          </div>
+          <p style="margin-bottom: 12px; font-size: 0.95rem; color: var(--text-muted);">
+            Execução superescalar, quebra da cadeia de dependências RAW via múltiplos acumuladores, desenrolamento de laço e interação com níveis de otimização <code>-O0</code>, <code>-O2</code> e <code>-O3</code>.
+          </p>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.88rem;">
+            <a href="lessons/0003-tarefa03-ilp-acumuladores.html"><strong>Lição 03</strong> &rarr;</a>
+            <a href="reference/03-teoria-ilp-pipeline-superscalar.html">Teoria 03 &rarr;</a>
+            <a href="reference/03-ilp-acumuladores-otimizacao.html">Referência 03 &rarr;</a>
+            <a href="tarefa03/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <section id="fundamentos-gerais" style="margin-top: 2.5em;">
+      <h2>Documentação Base e Teoria Geral</h2>
+      <div class="source-card">
+        <h3 style="margin-top: 0;"><a href="reference/00-fundamentos-programacao-paralela.html">00. Fundamentos de Programação Paralela e HPC</a></h3>
+        <p style="margin-bottom: 0; font-size: 0.92rem; color: var(--text-muted);">
+          Taxonomia de Flynn (SISD, SIMD, MISD, MIMD), Leis de Amdahl e Gustafson, métricas de speedup e eficiência, falso compartilhamento, condições de corrida e arquiteturas UMA/NUMA.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer-nav" style="margin-top: 4em;">
+    <span>DCA3703 &bull; UFRN</span>
+    <a href="https://github.com/eugenio-vitor/programacao-paralela" target="_blank">Repositório no GitHub &rarr;</a>
+  </footer>
+
+  <script>
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('theme', target);
+    }
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+  </script>
+</body>
+</html>
