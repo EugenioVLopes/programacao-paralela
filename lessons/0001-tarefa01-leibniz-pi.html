@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lição 01: Série de Leibniz, poder computacional e limites de hardware</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function applyMath(el = document.body) {
+      if (window.renderMathInElement) {
+        renderMathInElement(el, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+    document.addEventListener("DOMContentLoaded", () => applyMath());
+    window.addEventListener("load", () => applyMath());
+  </script>
+</head>
+<body>
+  <nav class="top-nav">
+    <div style="display: flex; gap: 16px;">
+      <a href="../reference/01-teoria-ponto-flutuante-hardware.html">&larr; Teoria 01</a>
+      <a href="../reference/01-ponto-flutuante-e-leibniz.html">Referência rápida 01</a>
+      <a href="../reference/00-fundamentos-programacao-paralela.html">Conceitos gerais &rarr;</a>
+    </div>
+    <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+  </nav>
+
+  <header>
+    <div class="lesson-badge">Lição 01 &bull; DCA3703</div>
+    <h1>Tarefa 01: Série de Leibniz, poder computacional e limites de hardware</h1>
+    
+    <div class="metadata">
+      Tempo estimado: 15 min &bull; Foco: Sintaxe C, precisão numérica, evolução dos processadores e transição para multicore
+    </div>
+  </header>
+
+  <main>
+    <p>
+      Esta lição analisa a implementação em <a href="../tarefa01/tarefa01.c">tarefa01.c</a> e os conceitos fundamentais sobre a evolução do poder computacional, as limitações físicas do processamento sequencial e a necessidade de utilizar múltiplos núcleos lógicos.
+    </p>
+
+    <!-- Seção 1: Código-fonte -->
+    <section>
+      <h2>1. Código-fonte em C</h2>
+      <p>Implementação sequencial do cálculo de $\pi$ via Série de Leibniz:</p>
+
+      <pre><code><span class="hl-prep">#include</span> <span class="hl-str">&lt;stdio.h&gt;</span>
+<span class="hl-prep">#include</span> <span class="hl-str">&lt;stdlib.h&gt;</span>
+<span class="hl-prep">#include</span> <span class="hl-str">&lt;math.h&gt;</span>
+
+<span class="hl-type">int</span> <span class="hl-fn">main</span>(<span class="hl-type">int</span> argc, <span class="hl-type">char</span> *argv[]) {
+    <span class="hl-kw">if</span> (argc != <span class="hl-num">2</span>) {
+        <span class="hl-fn">printf</span>(<span class="hl-str">"Uso: %s &lt;numero_de_iteracoes&gt;\n"</span>, argv[<span class="hl-num">0</span>]);
+        <span class="hl-kw">return</span> <span class="hl-num">1</span>;
+    }
+
+    <span class="hl-type">long long</span> N = <span class="hl-fn">atoll</span>(argv[<span class="hl-num">1</span>]);
+    <span class="hl-type">double</span> pi = <span class="hl-num">0.0</span>;
+
+    <span class="hl-kw">for</span> (<span class="hl-type">long long</span> k = <span class="hl-num">0</span>; k &lt; N; k++) {
+        <span class="hl-type">double</span> termo = <span class="hl-num">1.0</span> / (<span class="hl-num">2.0</span> * k + <span class="hl-num">1.0</span>);
+        pi += (k % <span class="hl-num">2</span> == <span class="hl-num">0</span>) ? termo : -termo;
+    }
+    pi *= <span class="hl-num">4.0</span>;
+
+    <span class="hl-type">double</span> erro = <span class="hl-fn">fabs</span>(pi - M_PI);
+
+    <span class="hl-fn">printf</span>(<span class="hl-str">"Iteracoes: %lld\n"</span>, N);
+    <span class="hl-fn">printf</span>(<span class="hl-str">"Pi:        %.15f\n"</span>, pi);
+    <span class="hl-fn">printf</span>(<span class="hl-str">"Erro:      %.2e\n"</span>, erro);
+
+    <span class="hl-kw">return</span> <span class="hl-num">0</span>;
+}</code></pre>
+    </section>
+
+    <!-- Seção 2: Análise do código C -->
+    <section>
+      <h2>2. Análise do código C</h2>
+
+      <h3>A. Leitura de argumentos e tipos de 64 bits</h3>
+      <pre><code><span class="hl-type">long long</span> N = <span class="hl-fn">atoll</span>(argv[<span class="hl-num">1</span>]);
+<span class="hl-type">double</span> pi = <span class="hl-num">0.0</span>;</code></pre>
+      <ul>
+        <li><strong><code>long long</code> e <code>atoll</code></strong>: Um inteiro de 32 bits (<code>int</code>) sofre estouro aritmético ao ultrapassar $2^{31}-1 \approx 2{,}14 \times 10^9$. Como os testes de convergência demandam $N = 10^{10}$ ou mais, utiliza-se <code>long long</code> (64 bits, limite de $\approx 9{,}22 \times 10^{18}$) e a função <code>atoll</code> para converter a string informada na linha de comando.</li>
+        <li><strong><code>double</code></strong>: Ponto flutuante de precisão dupla (IEEE 754, 64 bits). Oferece 52 bits de mantissa, garantindo de 15 a 17 dígitos decimais de precisão exata.</li>
+      </ul>
+
+      <h3>B. Laço de redução e custo de operações</h3>
+      <pre><code><span class="hl-kw">for</span> (<span class="hl-type">long long</span> k = <span class="hl-num">0</span>; k &lt; N; k++) {
+    <span class="hl-type">double</span> termo = <span class="hl-num">1.0</span> / (<span class="hl-num">2.0</span> * k + <span class="hl-num">1.0</span>);
+    pi += (k % <span class="hl-num">2</span> == <span class="hl-num">0</span>) ? termo : -termo;
+}
+pi *= <span class="hl-num">4.0</span>;</code></pre>
+      <ul>
+        <li><strong>Custo da divisão</strong>: A instrução <code>divsd</code> no x86-64 exige de 12 a 20 ciclos de clock por iteração. É o gargalo computacional do laço.</li>
+        <li><strong>Operador módulo</strong>: A expressão <code>(k % 2 == 0)</code> testa a paridade de $k$. Substituir por alternância simples de sinal (<code>sinal = -sinal</code>) ou por um laço desenrolado de passo 2 elimina desvios condicionais.</li>
+        <li><strong>Fator multiplicativo</strong>: Multiplicar por 4.0 ao final (<code>pi *= 4.0;</code>) economiza $N-1$ multiplicações durante o laço.</li>
+      </ul>
+
+      <h3>C. Cálculo de erro e formatação</h3>
+      <pre><code><span class="hl-type">double</span> erro = <span class="hl-fn">fabs</span>(pi - M_PI);
+<span class="hl-fn">printf</span>(<span class="hl-str">"Pi:        %.15f\n"</span>, pi);
+<span class="hl-fn">printf</span>(<span class="hl-str">"Erro:      %.2e\n"</span>, erro);</code></pre>
+      <ul>
+        <li><strong><code>fabs</code> vs <code>abs</code></strong>: <code>fabs()</code> opera com <code>double</code> em <code>&lt;math.h&gt;</code>. A função <code>abs()</code> converte o argumento para inteiro de 32 bits, destruindo a parte fracionária.</li>
+        <li><strong>Formatadores</strong>: <code>%.15f</code> exibe 15 casas decimais (limite de confiabilidade do <code>double</code>) e <code>%.2e</code> exibe o erro em notação científica.</li>
+      </ul>
+    </section>
+
+    <!-- Seção 3: Conceitos Teóricos de Programação Paralela -->
+    <section>
+      <h2>3. Conceitos de programação paralela e evolução de hardware</h2>
+
+      <h3>A. Poder computacional</h3>
+      <p>
+        <strong>Poder computacional</strong> é a capacidade total de processamento que um sistema computacional oferece para executar tarefas em um determinado tempo. Quanto mais complexo é um problema, maior é a exigência por poder computacional.
+      </p>
+      <p>
+        Aplicações reais demandam resultados cada vez mais precisos e em menor tempo:
+      </p>
+      <ul>
+        <li><strong>Simulações científicas para descoberta de novas drogas</strong>: Modelagem de acoplamento molecular (*in silico*) para testar compostos farmacológicos contra parasitas e vírus antes de testes em laboratório.</li>
+        <li><strong>Modelagem de sistemas para previsão do tempo</strong>: Resolução de equações diferenciais atmosféricas e climatológicas em malhas tridimensionais globais.</li>
+        <li><strong>Treinamento de modelos de Inteligência Artificial</strong>: Processamento de bilhões de parâmetros em grandes modelos de linguagem (como ChatGPT e LLMs).</li>
+      </ul>
+
+      <h3>B. Limitação dos processadores sequenciais</h3>
+      <p>
+        Historicamente, o ganho de desempenho em processadores sequenciais dependia de adicionar mais transistores ao chip e elevar sua frequência de operação. No entanto, o crescimento puramente sequencial encontrou <strong>limites físicos inevitáveis</strong>:
+      </p>
+      <ul>
+        <li><strong>Limite espacial</strong>: A miniaturização dos transistores atingiu dimensões atômicas, onde efeitos quânticos e correntes de fuga dificultam o controle da passagem de elétrons.</li>
+        <li><strong>Limite energético e térmico (Power Wall)</strong>: A potência dinâmica dissipada varia com o quadrado da tensão e linearmente com a frequência ($P \approx C \cdot V^2 \cdot f$). Como não foi mais possível reduzir a tensão $V$ sem gerar instabilidade, elevar a frequência $f$ além de 3 a 5 GHz passou a superaquecer os chips de forma insustentável.</li>
+      </ul>
+      <p>
+        Essas barreiras físicas estagnaram a evolução do desempenho de núcleos individuais operando em modo sequencial.
+      </p>
+
+      <h3>C. Cores lógicos e a transição para o paralelismo</h3>
+      <p>
+        Diante da impossibilidade de aumentar indefinidamente a frequência de um único núcleo, a indústria de semicondutores mudou a arquitetura dos processadores:
+      </p>
+      <div class="callout">
+        <div class="callout-title">A mudança para multicore</div>
+        <p>
+          Em vez de buscar aumentar a eficiência de um único núcleo sequencial, a solução foi **multiplicar a quantidade de cores lógicos** em um mesmo chip. Dessa forma, procura-se utilizar mais núcleos trabalhando em conjunto para executar instruções simultaneamente em paralelo.
+        </p>
+      </div>
+
+      <h3>D. A Série de Leibniz e a demanda por paralelismo</h3>
+      <p>A fórmula da série alternada é dada por:</p>
+      <div class="math-block">
+        $$\pi = 4 \sum_{k=0}^{\infty} \frac{(-1)^k}{2k + 1} = 4 \left( 1 - \frac{1}{3} + \frac{1}{5} - \frac{1}{7} + \frac{1}{9} - \dots \right)$$
+      </div>
+      <p>
+        O erro de truncamento decresce a uma taxa muito lenta de $\mathcal{O}(1/N)$. Para obter cada nova casa decimal de precisão em $\pi$, o número de iterações $N$ precisa ser multiplicado por 10. Obter 15 casas decimais em um único núcleo levaria anos de processamento sequencial. Dividir o laço entre múltiplos núcleos lógicos é a única forma de obter o resultado em tempo hábil.
+      </p>
+    </section>
+
+    <!-- Seção 4: Quiz -->
+    <section>
+      <h2>4. Quiz de fixação</h2>
+
+      <!-- Quiz 1 -->
+      <div class="quiz-container" id="quiz-1">
+        <div class="quiz-header">
+          <span>Questão 1: Tipos inteiros em C</span>
+          <button class="quiz-reset-btn" onclick="resetQuiz(1)">Tentar novamente</button>
+        </div>
+        <div class="quiz-question">
+          Por que o programa usa <code>long long</code> para a variável $N$ em vez de <code>int</code>?
+        </div>
+        <div class="quiz-options">
+          <button class="quiz-option-btn" onclick="checkAnswer(1, 0, false)">O tipo int gera lentidão no barramento de dados da CPU.</button>
+          <button class="quiz-option-btn" onclick="checkAnswer(1, 1, false)">O compilador GCC recusa converter strings em int com atoll.</button>
+          <button class="quiz-option-btn" onclick="checkAnswer(1, 2, true)">O tipo int sofre estouro de representação acima de dois bilhões.</button>
+          <button class="quiz-option-btn" onclick="checkAnswer(1, 3, false)">O tipo int impede o uso de números com ponto flutuante.</button>
+        </div>
+        <div class="quiz-explanation" id="exp-1"></div>
+      </div>
+
+      <!-- Quiz 2 -->
+      <div class="quiz-container" id="quiz-2">
+        <div class="quiz-header">
+          <span>Questão 2: Limites de hardware e multicore</span>
+          <button class="quiz-reset-btn" onclick="resetQuiz(2)">Tentar novamente</button>
+        </div>
+        <div class="quiz-question">
+          Qual fator físico motivou a transição da computação sequencial para processadores multicore?
+        </div>
+        <div class="quiz-options">
+          <button class="quiz-option-btn" onclick="checkAnswer(2, 0, false)">A escassez mundial de silício para a manufatura de novos circuitos.</button>
+          <button class="quiz-option-btn" onclick="checkAnswer(2, 1, true)">A barreira de potência térmica que estagnou as frequências de clock.</button>
+          <button class="quiz-option-btn" onclick="checkAnswer(2, 2, false)">A incapacidade técnica de se construir memórias RAM de alta largura.</button>
+          <button class="quiz-option-btn" onclick="checkAnswer(2, 3, false)">O abandono definitivo da linguagem C pelos sistemas computacionais.</button>
+        </div>
+        <div class="quiz-explanation" id="exp-2"></div>
+      </div>
+    </section>
+
+    <!-- Seção 5: Fontes -->
+    <section>
+      <h2>5. Leitura recomendada</h2>
+      <div class="source-card">
+        <strong>Fontes:</strong> <em>Computer Systems: A Programmer's Perspective (CS:APP)</em>, R. Bryant e D. O'Hallaron, Capítulo 2 (Ponto Flutuante IEEE 754); <em>An Introduction to Parallel Programming</em>, Peter S. Pacheco, Capítulo 1 (Necessidade de sistemas paralelos).
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer-nav">
+    <a href="../reference/01-teoria-ponto-flutuante-hardware.html">&larr; Teoria 01</a>
+    <a href="../reference/01-ponto-flutuante-e-leibniz.html">Referência rápida 01</a>
+    <a href="../reference/00-fundamentos-programacao-paralela.html">Conceitos gerais &rarr;</a>
+  </footer>
+
+  <script>
+    const explanations = {
+      1: {
+        text: "<strong>Correto.</strong> No x86-64, <code>int</code> tem 32 bits sinalizados com teto em $2^{31}-1 = 2{,}147{,}483{,}647$. Execuções com $N = 10^{10}$ causam estouro aritmético, exigindo <code>long long</code> (64 bits).",
+        wrong: "<strong>Incorreto.</strong> O problema é o estouro de representação do <code>int</code> de 32 bits quando $N > 2{,}147{,}483{,}647$."
+      },
+      2: {
+        text: "<strong>Correto.</strong> O fim da escala de Dennard e a barreira térmica (Power Wall) limitaram o clock uniprocessado a $\\approx 3\\text{ a }5\\text{ GHz}$, exigindo a multiplicação de cores lógicos para elevar o poder computacional.",
+        wrong: "<strong>Incorreto.</strong> A causa foi a dissipação térmica excessiva (Power Wall) decorrente da quebra da escala de Dennard."
+      }
+    };
+
+    function checkAnswer(qNum, optIndex, isCorrect) {
+      const container = document.getElementById(`quiz-${qNum}`);
+      const buttons = container.querySelectorAll('.quiz-option-btn');
+      const exp = document.getElementById(`exp-${qNum}`);
+      
+      buttons.forEach(btn => {
+        btn.disabled = true;
+      });
+
+      if (isCorrect) {
+        buttons[optIndex].classList.add('correct');
+        exp.innerHTML = explanations[qNum].text;
+        exp.style.borderLeft = "4px solid var(--success)";
+      } else {
+        buttons[optIndex].classList.add('wrong');
+        exp.innerHTML = explanations[qNum].wrong;
+        exp.style.borderLeft = "4px solid var(--error)";
+      }
+      exp.classList.add('visible');
+      applyMath(exp);
+    }
+
+    function resetQuiz(qNum) {
+      const container = document.getElementById(`quiz-${qNum}`);
+      const buttons = container.querySelectorAll('.quiz-option-btn');
+      const exp = document.getElementById(`exp-${qNum}`);
+      
+      buttons.forEach(btn => {
+        btn.disabled = false;
+        btn.classList.remove('correct', 'wrong');
+      });
+      exp.classList.remove('visible');
+      exp.innerHTML = '';
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('theme', target);
+    }
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+  </script>
+</body>
+</html>
