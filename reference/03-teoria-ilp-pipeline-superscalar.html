@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Teoria aprofundada para a Tarefa 03 (ILP): pipeline escalar, execução superescalar, dependências de dados RAW/WAR/WAW, renomeação de registradores, desenrolamento de laços e interação entre níveis de otimização do compilador e extração de ILP pelo hardware.">
+  <title>Teoria 03: Paralelismo ao Nível de Instrução (ILP)</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function applyMath(el = document.body) {
+      if (window.renderMathInElement) {
+        renderMathInElement(el, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+    document.addEventListener("DOMContentLoaded", () => applyMath());
+    window.addEventListener("load", () => applyMath());
+  </script>
+</head>
+<body>
+  <nav class="top-nav">
+    <div style="display: flex; gap: 16px;">
+      <a href="00-fundamentos-programacao-paralela.html">&larr; Conceitos gerais</a>
+      <a href="03-ilp-acumuladores-otimizacao.html">Referência rápida 03 &rarr;</a>
+    </div>
+    <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+  </nav>
+
+  <header>
+    <div class="lesson-badge">Teoria 03 &bull; DCA3703</div>
+    <h1>Teoria 03: Paralelismo ao Nível de Instrução — Pipeline, Superescalar e Dependências de Dados</h1>
+    <div class="metadata">
+      Fundamentação teórica para a Tarefa 03 (ILP com múltiplos acumuladores)
+    </div>
+  </header>
+
+  <main>
+
+    <div class="callout" style="border-left-color: var(--accent); background-color: var(--card-bg);">
+      <div class="callout-title">Índice</div>
+      <ol style="margin-bottom: 0;">
+        <li><a href="#pipeline">Pipeline: a linha de montagem do processador</a></li>
+        <li><a href="#superescalar">Execução superescalar e janela de instrução</a></li>
+        <li><a href="#dependencias">Dependências de dados: RAW, WAR e WAW</a></li>
+        <li><a href="#ooo">Execução fora de ordem e renomeação de registradores</a></li>
+        <li><a href="#caminho-critico">Caminho crítico e latência de operações</a></li>
+        <li><a href="#unroll">Desenrolamento de laços e múltiplos acumuladores</a></li>
+        <li><a href="#compilador-vs-hw">Compilador vs. hardware: quem extrai ILP?</a></li>
+      </ol>
+    </div>
+
+    <!-- Seção 1 -->
+    <section id="pipeline">
+      <h2>1. Pipeline: a linha de montagem do processador</h2>
+      <p>
+        Um processador sequencial ingênuo executaria cada instrução completamente antes de iniciar a próxima. A técnica de <strong>pipeline</strong> divide a execução em estágios (tipicamente 5 a 20+), cada um responsável por uma fase: busca (fetch), decodificação (decode), execução (execute), acesso à memória (memory) e escrita (writeback).
+      </p>
+      <p>
+        Com o pipeline, múltiplas instruções ocupam estágios diferentes simultaneamente — como uma linha de montagem industrial. Um pipeline de $k$ estágios pode ter até $k$ instruções em voo ao mesmo tempo.
+      </p>
+
+      <div class="math-block">
+        $$\text{Throughput}_{\text{ideal}} = 1 \text{ instrução/ciclo} \quad (\text{pipeline de } k \text{ estágios totalmente preenchido})$$
+      </div>
+
+      <p>
+        O pipeline não reduz a latência de uma instrução individual — cada uma ainda leva $k$ ciclos do início ao fim. O ganho está no <strong>throughput</strong>: uma nova instrução pode ser iniciada a cada ciclo.
+      </p>
+
+      <h3>Hazards: quando o pipeline para</h3>
+      <p>
+        Três tipos de situação podem forçar o pipeline a inserir "bolhas" (ciclos de espera):
+      </p>
+      <ul>
+        <li><strong>Hazard estrutural</strong>: dois estágios competem pelo mesmo recurso de hardware (ex.: uma única porta de memória compartilhada entre busca e acesso a dados).</li>
+        <li><strong>Hazard de dados</strong>: uma instrução depende do resultado de outra que ainda não terminou (principal foco desta tarefa).</li>
+        <li><strong>Hazard de controle</strong>: um desvio condicional (<code>if</code>, <code>for</code>) pode invalidar instruções já buscadas, exigindo <em>flush</em> do pipeline.</li>
+      </ul>
+    </section>
+
+    <!-- Seção 2 -->
+    <section id="superescalar">
+      <h2>2. Execução superescalar e janela de instrução</h2>
+      <p>
+        Processadores modernos são <strong>superescalares</strong>: contêm múltiplas unidades de execução e podem iniciar 4 a 6 instruções por ciclo (ou mais). Um Intel Skylake, por exemplo, possui 4 portas de execução aritmética inteira e 2 unidades de ponto flutuante (FMA).
+      </p>
+      <p>
+        Para alimentar essas unidades, o processador mantém uma <strong>janela de instrução</strong> (instruction window ou ROB — Reorder Buffer) com 200 a 500+ instruções em análise simultânea. O hardware examina essa janela buscando instruções independentes que possam executar em paralelo.
+      </p>
+
+      <div class="callout" style="border-left-color: var(--accent); background-color: var(--card-bg);">
+        <div class="callout-title">Capacidade superescalar — números reais</div>
+        <table style="width: 100%; border-collapse: collapse; font-family: 'Inter', sans-serif; font-size: 0.88rem;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+              <th style="padding: 7px;">Microarquitetura</th>
+              <th style="padding: 7px;">Despacho máximo</th>
+              <th style="padding: 7px;">ROB (entradas)</th>
+              <th style="padding: 7px;">Portas de FP</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 7px;">Intel Skylake (2015)</td>
+              <td style="padding: 7px;">6 µops/ciclo</td>
+              <td style="padding: 7px;">224</td>
+              <td style="padding: 7px;">2 (FMA de 256 bits)</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 7px;">Intel Golden Cove (2021)</td>
+              <td style="padding: 7px;">6 µops/ciclo</td>
+              <td style="padding: 7px;">512</td>
+              <td style="padding: 7px;">2 (FMA de 256 bits)</td>
+            </tr>
+            <tr>
+              <td style="padding: 7px;">AMD Zen 4 (2022)</td>
+              <td style="padding: 7px;">6 µops/ciclo</td>
+              <td style="padding: 7px;">320</td>
+              <td style="padding: 7px;">2 (FMA de 256 bits)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        O ILP (Instruction-Level Parallelism) é a quantidade de paralelismo disponível dentro de um fluxo sequencial de instruções. A capacidade superescalar existe para explorar ILP — mas só funciona quando há instruções independentes suficientes na janela.
+      </p>
+    </section>
+
+    <!-- Seção 3 -->
+    <section id="dependencias">
+      <h2>3. Dependências de dados: RAW, WAR e WAW</h2>
+      <p>
+        A classificação formal de dependências usa a terminologia de Bernstein (1966):
+      </p>
+
+      <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; font-family: 'Inter', sans-serif; font-size: 0.88rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+            <th style="padding: 8px;">Tipo</th>
+            <th style="padding: 8px;">Sigla</th>
+            <th style="padding: 8px;">Descrição</th>
+            <th style="padding: 8px;">Eliminável por hardware?</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Dependência verdadeira</td>
+            <td style="padding: 8px;">RAW (Read After Write)</td>
+            <td style="padding: 8px;">Instrução B lê resultado que A produz</td>
+            <td style="padding: 8px;">Não — é física</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Antidependência</td>
+            <td style="padding: 8px;">WAR (Write After Read)</td>
+            <td style="padding: 8px;">B escreve em registrador que A ainda lê</td>
+            <td style="padding: 8px;">Sim — renomeação</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px;">Dependência de saída</td>
+            <td style="padding: 8px;">WAW (Write After Write)</td>
+            <td style="padding: 8px;">A e B escrevem no mesmo registrador</td>
+            <td style="padding: 8px;">Sim — renomeação</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        Na Tarefa 03, o laço com acumulador único contém uma cadeia RAW <strong>inevitável</strong>:
+      </p>
+      <pre><code><span class="hl-com">// Cada iteração depende do resultado da anterior:</span>
+<span class="hl-com">//   soma += v[i]   →   soma = soma_anterior + v[i]</span>
+<span class="hl-com">//   RAW: a soma da iteração i+1 precisa do valor produzido na iteração i</span>
+<span class="hl-kw">for</span> (<span class="hl-type">long</span> i = <span class="hl-num">0</span>; i &lt; n; ++i)
+    soma_dependente += v[i];  <span class="hl-com">// cadeia de N somas encadeadas</span></code></pre>
+
+      <p>
+        Essa cadeia de $N$ adições sequenciais forma o <strong>caminho crítico</strong> do laço. O hardware não pode começar a soma da iteração $i+1$ antes de obter o resultado de $i$, independentemente de quantas unidades funcionais estejam disponíveis.
+      </p>
+    </section>
+
+    <!-- Seção 4 -->
+    <section id="ooo">
+      <h2>4. Execução fora de ordem e renomeação de registradores</h2>
+      <p>
+        Processadores x86 modernos implementam <strong>execução fora de ordem</strong> (Out-of-Order Execution, OoOE). O front-end decodifica instruções em ordem, mas o back-end pode executá-las em qualquer sequência, desde que as dependências RAW sejam respeitadas.
+      </p>
+      <p>
+        A <strong>renomeação de registradores</strong> elimina falsas dependências WAR e WAW. O processador mantém centenas de registradores físicos internos (muito mais que os 16 registradores arquiteturais x86_64) e mapeia cada escrita para um registrador físico diferente. Assim, instruções que escrevem no mesmo registrador lógico podem executar em paralelo.
+      </p>
+
+      <div class="callout" style="border-left-color: #1b7a43; background-color: var(--success-bg);">
+        <div class="callout-title" style="color: var(--success);">Consequência para o laço de acumulador único</div>
+        <p style="margin: 0; font-family: 'Inter', sans-serif; font-size: 0.9rem;">
+          A renomeação de registradores <strong>não ajuda</strong> com a cadeia RAW do acumulador único: a adição <code>soma += v[i]</code> tem dependência verdadeira — o resultado da iteração $i$ é dado de entrada da iteração $i+1$. Nenhum truque de hardware elimina isso. A <em>única</em> solução é reestruturar o código para criar cadeias independentes.
+        </p>
+      </div>
+    </section>
+
+    <!-- Seção 5 -->
+    <section id="caminho-critico">
+      <h2>5. Caminho crítico e latência de operações</h2>
+      <p>
+        Cada operação aritmética tem dois tempos: <strong>latência</strong> (ciclos até o resultado estar pronto) e <strong>throughput recíproco</strong> (ciclos mínimos entre inícios de operações independentes na mesma unidade).
+      </p>
+
+      <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; font-family: 'Inter', sans-serif; font-size: 0.88rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+            <th style="padding: 8px;">Operação</th>
+            <th style="padding: 8px;">Latência (ciclos)</th>
+            <th style="padding: 8px;">Throughput recíproco</th>
+            <th style="padding: 8px;">Exemplo (Intel Skylake)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>ADD</code> inteiro</td>
+            <td style="padding: 8px;">1</td>
+            <td style="padding: 8px;">0,25 ciclo (4 por ciclo)</td>
+            <td style="padding: 8px;"><code>add rax, rbx</code></td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>ADDSD</code> (FP double)</td>
+            <td style="padding: 8px;">4</td>
+            <td style="padding: 8px;">0,5 ciclo (2 por ciclo)</td>
+            <td style="padding: 8px;"><code>addsd xmm0, xmm1</code></td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>MULSD</code> (FP double)</td>
+            <td style="padding: 8px;">4</td>
+            <td style="padding: 8px;">0,5 ciclo (2 por ciclo)</td>
+            <td style="padding: 8px;"><code>mulsd xmm0, xmm1</code></td>
+          </tr>
+          <tr>
+            <td style="padding: 8px;"><code>VFMADD</code> (FP FMA)</td>
+            <td style="padding: 8px;">4</td>
+            <td style="padding: 8px;">0,5 ciclo (2 por ciclo)</td>
+            <td style="padding: 8px;"><code>vfmadd231sd xmm0, xmm1, xmm2</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Acumulador único: limitado pela latência</h3>
+      <p>
+        No laço <code>soma += v[i]</code>, a adição inteira tem latência de 1 ciclo. O resultado de cada iteração alimenta a próxima, então o laço executa a <strong>1 adição por ciclo</strong>, apesar de o hardware poder fazer 4 adições independentes por ciclo. Apenas 25% da capacidade é utilizada.
+      </p>
+
+      <div class="math-block">
+        $$T_{\text{dependente}} = N \times L_{\text{add}} = N \times 1 \text{ ciclo}$$
+      </div>
+
+      <h3>Quatro acumuladores: limitado pelo throughput</h3>
+      <p>
+        Com 4 acumuladores independentes (<code>s0, s1, s2, s3</code>), o processador pode iniciar até 4 adições por ciclo (uma em cada porta). O tempo total cai para aproximadamente:
+      </p>
+
+      <div class="math-block">
+        $$T_{\text{múltiplos}} \approx \frac{N}{4} \times \frac{1}{\text{throughput}} = \frac{N}{4} \times 0{,}25 = \frac{N}{16} \text{ ciclos (ideal)}$$
+      </div>
+
+      <p>
+        Na prática, a melhoria é limitada pela largura de banda de memória (leitura de <code>v[i]</code>) e pelo custo da redução final <code>s0 + s1 + s2 + s3</code>. O speedup observado na Tarefa 03 (2,6× em <code>-O0</code>) é coerente com a remoção parcial do gargalo de latência.
+      </p>
+    </section>
+
+    <!-- Seção 6 -->
+    <section id="unroll">
+      <h2>6. Desenrolamento de laços e múltiplos acumuladores</h2>
+      <p>
+        O <strong>loop unrolling</strong> é a técnica de replicar o corpo de um laço $k$ vezes dentro de uma única iteração, reduzindo o overhead de controle (branch, incremento) e criando mais instruções independentes na janela de execução.
+      </p>
+      <p>
+        O desenrolamento por si só <em>não é suficiente</em> para quebrar a cadeia de dependência. Se o laço desenrolado usa o mesmo acumulador, a cadeia RAW permanece:
+      </p>
+      <pre><code><span class="hl-com">/* Desenrolado SEM múltiplos acumuladores: NÃO remove a dependência */</span>
+<span class="hl-kw">for</span> (; i + <span class="hl-num">3</span> &lt; n; i += <span class="hl-num">4</span>) {
+    soma += v[i];      <span class="hl-com">// depende de soma anterior</span>
+    soma += v[i + <span class="hl-num">1</span>];  <span class="hl-com">// depende da linha acima</span>
+    soma += v[i + <span class="hl-num">2</span>];  <span class="hl-com">// depende da linha acima</span>
+    soma += v[i + <span class="hl-num">3</span>];  <span class="hl-com">// depende da linha acima</span>
+}</code></pre>
+      <p>
+        O truque decisivo é combinar desenrolamento com <strong>acumuladores separados</strong>. Cada cadeia de somas é independente das demais:
+      </p>
+      <pre><code><span class="hl-com">/* Desenrolado COM múltiplos acumuladores: 4 cadeias independentes */</span>
+<span class="hl-kw">for</span> (; i + <span class="hl-num">3</span> &lt; n; i += <span class="hl-num">4</span>) {
+    s0 += v[i];      <span class="hl-com">// cadeia s0: s0 depende só do s0 anterior</span>
+    s1 += v[i + <span class="hl-num">1</span>];  <span class="hl-com">// cadeia s1: independente de s0</span>
+    s2 += v[i + <span class="hl-num">2</span>];  <span class="hl-com">// cadeia s2: independente de s0, s1</span>
+    s3 += v[i + <span class="hl-num">3</span>];  <span class="hl-com">// cadeia s3: independente de s0, s1, s2</span>
+}</code></pre>
+
+      <div class="callout" style="border-left-color: var(--accent); background-color: var(--card-bg);">
+        <div class="callout-title">Número ideal de acumuladores</div>
+        <p style="margin: 0; font-family: 'Inter', sans-serif; font-size: 0.9rem;">
+          O número ótimo de acumuladores depende da razão $\frac{\text{latência}}{\text{throughput recíproco}}$. Para adição inteira no Skylake: latência = 1, throughput recíproco = 0,25 → razão = 4. Para FP: latência = 4, throughput recíproco = 0,5 → razão = 8. Usar mais acumuladores que essa razão não traz ganho adicional; os registradores extras ficam parados esperando a unidade funcional.
+        </p>
+      </div>
+    </section>
+
+    <!-- Seção 7 -->
+    <section id="compilador-vs-hw">
+      <h2>7. Compilador vs. hardware: quem extrai ILP?</h2>
+      <p>
+        Em <code>-O0</code>, o compilador traduz o código literalmente: cada variável é armazenada na pilha, cada acesso envolve <code>mov</code> de/para a memória. O hardware OoOE ainda tenta encontrar ILP, mas com instruções extras de <code>load/store</code> a cada iteração, o overhead é substancial. Nesse cenário, a diferença entre 1 e 4 acumuladores é visível (2,6× na Tarefa 03).
+      </p>
+
+      <h3>Com -O2: o compilador ajuda</h3>
+      <p>
+        O <code>-O2</code> ativa dezenas de passes de otimização, incluindo:
+      </p>
+      <ul>
+        <li><strong>Promoção de variáveis a registradores</strong>: o acumulador deixa de estar na pilha e vive em um registrador — elimina <code>load/store</code> a cada iteração.</li>
+        <li><strong>Strength reduction</strong>: simplifica expressões como <code>3*i + 1</code>.</li>
+        <li><strong>Loop-invariant code motion</strong>: move cálculos que não mudam para fora do laço.</li>
+        <li><strong>Desenrolamento parcial</strong>: pode desenrolar o laço 2× ou 4× e mesclar acumuladores internamente.</li>
+      </ul>
+
+      <h3>Com -O3: vetorização automática</h3>
+      <p>
+        O <code>-O3</code> adiciona <strong>auto-vectorization</strong>: o compilador pode converter o laço escalar em instruções SIMD (SSE/AVX), processando 4 inteiros de 32 bits por instrução <code>VPADDD</code> (128 bits) ou 8 por instrução <code>VPADDD ymm</code> (256 bits).
+      </p>
+      <p>
+        Quando o compilador vetoriza o laço de acumulador único, ele efetivamente cria múltiplos acumuladores "sob o capô" (um por lane SIMD) — tornando a versão explícita de 4 acumuladores <em>redundante</em>. Essa é a razão pela qual, em <code>-O2</code>/<code>-O3</code>, a diferença entre as duas versões praticamente desaparece.
+      </p>
+
+      <div class="callout" style="border-left-color: #b91c1c; background-color: var(--error-bg);">
+        <div class="callout-title" style="color: var(--error);">Atenção: nem sempre O3 é mais rápido que O2</div>
+        <p style="margin: 0; font-family: 'Inter', sans-serif; font-size: 0.9rem;">
+          O3 pode escolher uma estratégia de vetorização ou desenrolamento que <em>não</em> é ótima para um kernel específico. Possíveis causas: penalidades de alinhamento, pressão de registradores, ou heurísticas de custo imprecisas no compilador. A Tarefa 03 observa 0,030 s (O3) contra 0,026 s (O2) para o laço de múltiplos acumuladores — O3 ligeiramente mais lento, provavelmente por uma escolha de vetorização diferente.
+        </p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer-nav">
+    <a href="../lessons/0003-tarefa03-ilp-acumuladores.html">&larr; Ir para a Lição 03</a>
+    <a href="03-ilp-acumuladores-otimizacao.html">Referência rápida 03 &rarr;</a>
+  </footer>
+
+  <script>
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('theme', target);
+    }
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+  </script>
+</body>
+</html>

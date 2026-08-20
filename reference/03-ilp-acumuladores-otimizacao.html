@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Referência rápida para a Tarefa 03 (ILP): tabelas de latência e throughput de instruções, flags de otimização -O0/-O2/-O3, clock_gettime, loop unrolling e fórmulas de speedup por acumuladores.">
+  <title>Referência 03: ILP — Acumuladores e Otimização em C</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function applyMath(el = document.body) {
+      if (window.renderMathInElement) {
+        renderMathInElement(el, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+    document.addEventListener("DOMContentLoaded", () => applyMath());
+    window.addEventListener("load", () => applyMath());
+  </script>
+</head>
+<body>
+  <nav class="top-nav">
+    <div style="display: flex; gap: 16px;">
+      <a href="03-teoria-ilp-pipeline-superscalar.html">&larr; Teoria 03</a>
+      <a href="../lessons/0003-tarefa03-ilp-acumuladores.html">Lição 03 &rarr;</a>
+    </div>
+    <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+  </nav>
+
+  <header>
+    <div class="lesson-badge">Referência 03 &bull; DCA3703</div>
+    <h1>Referência rápida 03: ILP — Acumuladores e Otimização em C</h1>
+    <div class="metadata">
+      Guia de consulta rápida para a Tarefa 03 (Paralelismo ao Nível de Instrução)
+    </div>
+  </header>
+
+  <main>
+
+    <!-- Seção 1: Medição de tempo -->
+    <section id="medicao-tempo">
+      <h2>1. Medição de tempo com <code>clock_gettime</code></h2>
+      <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; font-family: 'Inter', sans-serif; font-size: 0.88rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+            <th style="padding: 8px;">Símbolo / tipo</th>
+            <th style="padding: 8px;">Descrição</th>
+            <th style="padding: 8px;">Valor típico (Linux)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>struct timespec</code></td>
+            <td style="padding: 8px;">Estrutura com <code>tv_sec</code> (segundos) e <code>tv_nsec</code> (nanossegundos)</td>
+            <td style="padding: 8px;">Definido em <code>&lt;time.h&gt;</code></td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>CLOCK_MONOTONIC</code></td>
+            <td style="padding: 8px;">Relógio monotônico (não afetado por NTP)</td>
+            <td style="padding: 8px;">Resolução ~1 ns</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>_POSIX_C_SOURCE 199309L</code></td>
+            <td style="padding: 8px;">Feature-test macro para habilitar <code>clock_gettime</code></td>
+            <td style="padding: 8px;">Deve ser definido <em>antes</em> de qualquer <code>#include</code></td>
+          </tr>
+          <tr>
+            <td style="padding: 8px;"><code>clock_gettime()</code></td>
+            <td style="padding: 8px;">Captura tempo de parede com resolução de nanosegundos</td>
+            <td style="padding: 8px;">Syscall ou vDSO</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <pre><code><span class="hl-prep">#define</span> _POSIX_C_SOURCE <span class="hl-num">199309L</span>
+<span class="hl-prep">#include</span> <span class="hl-str">&lt;time.h&gt;</span>
+
+<span class="hl-kw">static</span> <span class="hl-type">double</span> <span class="hl-fn">agora</span>(<span class="hl-type">void</span>) {
+    <span class="hl-type">struct</span> timespec t;
+    <span class="hl-fn">clock_gettime</span>(CLOCK_MONOTONIC, &amp;t);
+    <span class="hl-kw">return</span> t.tv_sec + t.tv_nsec / <span class="hl-num">1e9</span>;
+}
+
+<span class="hl-type">double</span> inicio = <span class="hl-fn">agora</span>();
+<span class="hl-com">/* ... trecho a medir ... */</span>
+<span class="hl-type">double</span> tempo = <span class="hl-fn">agora</span>() - inicio;</code></pre>
+
+      <div class="callout" style="border-left-color: var(--accent); background-color: var(--card-bg);">
+        <div class="callout-title">Por que clock_gettime e não clock()?</div>
+        <p style="margin: 0; font-family: 'Inter', sans-serif; font-size: 0.9rem;">
+          <code>clock()</code> mede CPU time (soma de todos os núcleos), com resolução de ~1 µs. <code>clock_gettime(CLOCK_MONOTONIC)</code> mede wall time com resolução de ~1 ns. Para programas paralelos (OpenMP), <code>clock()</code> produz resultados enganosos. A Tarefa 03 usa <code>clock_gettime</code> para precisão de nanossegundos.
+        </p>
+      </div>
+    </section>
+
+    <!-- Seção 2: Latências de operações -->
+    <section id="latencias">
+      <h2>2. Latência e throughput de instruções</h2>
+      <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; font-family: 'Inter', sans-serif; font-size: 0.88rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+            <th style="padding: 8px;">Operação</th>
+            <th style="padding: 8px;">Instrução x86</th>
+            <th style="padding: 8px;">Latência</th>
+            <th style="padding: 8px;">Throughput rec.</th>
+            <th style="padding: 8px;">Acumuladores ideais</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Soma inteira</td>
+            <td style="padding: 8px;"><code>ADD r, r</code></td>
+            <td style="padding: 8px;">1 ciclo</td>
+            <td style="padding: 8px;">0,25 ciclo</td>
+            <td style="padding: 8px;">4</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Soma FP double</td>
+            <td style="padding: 8px;"><code>ADDSD xmm, xmm</code></td>
+            <td style="padding: 8px;">4 ciclos</td>
+            <td style="padding: 8px;">0,5 ciclo</td>
+            <td style="padding: 8px;">8</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Multiplicação FP</td>
+            <td style="padding: 8px;"><code>MULSD xmm, xmm</code></td>
+            <td style="padding: 8px;">4 ciclos</td>
+            <td style="padding: 8px;">0,5 ciclo</td>
+            <td style="padding: 8px;">8</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px;">FMA (mul + add)</td>
+            <td style="padding: 8px;"><code>VFMADD xmm</code></td>
+            <td style="padding: 8px;">4 ciclos</td>
+            <td style="padding: 8px;">0,5 ciclo</td>
+            <td style="padding: 8px;">8</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="math-block">
+        $$\text{Acumuladores ideais} = \frac{\text{Latência}}{\text{Throughput recíproco}} = \frac{L}{T_r}$$
+      </div>
+    </section>
+
+    <!-- Seção 3: Flags de compilação -->
+    <section id="flags">
+      <h2>3. Flags de compilação e seus efeitos</h2>
+      <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; font-family: 'Inter', sans-serif; font-size: 0.88rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+            <th style="padding: 8px;">Flag</th>
+            <th style="padding: 8px;">Nível</th>
+            <th style="padding: 8px;">Otimizações relevantes para ILP</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>-O0</code></td>
+            <td style="padding: 8px;">Nenhuma</td>
+            <td style="padding: 8px;">Tradução literal; variáveis na pilha; nenhum unroll</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>-O1</code></td>
+            <td style="padding: 8px;">Básico</td>
+            <td style="padding: 8px;">Promoção a registradores; remoção de código morto</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>-O2</code></td>
+            <td style="padding: 8px;">Padrão</td>
+            <td style="padding: 8px;">Loop unroll parcial; strength reduction; inlining</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>-O3</code></td>
+            <td style="padding: 8px;">Agressivo</td>
+            <td style="padding: 8px;">Auto-vectorização SIMD; unroll agressivo</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>-march=native</code></td>
+            <td style="padding: 8px;">—</td>
+            <td style="padding: 8px;">Habilita instruções ISA do hardware local (AVX2, etc.)</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px;"><code>-funroll-loops</code></td>
+            <td style="padding: 8px;">—</td>
+            <td style="padding: 8px;">Força desenrolamento de laços (pode aumentar código)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <pre><code><span class="hl-com"># Compilar nos três níveis de otimização:</span>
+gcc -std=c11 -Wall -Wextra -O0 tarefa03.c -o tarefa03_O0
+gcc -std=c11 -Wall -Wextra -O2 tarefa03.c -o tarefa03_O2
+gcc -std=c11 -Wall -Wextra -O3 tarefa03.c -o tarefa03_O3
+
+<span class="hl-com"># Inspecionar o assembly gerado:</span>
+gcc -std=c11 -O2 -S tarefa03.c -o tarefa03_O2.s
+gcc -std=c11 -O3 -S tarefa03.c -o tarefa03_O3.s
+
+<span class="hl-com"># Verificar se houve vetorização (procurar por vpadd, vpaddd, etc.):</span>
+grep -i 'vpadd\|addsd\|paddd' tarefa03_O3.s</code></pre>
+    </section>
+
+    <!-- Seção 4: Padrões de laço -->
+    <section id="padroes-laco">
+      <h2>4. Padrões de laço para ILP</h2>
+
+      <h3>Acumulador único (cadeia RAW)</h3>
+      <pre><code><span class="hl-type">long long</span> soma = <span class="hl-num">0</span>;
+<span class="hl-kw">for</span> (<span class="hl-type">long</span> i = <span class="hl-num">0</span>; i &lt; n; ++i)
+    soma += v[i];  <span class="hl-com">// cadeia de N dependências</span></code></pre>
+
+      <h3>Múltiplos acumuladores (cadeias independentes)</h3>
+      <pre><code><span class="hl-type">long long</span> s0 = <span class="hl-num">0</span>, s1 = <span class="hl-num">0</span>, s2 = <span class="hl-num">0</span>, s3 = <span class="hl-num">0</span>;
+<span class="hl-type">long</span> i = <span class="hl-num">0</span>;
+<span class="hl-kw">for</span> (; i + <span class="hl-num">3</span> &lt; n; i += <span class="hl-num">4</span>) {
+    s0 += v[i];
+    s1 += v[i + <span class="hl-num">1</span>];
+    s2 += v[i + <span class="hl-num">2</span>];
+    s3 += v[i + <span class="hl-num">3</span>];
+}
+<span class="hl-com">/* Tail: elementos restantes */</span>
+<span class="hl-kw">for</span> (; i &lt; n; ++i) s0 += v[i];
+<span class="hl-type">long long</span> soma = s0 + s1 + s2 + s3;</code></pre>
+
+      <div class="callout" style="border-left-color: var(--accent); background-color: var(--card-bg);">
+        <div class="callout-title">Laço de cauda (tail loop)</div>
+        <p style="margin: 0; font-family: 'Inter', sans-serif; font-size: 0.9rem;">
+          Quando $N$ não é divisível por 4, o segundo <code>for</code> processa os últimos 0 a 3 elementos. Isso garante que a soma é correta para qualquer $N$.
+        </p>
+      </div>
+    </section>
+
+    <!-- Seção 5: Fórmulas -->
+    <section id="formulas">
+      <h2>5. Resumo executivo de fórmulas</h2>
+      <div class="callout" style="border-left-color: var(--accent); background-color: var(--card-bg);">
+        <div class="callout-title">Regras práticas — ILP e acumuladores</div>
+        <ul style="margin-bottom: 0; font-family: 'Inter', sans-serif; font-size: 0.9rem;">
+          <li>Acumuladores ideais = $\frac{\text{Latência}}{\text{Throughput recíproco}}$.</li>
+          <li>ADD inteiro: $\frac{1}{0{,}25} = 4$ acumuladores ideais.</li>
+          <li>ADDSD FP double: $\frac{4}{0{,}5} = 8$ acumuladores ideais.</li>
+          <li>Cadeia RAW: $T = N \times L$ ciclos (limitado pela latência).</li>
+          <li>$k$ cadeias independentes: $T \approx \frac{N}{k} \times L$ ciclos.</li>
+          <li><code>-O0</code>: sem otimização → diferença entre estilos é máxima.</li>
+          <li><code>-O2</code>/<code>-O3</code>: compilador pode gerar acumuladores e vetorizar → diferença diminui.</li>
+          <li>Use <code>clock_gettime(CLOCK_MONOTONIC)</code> para medição precisa de wall time.</li>
+          <li>Use <code>gcc -S</code> para inspecionar o assembly e confirmar vetorização.</li>
+        </ul>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer-nav">
+    <a href="03-teoria-ilp-pipeline-superscalar.html">&larr; Teoria 03</a>
+    <a href="../lessons/0003-tarefa03-ilp-acumuladores.html">Lição 03 &rarr;</a>
+  </footer>
+
+  <script>
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('theme', target);
+    }
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+  </script>
+</body>
+</html>

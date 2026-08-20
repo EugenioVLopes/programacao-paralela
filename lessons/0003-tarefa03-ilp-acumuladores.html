@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Lição prática 03: dissecando tarefa03.c linha a linha. Paralelismo em nível de instrução (ILP), cadeia de dependência RAW, múltiplos acumuladores, níveis de otimização -O0, -O2 e -O3 e quizzes interativos simétricos.">
+  <title>Lição 03: Paralelismo ao Nível de Instrução (ILP) e Otimização de Compilador</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function applyMath(el = document.body) {
+      if (window.renderMathInElement) {
+        renderMathInElement(el, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+    document.addEventListener("DOMContentLoaded", () => applyMath());
+    window.addEventListener("load", () => applyMath());
+  </script>
+</head>
+<body>
+  <nav class="top-nav">
+    <div style="display: flex; gap: 16px;">
+      <a href="../reference/03-teoria-ilp-pipeline-superscalar.html">&larr; Teoria 03</a>
+      <a href="../reference/03-ilp-acumuladores-otimizacao.html">Referência rápida 03</a>
+      <a href="../reference/00-fundamentos-programacao-paralela.html">Índice geral</a>
+    </div>
+    <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+  </nav>
+
+  <header>
+    <div class="lesson-badge">Lição 03 &bull; DCA3703</div>
+    <h1>Lição 03: Paralelismo ao Nível de Instrução (ILP) e Otimização</h1>
+    <div class="metadata">
+      Tarefa 03 &bull; Dissecção de <code>tarefa03.c</code> &bull; Dependências de dados, múltiplos acumuladores, níveis de otimização e quizzes simétricos
+    </div>
+  </header>
+
+  <main>
+
+    <!-- Seção 1: Poder computacional -->
+    <section id="poder-computacional">
+      <h2>1. Por que precisamos de poder computacional?</h2>
+      <p>
+        Operações de <strong>redução vetorial</strong> (como somar todos os elementos de um vetor com centenas de milhões de números) constituem a base computacional de inúmeras aplicações de alto impacto:
+      </p>
+      <ul>
+        <li><strong>Treinamento de Redes Neurais e LLMs</strong>: o cálculo de funções de perda (como Cross-Entropy), regularização $L_2$ e normalizações de camadas (LayerNorm, RMSNorm) dependem de reduções contínuas sobre tensores de bilhões de parâmetros.</li>
+        <li><strong>Simulações Numéricas e Métodos Iterativos</strong>: algoritmos de álgebra linear (como Gradiente Conjugado) avaliam produtos escalares $\mathbf{x}^T \mathbf{y}$ repetidamente a cada iteração para resolver sistemas de equações com milhões de variáveis.</li>
+        <li><strong>Física Computacional e Astrofísica</strong>: integração numérica de grandezas conservadas (energia total, momento linear e angular) em problemas de $N$-corpos.</li>
+        <li><strong>Processamento de Dados e Estatística em Tempo Real</strong>: computação de médias, variâncias e correlações em fluxos massivos de telemetria e sinais de radares.</li>
+      </ul>
+      <p>
+        Somar $10^8$ elementos em um único processador parece uma tarefa trivial ($O(N)$), mas a forma como as instruções são estruturadas pode fazer o código executar até <strong>6 vezes mais rápido</strong> sem alterar o hardware.
+      </p>
+    </section>
+
+    <!-- Seção 2: Limitações do processador sequencial -->
+    <section id="limites-hardware">
+      <h2>2. Limitações de processadores sequenciais e o papel do ILP</h2>
+      <p>
+        Historicamente, os processadores aumentavam o desempenho simplesmente elevando a frequência de clock. Esse avanço estagnou na faixa de 3 a 5 GHz devido a dois limites físicos fundamentais:
+      </p>
+      <ul>
+        <li>
+          <strong>Power Wall (Barreira Térmica)</strong>: a potência dinâmica $P = C \cdot V^2 \cdot f$ escala linearmente com a frequência e quadraticamente com a tensão. Aumentar ainda mais o clock derreteria os circuitos de silício.
+        </li>
+        <li>
+          <strong>Limites Espaciais e Escala de Dennard</strong>: a miniaturização dos transistores atingiu dimensões atômicas, onde efeitos quânticos (corrente de fuga) impedem a redução da tensão $V$.
+        </li>
+      </ul>
+
+      <div class="math-block">
+        $$P_{\text{din}} \approx C \cdot V^2 \cdot f \quad \xrightarrow{\text{Fim de Dennard}} \quad f \text{ estagnou em } \sim 3\text{--}5\text{ GHz}$$
+      </div>
+
+      <h3>A resposta da arquitetura: ILP dentro do núcleo e múltiplos núcleos lógicos</h3>
+      <p>
+        Para continuar extraindo desempenho de cada ciclo de clock, os projetistas equiparam os núcleos de CPU com <strong>paralelismo em nível de instrução (ILP)</strong>:
+      </p>
+      <ul>
+        <li><strong>Pipelines profundos</strong>: instruções divididas em estágios independentes operando como esteiras de produção.</li>
+        <li><strong>Arquiteturas Superescalares</strong>: múltiplos canais de despacho que permitem iniciar 4 a 6 instruções por ciclo no mesmo núcleo.</li>
+        <li><strong>Execução Fora de Ordem (OoO)</strong>: o processador rearranja instruções na janela de execução para manter as unidades aritméticas ocupadas.</li>
+      </ul>
+      <p>
+        No entanto, o hardware só consegue disparar instruções em paralelo se elas forem <strong>independentes</strong>. Se uma instrução precisa do resultado da anterior, o pipeline é forçado a esperar — gerando bolhas de ociosidade.
+      </p>
+    </section>
+
+    <!-- Seção 3: Dissecção linha a linha de tarefa03.c -->
+    <section id="disseccao-codigo">
+      <h2>3. Dissecção linha a linha de <code>tarefa03.c</code></h2>
+
+      <h3>1. Macros e cabeçalhos de sistema</h3>
+      <pre><code><span class="hl-prep">#define</span> _POSIX_C_SOURCE <span class="hl-num">199309L</span>
+
+<span class="hl-prep">#include</span> <span class="hl-str">&lt;stdio.h&gt;</span>
+<span class="hl-prep">#include</span> <span class="hl-str">&lt;stdlib.h&gt;</span>
+<span class="hl-prep">#include</span> <span class="hl-str">&lt;time.h&gt;</span>
+
+<span class="hl-prep">#define</span> DEFAULT_N <span class="hl-num">100000000L</span></code></pre>
+      <ul>
+        <li><code>#define _POSIX_C_SOURCE 199309L</code>: macro de conformidade POSIX que expõe <code>clock_gettime</code> e a constante <code>CLOCK_MONOTONIC</code> no cabeçalho <code>&lt;time.h&gt;</code>. Deve preceder todos os <code>#include</code>.</li>
+        <li><code>DEFAULT_N 100000000L</code>: define o tamanho padrão do vetor ($10^8$ elementos, ~400 MB de memória para inteiros de 32 bits). O sufixo <code>L</code> garante tipo <code>long</code>.</li>
+      </ul>
+
+      <h3>2. Função de temporização em nanossegundos</h3>
+      <pre><code><span class="hl-kw">static</span> <span class="hl-type">double</span> <span class="hl-fn">agora</span>(<span class="hl-type">void</span>) {
+    <span class="hl-type">struct</span> timespec t;
+    <span class="hl-fn">clock_gettime</span>(CLOCK_MONOTONIC, &amp;t);
+    <span class="hl-kw">return</span> t.tv_sec + t.tv_nsec / <span class="hl-num">1e9</span>;
+}</code></pre>
+      <ul>
+        <li><code>struct timespec</code>: armazena segundos (<code>tv_sec</code>) e nanossegundos (<code>tv_nsec</code>).</li>
+        <li><code>CLOCK_MONOTONIC</code>: relógio estritamente crescente que mede tempo de parede real, imune a ajustes de horário via NTP.</li>
+        <li><code>return t.tv_sec + t.tv_nsec / 1e9</code>: converte o timestamp completo para segundos em ponto flutuante de precisão dupla (<code>double</code>).</li>
+      </ul>
+
+      <h3>3. Leitura de parâmetros e alocação dinâmica</h3>
+      <pre><code><span class="hl-type">long</span> n = argc &gt; <span class="hl-num">1</span> ? <span class="hl-fn">atol</span>(argv[<span class="hl-num">1</span>]) : DEFAULT_N;
+<span class="hl-kw">if</span> (n &lt;= <span class="hl-num">0</span>) {
+    <span class="hl-fn">fprintf</span>(stderr, <span class="hl-str">"Uso: %s [numero_de_elementos]\n"</span>, argv[<span class="hl-num">0</span>]);
+    <span class="hl-kw">return</span> <span class="hl-num">1</span>;
+}
+
+<span class="hl-type">int</span> *v = <span class="hl-fn">malloc</span>((<span class="hl-type">size_t</span>)n * <span class="hl-kw">sizeof</span>(*v));
+<span class="hl-kw">if</span> (!v) {
+    <span class="hl-fn">perror</span>(<span class="hl-str">"malloc"</span>);
+    <span class="hl-kw">return</span> <span class="hl-num">1</span>;
+}</code></pre>
+      <ul>
+        <li><code>atol(argv[1])</code>: converte a string do argumento para <code>long</code>, permitindo testar diferentes ordens de grandeza pela linha de comando.</li>
+        <li><code>malloc((size_t)n * sizeof(*v))</code>: aloca $10^8 \times 4\text{ bytes} \approx 381{,}47\text{ MB}$ na heap. O cast <code>(size_t)</code> previne overflow aritmético no cálculo de bytes.</li>
+        <li><code>if (!v)</code>: checagem defensiva obrigatória contra falhas de alocação de memória do sistema operacional.</li>
+      </ul>
+
+      <h3>4. Laço de inicialização</h3>
+      <pre><code><span class="hl-type">double</span> inicio = <span class="hl-fn">agora</span>();
+<span class="hl-kw">for</span> (<span class="hl-type">long</span> i = <span class="hl-num">0</span>; i &lt; n; ++i)
+    v[i] = (<span class="hl-type">int</span>)(<span class="hl-num">3</span> * i + <span class="hl-num">1</span>);
+<span class="hl-type">double</span> tempo_inicializacao = <span class="hl-fn">agora</span>() - inicio;</code></pre>
+      <ul>
+        <li>Cada iteração escreve em um índice independente <code>v[i]</code>. Não há dependências de dados entre iterações distintas ($i$ e $i+1$).</li>
+        <li>O compilador consegue vetorizar este laço facilmente usando instruções SIMD ou desenrolá-lo sem restrições.</li>
+        <li>Além do cálculo, este laço força os <em>page faults</em> de primeira escrita no Linux, alocando páginas físicas na memória DRAM.</li>
+      </ul>
+
+      <h3>5. Laço de soma dependente (acumulador único)</h3>
+      <pre><code>inicio = <span class="hl-fn">agora</span>();
+<span class="hl-type">long long</span> soma_dependente = <span class="hl-num">0</span>;
+<span class="hl-kw">for</span> (<span class="hl-type">long</span> i = <span class="hl-num">0</span>; i &lt; n; ++i)
+    soma_dependente += v[i];
+<span class="hl-type">double</span> tempo_dependente = <span class="hl-fn">agora</span>() - inicio;</code></pre>
+      <ul>
+        <li><code>long long</code> (64 bits): evita overflow, pois a soma de $10^8$ elementos atinge $\approx 1{,}5 \times 10^{16}$, ultrapassando o limite de 32 bits ($\approx 2 \times 10^9$).</li>
+        <li><strong>Dependência RAW (Read-After-Write)</strong>: a adição da iteração $i+1$ precisa ler <code>soma_dependente</code> que acabou de ser calculada na iteração $i$.</li>
+        <li>Cria um <strong>caminho crítico sequencial</strong> de $N$ instruções encadeadas. A CPU é forçada a esperar a latência de cada adição terminar antes de iniciar a próxima.</li>
+      </ul>
+
+      <div class="callout" style="border-left-color: #b91c1c; background-color: var(--error-bg);">
+        <div class="callout-title" style="color: var(--error);">Gargalo do acumulador único</div>
+        <p style="margin: 0; font-family: 'Inter', sans-serif; font-size: 0.9rem;">
+          Mesmo que a CPU tenha 4 unidades aritméticas capazes de somar em paralelo, apenas 1 unidade é utilizada porque as operações não possuem operandos prontos ao mesmo tempo.
+        </p>
+      </div>
+
+      <h3>6. Laço com múltiplos acumuladores (4 cadeias independentes)</h3>
+      <pre><code>inicio = <span class="hl-fn">agora</span>();
+<span class="hl-type">long long</span> s0 = <span class="hl-num">0</span>, s1 = <span class="hl-num">0</span>, s2 = <span class="hl-num">0</span>, s3 = <span class="hl-num">0</span>;
+<span class="hl-type">long</span> i = <span class="hl-num">0</span>;
+<span class="hl-kw">for</span> (; i + <span class="hl-num">3</span> &lt; n; i += <span class="hl-num">4</span>) {
+    s0 += v[i];
+    s1 += v[i + <span class="hl-num">1</span>];
+    s2 += v[i + <span class="hl-num">2</span>];
+    s3 += v[i + <span class="hl-num">3</span>];
+}
+<span class="hl-kw">for</span> (; i &lt; n; ++i)
+    s0 += v[i];
+<span class="hl-type">long long</span> soma_multiplos = s0 + s1 + s2 + s3;
+<span class="hl-type">double</span> tempo_multiplos = <span class="hl-fn">agora</span>() - inicio;</code></pre>
+      <ul>
+        <li><code>s0, s1, s2, s3</code>: quatro registradores acumuladores independentes.</li>
+        <li>No corpo do laço, as quatro adições são mutuamente independentes: <code>s0</code> depende apenas do valor anterior de <code>s0</code>, <code>s1</code> apenas de <code>s1</code>, etc.</li>
+        <li>O processador superescalar pode despachar as quatro somas <strong>no mesmo ciclo de clock</strong>, ocupando múltiplas portas de execução simultaneamente.</li>
+        <li><code>for (; i &lt; n; ++i) s0 += v[i];</code>: <em>tail loop</em> (laço de cauda) que soma os elementos remanescentes caso $N$ não seja múltiplo exato de 4.</li>
+        <li><code>s0 + s1 + s2 + s3</code>: redução final das somas parciais em um único valor escalar.</li>
+      </ul>
+
+      <h3>7. Impressão, liberação de memória e validação</h3>
+      <pre><code><span class="hl-fn">printf</span>(<span class="hl-str">"N=%ld inicializacao=%.9f dependente=%.9f multiplos=%.9f "</span>
+       <span class="hl-str">"somas=%lld,%lld\n"</span>, n, tempo_inicializacao,
+       tempo_dependente, tempo_multiplos, soma_dependente,
+       soma_multiplos);
+<span class="hl-fn">free</span>(v);
+<span class="hl-kw">return</span> soma_dependente != soma_multiplos;</code></pre>
+      <ul>
+        <li>Imprime os tempos com 9 casas decimais (resolução de nanossegundos).</li>
+        <li><code>free(v)</code>: desaloca o bloco de 400 MB da heap.</li>
+        <li><code>return soma_dependente != soma_multiplos</code>: código de saída retorna <code>0</code> (sucesso) se ambas as somas forem idênticas ou <code>1</code> caso haja discrepância numérica.</li>
+      </ul>
+    </section>
+
+    <!-- Seção 4: Análise comparativa e níveis de otimização -->
+    <section id="comparativo-otimizacao">
+      <h2>4. Análise de desempenho por nível de otimização (-O0, -O2, -O3)</h2>
+      <p>
+        Abaixo estão os dados empíricos medidos no ambiente de teste para $N = 100.000.000$ inteiros:
+      </p>
+
+      <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; font-family: 'Inter', sans-serif; font-size: 0.9rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+            <th style="padding: 8px;">Nível</th>
+            <th style="padding: 8px;">Inicialização (s)</th>
+            <th style="padding: 8px;">Soma dependente (s)</th>
+            <th style="padding: 8px;">Múltiplos acumuladores (s)</th>
+            <th style="padding: 8px;">Speedup relativo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><strong>-O0</strong> (sem otimização)</td>
+            <td style="padding: 8px;">0,30058 s</td>
+            <td style="padding: 8px;">0,15114 s</td>
+            <td style="padding: 8px;">0,05847 s</td>
+            <td style="padding: 8px; color: var(--success); font-weight: 600;">2,58&times; mais rápido</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><strong>-O2</strong> (otimização padrão)</td>
+            <td style="padding: 8px;">0,10249 s</td>
+            <td style="padding: 8px;">0,02825 s</td>
+            <td style="padding: 8px;">0,02616 s</td>
+            <td style="padding: 8px;">1,08&times; mais rápido</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px;"><strong>-O3</strong> (otimização agressiva)</td>
+            <td style="padding: 8px;">0,10935 s</td>
+            <td style="padding: 8px;">0,02617 s</td>
+            <td style="padding: 8px;">0,03044 s</td>
+            <td style="padding: 8px;">0,86&times; (efeito SIMD)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Interpretação dos fenômenos observados</h3>
+      <ol>
+        <li>
+          <strong>Em <code>-O0</code> (2,58&times; de speedup)</strong>: o compilador gera código direto para a pilha sem registrar variáveis. A versão com 4 acumuladores quebra a cadeia de dependências e permite que a unidade de execução fora de ordem (OoO) do processador execute múltiplas instruções por ciclo.
+        </li>
+        <li>
+          <strong>Em <code>-O2</code> (ganho de ~5,8&times; sobre O0)</strong>: o compilador aloca acumuladores diretamente em registradores e aplica desenrolamento automático de laços. O gargalo passa a ser a largura de banda de leitura da memória.
+        </li>
+        <li>
+          <strong>Em <code>-O3</code> (vetorização automática SIMD)</strong>: o GCC vetoriza o laço de acumulador único gerando instruções vetoriais (AVX2/SSE) que acumulam múltiplos dados por instrução. Isso torna a versão de acumulador único tão rápida quanto (ou ligeiramente mais rápida que) a versão manual de 4 acumuladores.
+        </li>
+      </ol>
+    </section>
+
+    <!-- Seção 5: Quizzes simétricos -->
+    <section id="quizzes">
+      <h2>5. Quizzes interativos</h2>
+
+      <!-- Quiz 1 -->
+      <div class="quiz-container" id="quiz1">
+        <div class="quiz-header">
+          <span>Questão 1 de 4</span>
+          <span id="q1-badge" style="font-size: 0.8rem; font-family: 'Inter', sans-serif;"></span>
+        </div>
+        <div class="quiz-question">
+          Por que o laço com um único acumulador (<code>soma += v[i]</code>) não consegue utilizar todas as portas de execução aritmética disponíveis no núcleo do processador?
+        </div>
+        <div class="quiz-options" id="q1-opts">
+          <button class="quiz-option-btn" onclick="answer('q1', 0, true)">Impede a execução paralela pois cada iteração necessita ler o acumulador calculado na iteração anterior.</button>
+          <button class="quiz-option-btn" onclick="answer('q1', 1, false)">Permite a execução paralela pois o compilador renomeia automaticamente os registradores de cada iteração.</button>
+          <button class="quiz-option-btn" onclick="answer('q1', 2, false)">Garante a execução paralela pois a unidade de busca antecipa a decodificação de todas as instruções.</button>
+          <button class="quiz-option-btn" onclick="answer('q1', 3, false)">Elimina a execução paralela pois o acesso aos elementos da memória principal satura o barramento de dados.</button>
+        </div>
+        <div class="quiz-explanation" id="q1-exp">
+          <strong>Correto!</strong> Existe uma dependência verdadeira de dados do tipo <strong>RAW (Read-After-Write)</strong>. Cada adição depende do resultado da adição anterior, formando uma cadeia crítica que força o processador a executar uma soma após a outra sequencialmente, sem explorar o pipeline superescalar.
+        </div>
+        <button class="quiz-reset-btn" id="q1-reset" onclick="resetQuiz('q1')" style="display:none;">Tentar novamente</button>
+      </div>
+
+      <!-- Quiz 2 -->
+      <div class="quiz-container" id="quiz2">
+        <div class="quiz-header">
+          <span>Questão 2 de 4</span>
+          <span id="q2-badge" style="font-size: 0.8rem; font-family: 'Inter', sans-serif;"></span>
+        </div>
+        <div class="quiz-question">
+          Qual mecanismo de microarquitetura explica o speedup de 2,6&times; obtido ao usar quatro acumuladores independentes (<code>s0, s1, s2, s3</code>) em nível <code>-O0</code>?
+        </div>
+        <div class="quiz-options" id="q2-opts">
+          <button class="quiz-option-btn" onclick="answer('q2', 0, false)">O compilador converte os acumuladores em quatro threads que rodam paralelamente em núcleos físicos distintos.</button>
+          <button class="quiz-option-btn" onclick="answer('q2', 1, true)">O código expõe quatro cadeias de dependência que executam simultaneamente em portas aritméticas distintas da CPU.</button>
+          <button class="quiz-option-btn" onclick="answer('q2', 2, false)">A memória ram transfere blocos quatro vezes maiores aumentando a largura de banda efetiva do barramento de dados.</button>
+          <button class="quiz-option-btn" onclick="answer('q2', 3, false)">O processador desativa a checagem de limites do laço reduzindo pela metade as instruções de controle executadas.</button>
+        </div>
+        <div class="quiz-explanation" id="q2-exp">
+          <strong>Correto!</strong> Com quatro acumuladores independentes, quebra-se a dependência estrita entre adições adjacentes. A unidade superescalar pode disparar até 4 instruções de soma por ciclo, aproveitando as múltiplas ALUs do mesmo núcleo (ILP — Paralelismo ao Nível de Instrução).
+        </div>
+        <button class="quiz-reset-btn" id="q2-reset" onclick="resetQuiz('q2')" style="display:none;">Tentar novamente</button>
+      </div>
+
+      <!-- Quiz 3 -->
+      <div class="quiz-container" id="quiz3">
+        <div class="quiz-header">
+          <span>Questão 3 de 4</span>
+          <span id="q3-badge" style="font-size: 0.8rem; font-family: 'Inter', sans-serif;"></span>
+        </div>
+        <div class="quiz-question">
+          Por que a vantagem percentual da versão manual com múltiplos acumuladores praticamente desaparece quando compilamos com os níveis de otimização <code>-O2</code> e <code>-O3</code>?
+        </div>
+        <div class="quiz-options" id="q3-opts">
+          <button class="quiz-option-btn" onclick="answer('q3', 0, true)">No nível O3 a vetorização automática gera múltiplos acumuladores internos diminuindo o ganho do código manual.</button>
+          <button class="quiz-option-btn" onclick="answer('q3', 1, false)">No nível O3 o compilador desativa as otimizações agressivas para preservar a precisão numérica das operações.</button>
+          <button class="quiz-option-btn" onclick="answer('q3', 2, false)">No nível O0 o compilador promove todas as variáveis aos registradores físicos eliminando os acessos à pilha.</button>
+          <button class="quiz-option-btn" onclick="answer('q3', 3, false)">No nível O0 o processador consegue vetorizar automaticamente o laço dependente usando instruções AVX de 256 bits.</button>
+        </div>
+        <div class="quiz-explanation" id="q3-exp">
+          <strong>Correto!</strong> Compiladores modernos com <code>-O3</code> aplicam vetorização automática (SIMD) e desenrolamento de laço com acumuladores vetoriais ocultos, realizando o mesmo trabalho que a técnica manual e saturando a largura de banda da memória.
+        </div>
+        <button class="quiz-reset-btn" id="q3-reset" onclick="resetQuiz('q3')" style="display:none;">Tentar novamente</button>
+      </div>
+
+      <!-- Quiz 4 -->
+      <div class="quiz-container" id="quiz4">
+        <div class="quiz-header">
+          <span>Questão 4 de 4</span>
+          <span id="q4-badge" style="font-size: 0.8rem; font-family: 'Inter', sans-serif;"></span>
+        </div>
+        <div class="quiz-question">
+          Por que a função <code>clock_gettime(CLOCK_MONOTONIC)</code> é a escolha recomendada para medir o tempo de execução em experimentos de computação de alto desempenho?
+        </div>
+        <div class="quiz-options" id="q4-opts">
+          <button class="quiz-option-btn" onclick="answer('q4', 0, false)">Fornece o tempo total de cpu somando os núcleos e possui resolução limitada a milissegundos pelo sistema.</button>
+          <button class="quiz-option-btn" onclick="answer('q4', 1, true)">Mede o tempo de parede real com resolução de nanossegundos sem sofrer saltos por ajustes do relógio NTP.</button>
+          <button class="quiz-option-btn" onclick="answer('q4', 2, false)">Calcula a quantidade de ciclos consumidos na instrução sem interagir com as camadas do sistema operacional.</button>
+          <button class="quiz-option-btn" onclick="answer('q4', 3, false)">Depende de permissões de superusuário para acessar diretamente os contadores de desempenho do núcleo de hardware.</button>
+        </div>
+        <div class="quiz-explanation" id="q4-exp">
+          <strong>Correto!</strong> O relógio monotônico garante contagem contínua e imutável do tempo de parede (wall time) com resolução de nanossegundos ($10^{-9}$ s), essencial para benchmarks de alta precisão e algoritmos paralelos.
+        </div>
+        <button class="quiz-reset-btn" id="q4-reset" onclick="resetQuiz('q4')" style="display:none;">Tentar novamente</button>
+      </div>
+    </section>
+
+    <!-- Seção 6: Navegação -->
+    <section id="navegacao">
+      <h2>6. Próximos passos</h2>
+      <div class="source-card">
+        <ul style="margin: 0; padding-left: 1.2em;">
+          <li><a href="../reference/03-teoria-ilp-pipeline-superscalar.html">Teoria 03</a> — Pipeline, execução superescalar, dependências de dados RAW/WAR/WAW, Out-of-Order e registradores físicos.</li>
+          <li><a href="../reference/03-ilp-acumuladores-otimizacao.html">Referência rápida 03</a> — Tabelas de latência e throughput de instruções, flags GCC e templates de código C com <code>clock_gettime</code>.</li>
+          <li><a href="../reference/00-fundamentos-programacao-paralela.html">Conceitos gerais</a> — Visão panorâmica dos fundamentos de programação paralela e HPC.</li>
+          <li><strong>Tarefa 04</strong>: Paralelismo com OpenMP e regiões paralelas <code>#pragma omp parallel</code>.</li>
+        </ul>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer-nav">
+    <a href="../lessons/0002-tarefa02-mxv-cache.html">&larr; Lição 02 (MxV &amp; Cache)</a>
+    <a href="../reference/03-teoria-ilp-pipeline-superscalar.html">Teoria 03 &rarr;</a>
+  </footer>
+
+  <script>
+    /* -------- Theme toggle -------- */
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('theme', target);
+    }
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+
+    /* -------- Symmetric Quiz Engine -------- */
+    function answer(qid, idx, correct) {
+      const opts = document.querySelectorAll('#' + qid + '-opts .quiz-option-btn');
+      opts.forEach(b => b.disabled = true);
+      opts[idx].classList.add(correct ? 'correct' : 'wrong');
+      if (!correct) {
+        opts.forEach(b => {
+          if (b.getAttribute('onclick').includes(', true)')) {
+            b.classList.add('correct');
+          }
+        });
+      }
+      const exp = document.getElementById(qid + '-exp');
+      exp.classList.add('visible');
+      const badge = document.getElementById(qid + '-badge');
+      badge.textContent = correct ? '✓ Acertou' : '✗ Errou';
+      badge.style.color = correct ? 'var(--success)' : 'var(--error)';
+      document.getElementById(qid + '-reset').style.display = 'inline-block';
+    }
+
+    function resetQuiz(qid) {
+      const opts = document.querySelectorAll('#' + qid + '-opts .quiz-option-btn');
+      opts.forEach(b => {
+        b.disabled = false;
+        b.classList.remove('correct', 'wrong');
+      });
+      document.getElementById(qid + '-exp').classList.remove('visible');
+      document.getElementById(qid + '-badge').textContent = '';
+      document.getElementById(qid + '-reset').style.display = 'none';
+    }
+  </script>
+</body>
+</html>
