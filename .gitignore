@@ -13,13 +13,16 @@ skills-lock.json
 *.exe
 
 # Compiled course task binaries
-tarefa01/tarefa01
-tarefa02/row_major*
-tarefa02/*column_major*
-tarefa02/*collum_major*
-tarefa03/tarefa03
-tarefa03/tarefa03_*
+/tarefa01/tarefa01
+/tarefa02/row_major
+/tarefa02/column_major
+/tarefa02/collum_major
+/tarefa02/tarefa2_column_major
+/tarefa02/tarefa2_collum_major
+/tarefa03/tarefa03
+/tarefa03/tarefa03_*
 
+# Presentation scripts & podcasts (untracked)
 *roteiro*.md
 *podcast*.md
 

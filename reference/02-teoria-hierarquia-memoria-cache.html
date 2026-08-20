@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Teoria aprofundada para a Tarefa 02 (MxV): gargalo de von Neumann, Memory Wall, hierarquia de cache L1/L2/L3, localidade espacial e temporal, linhas de 64 bytes e saturação de barramento.">
+  <title>Teoria 02: Hierarquia de memória e cache — MxV</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function applyMath(el = document.body) {
+      if (window.renderMathInElement) {
+        renderMathInElement(el, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+    document.addEventListener("DOMContentLoaded", () => applyMath());
+    window.addEventListener("load", () => applyMath());
+  </script>
+</head>
+<body>
+  <nav class="top-nav">
+    <div style="display: flex; gap: 16px;">
+      <a href="00-fundamentos-programacao-paralela.html">&larr; Conceitos gerais</a>
+      <a href="02-mxv-cache-localidade.html">Referência rápida 02 &rarr;</a>
+    </div>
+    <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+  </nav>
+
+  <header>
+    <div class="lesson-badge">Teoria 02 &bull; DCA3703</div>
+    <h1>Teoria 02: Hierarquia de memória, cache e o gargalo de von Neumann</h1>
+    <div class="metadata">
+      Fundamentação teórica para a Tarefa 02 (Multiplicação Matriz-Vetor)
+    </div>
+  </header>
+
+  <main>
+
+    <div class="callout" style="border-left-color: var(--accent); background-color: var(--card-bg);">
+      <div class="callout-title">Índice</div>
+      <ol style="margin-bottom: 0;">
+        <li><a href="#von-neumann">O gargalo de von Neumann</a></li>
+        <li><a href="#hierarquia-cache">Hierarquia de cache: L1, L2 e L3</a></li>
+        <li><a href="#row-vs-col">Acesso row-major vs. column-major na MxV</a></li>
+        <li><a href="#bandwidth-roofline">Saturação de barramento e modelo Roofline</a></li>
+        <li><a href="#numa">NUMA e o impacto em HPC</a></li>
+        <li><a href="#medicao">Medição de tempo: clock() vs. clock_gettime()</a></li>
+      </ol>
+    </div>
+
+    <!-- Seção 1 -->
+    <section id="von-neumann">
+      <h2>1. O gargalo de von Neumann</h2>
+      <p>
+        A arquitetura de von Neumann, proposta em 1945, separa fisicamente a unidade de processamento (CPU) da memória principal (RAM). Toda instrução e todo dado precisam cruzar o <strong>barramento de memória</strong> para chegar à CPU. Esse canal é o principal estrangulamento de desempenho em programas modernos.
+      </p>
+      <p>
+        A CPU executa bilhões de operações por segundo (GHz), enquanto a RAM responde em dezenas ou centenas de nanosegundos. A diferença de velocidade entre processador e memória tem crescido desde os anos 1980 — documentada por Wulf e McKee em 1995 como o <strong>Memory Wall</strong>.
+      </p>
+
+      <div class="callout" style="border-left-color: var(--accent); background-color: var(--card-bg);">
+        <div class="callout-title">Memory Wall — ordem de grandeza</div>
+        <table style="width: 100%; border-collapse: collapse; font-family: 'Inter', sans-serif; font-size: 0.88rem;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+              <th style="padding: 7px;">Componente</th>
+              <th style="padding: 7px;">Latência típica</th>
+              <th style="padding: 7px;">Largura de banda típica</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 7px;">Registrador</td>
+              <td style="padding: 7px;">&lt; 0,3 ns (1 ciclo)</td>
+              <td style="padding: 7px;">centenas de GB/s (interno)</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 7px;">Cache L1 (32–64 KB)</td>
+              <td style="padding: 7px;">1–4 ns (4–12 ciclos)</td>
+              <td style="padding: 7px;">1–2 TB/s</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 7px;">Cache L2 (256 KB – 1 MB)</td>
+              <td style="padding: 7px;">5–15 ns (12–40 ciclos)</td>
+              <td style="padding: 7px;">200–500 GB/s</td>
+            </tr>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 7px;">Cache L3 (8–64 MB)</td>
+              <td style="padding: 7px;">30–60 ns (80–200 ciclos)</td>
+              <td style="padding: 7px;">100–300 GB/s</td>
+            </tr>
+            <tr>
+              <td style="padding: 7px;">RAM (DDR5)</td>
+              <td style="padding: 7px;">60–100 ns (&gt; 200 ciclos)</td>
+              <td style="padding: 7px;">40–100 GB/s por canal</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        Para uma CPU a 3 GHz, cada ciclo dura ~0,33 ns. Um acesso a RAM que demora 80 ns representa <strong>240 ciclos de espera</strong> — ciclos em que a unidade de execução fica parada aguardando dados.
+      </p>
+    </section>
+
+    <!-- Seção 2 -->
+    <section id="hierarquia-cache">
+      <h2>2. Hierarquia de cache: L1, L2 e L3</h2>
+      <p>
+        Para atenuar o Memory Wall, os processadores modernos inserem bancos de memória SRAM (mais rápida que DRAM, mas menor e mais cara) em múltiplos níveis entre a CPU e a memória principal.
+      </p>
+
+      <h3>Funcionamento básico</h3>
+      <p>
+        Quando a CPU requisita um endereço, o hardware percorre a hierarquia do nível mais rápido para o mais lento:
+      </p>
+      <ol>
+        <li><strong>L1 hit</strong>: dado encontrado em L1 — resposta em ~4 ciclos.</li>
+        <li><strong>L2 hit</strong>: ausente em L1, encontrado em L2 — resposta em ~12–40 ciclos.</li>
+        <li><strong>L3 hit</strong>: ausente em L1 e L2, encontrado em L3 — resposta em ~80–200 ciclos.</li>
+        <li><strong>Cache miss (DRAM)</strong>: ausente em todos os níveis — resposta em &gt; 200 ciclos.</li>
+      </ol>
+
+      <h3>Linhas de cache de 64 bytes</h3>
+      <p>
+        O hardware não transfere bytes individuais; transfere <strong>linhas de cache</strong> inteiras de <strong>64 bytes = 8 doubles</strong> entre níveis. Quando o dado no endereço $A$ é requisitado, os bytes $A$ até $A+63$ são todos carregados para a cache.
+      </p>
+      <p>
+        Isso cria dois princípios fundamentais:
+      </p>
+      <ul>
+        <li><strong>Localidade temporal</strong>: um dado acessado recentemente provavelmente será acessado novamente. Mantê-lo em cache é benéfico.</li>
+        <li><strong>Localidade espacial</strong>: quando um dado é acessado, vizinhos na memória provavelmente também serão. Carregar 64 bytes antecipa esses acessos.</li>
+      </ul>
+
+      <div class="math-block">
+        $$\text{Dados por linha} = \frac{64 \text{ bytes}}{8 \text{ bytes/double}} = 8 \text{ doubles}$$
+      </div>
+    </section>
+
+    <!-- Seção 3 -->
+    <section id="row-vs-col">
+      <h2>3. Acesso row-major vs. column-major na MxV</h2>
+      <p>
+        C armazena arrays multidimensionais em ordem <strong>row-major</strong>: os elementos de uma mesma linha são contíguos na memória. Para uma matriz $N \times N$ mapeada em array 1-D, o elemento $A[i][j]$ fica no endereço base <code>A + i*N + j</code>.
+      </p>
+
+      <h3>Row-major (acesso sequencial — cache-friendly)</h3>
+      <p>
+        O laço interno percorre $j$ enquanto $i$ é fixo: <code>A[i*N+0], A[i*N+1], ..., A[i*N+N-1]</code>. Esses endereços são <strong>contíguos</strong>. Um único carregamento de linha de cache traz 8 doubles usados nos próximos 7 passos. A taxa de miss tende a $\frac{1}{8}$ miss/operação — próxima do mínimo físico.
+      </p>
+
+      <h3>Column-major (acesso strided — cache-unfriendly)</h3>
+      <p>
+        O laço externo percorre $j$ enquanto o interno percorre $i$: <code>A[0*N+j], A[1*N+j], ..., A[(N-1)*N+j]</code>. Cada acesso consecutivo pula $N$ posições (stride de $N \times 8$ bytes). Para $N = 2000$, o stride é 16 000 bytes — 250 linhas de cache entre acessos consecutivos. Cada acesso a $A[i \cdot N + j]$ resulta provavelmente em um <strong>cache miss compulsório</strong> em L1 e L2.
+      </p>
+
+      <div class="math-block">
+        $$\text{Stride}_{\text{col}} = N \times 8 \text{ bytes} \xrightarrow{N=2000} 16\,000 \text{ bytes} = 250 \text{ linhas de cache}$$
+      </div>
+
+      <h3>Impacto em contagem de misses</h3>
+      <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; font-family: 'Inter', sans-serif; font-size: 0.9rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+            <th style="padding: 8px;">Ordem de acesso</th>
+            <th style="padding: 8px;">L1 misses estimados</th>
+            <th style="padding: 8px;">Razão de misses</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Row-major (sequencial)</td>
+            <td style="padding: 8px;">$N^2 / 8$</td>
+            <td style="padding: 8px;">~12,5% (1 miss a cada 8 acessos)</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px;">Column-major (strided)</td>
+            <td style="padding: 8px;">$\approx N^2$</td>
+            <td style="padding: 8px;">~100% (1 miss por acesso)</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Seção 4 -->
+    <section id="bandwidth-roofline">
+      <h2>4. Saturação de barramento e modelo Roofline</h2>
+      <p>
+        A MxV é um algoritmo <strong>memory-bound</strong>: para cada linha da matriz, realiza $2N$ FLOPs lendo $8N$ bytes ($N$ doubles de $A$ mais reutilização de $x$). A intensidade aritmética é:
+      </p>
+      <div class="math-block">
+        $$I = \frac{2N \text{ FLOPs}}{8N \text{ bytes}} = 0{,}25 \text{ FLOP/byte}$$
+      </div>
+      <p>
+        O modelo Roofline impõe que o desempenho real não pode superar:
+      </p>
+      <div class="math-block">
+        $$\text{Desempenho}_{\max} = \min\!\left(P_{\text{pico}},\; I \times B_{\text{mem}}\right)$$
+      </div>
+      <p>
+        Para $B_{\text{mem}} = 100$ GB/s: $I \times B = 0{,}25 \times 100 = 25$ GFLOP/s. Mesmo com 1 TFLOP/s de pico da CPU, a MxV atinge no máximo ~25 GFLOP/s — ditado pelo barramento, não pela ALU.
+      </p>
+
+      <h3>Prefetching e hardware stream prefetchers</h3>
+      <p>
+        Processadores modernos detectam acessos sequenciais e pré-carregam linhas de cache antes de serem requisitadas. Para acessos row-major, o prefetcher funciona eficientemente. Para strides grandes (column-major), ele falha ou age tarde demais para ocultar a latência.
+      </p>
+    </section>
+
+    <!-- Seção 5 -->
+    <section id="numa">
+      <h2>5. NUMA e impacto em HPC</h2>
+      <p>
+        Nos nós do cluster NPAD/UFRN, a arquitetura é <strong>NUMA</strong> (Non-Uniform Memory Access). Cada soquete tem sua memória local; o acesso ao soquete remoto atravessa a interconexão QPI/UPI com latência maior. Para programas memory-bound como a MxV, a afinidade de memória pode representar uma penalidade de 20–40%.
+      </p>
+      <div class="math-block">
+        $$\text{Latência}_{\text{remoto}} \approx 1{,}3 \times \text{Latência}_{\text{local}}$$
+      </div>
+      <p>
+        Políticas como <code>OMP_PROC_BIND=close</code> e <code>numactl --localalloc</code> garantem que os dados sejam alocados no mesmo soquete das threads que os acessam.
+      </p>
+    </section>
+
+    <!-- Seção 6 -->
+    <section id="medicao">
+      <h2>6. Medição de tempo: <code>clock()</code> vs. <code>clock_gettime()</code></h2>
+      <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; font-family: 'Inter', sans-serif; font-size: 0.88rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+            <th style="padding: 8px;">Função</th>
+            <th style="padding: 8px;">O que mede</th>
+            <th style="padding: 8px;">Resolução típica</th>
+            <th style="padding: 8px;">Quando usar</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>clock()</code></td>
+            <td style="padding: 8px;">CPU time (soma de todos os núcleos)</td>
+            <td style="padding: 8px;">~1 ms (CLOCKS_PER_SEC = 10⁶)</td>
+            <td style="padding: 8px;">Comparação de esforço CPU em sequencial</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px;"><code>clock_gettime(CLOCK_MONOTONIC)</code></td>
+            <td style="padding: 8px;">Tempo de parede (wall time)</td>
+            <td style="padding: 8px;">~1 ns</td>
+            <td style="padding: 8px;">HPC, benchmarking preciso, OpenMP</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        Em versões paralelas com OpenMP, <code>clock()</code> soma o tempo de todos os núcleos e produz resultado enganoso. Use <code>omp_get_wtime()</code> ou <code>clock_gettime(CLOCK_MONOTONIC)</code> nesses casos.
+      </p>
+    </section>
+
+  </main>
+
+  <footer class="footer-nav">
+    <a href="../lessons/0002-tarefa02-mxv-cache.html">&larr; Ir para a Lição 02</a>
+    <a href="02-mxv-cache-localidade.html">Referência rápida 02 &rarr;</a>
+  </footer>
+
+  <script>
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('theme', target);
+    }
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+  </script>
+</body>
+</html>

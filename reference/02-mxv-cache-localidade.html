@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Referência rápida para a Tarefa 02 (MxV): tabelas de sintaxe C com malloc, calloc, aritmética de ponteiros, clock() e flags de compilação.">
+  <title>Referência 02: MxV — Cache e Localidade em C</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function applyMath(el = document.body) {
+      if (window.renderMathInElement) {
+        renderMathInElement(el, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+    document.addEventListener("DOMContentLoaded", () => applyMath());
+    window.addEventListener("load", () => applyMath());
+  </script>
+</head>
+<body>
+  <nav class="top-nav">
+    <div style="display: flex; gap: 16px;">
+      <a href="02-teoria-hierarquia-memoria-cache.html">&larr; Teoria 02</a>
+      <a href="../lessons/0002-tarefa02-mxv-cache.html">Li&ccedil;&atilde;o 02 &rarr;</a>
+    </div>
+    <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+  </nav>
+
+  <header>
+    <div class="lesson-badge">Refer&ecirc;ncia 02 &bull; DCA3703</div>
+    <h1>Refer&ecirc;ncia r&aacute;pida 02: MxV — Cache e Localidade em C</h1>
+    <div class="metadata">
+      Guia de consulta r&aacute;pida para a Tarefa 02 (Multiplica&ccedil;&atilde;o Matriz-Vetor)
+    </div>
+  </header>
+
+  <main>
+
+    <!-- Seção 1: Funções de alocação -->
+    <section id="alocacao">
+      <h2>1. Fun&ccedil;&otilde;es de aloca&ccedil;&atilde;o din&acirc;mica</h2>
+      <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; font-family: 'Inter', sans-serif; font-size: 0.88rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+            <th style="padding: 8px;">Fun&ccedil;&atilde;o</th>
+            <th style="padding: 8px;">Assinatura</th>
+            <th style="padding: 8px;">Inicializa?</th>
+            <th style="padding: 8px;">Uso t&iacute;pico</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>malloc</code></td>
+            <td style="padding: 8px;"><code>void *malloc(size_t n)</code></td>
+            <td style="padding: 8px;">N&atilde;o (lixo de mem&oacute;ria)</td>
+            <td style="padding: 8px;">Aloca bloco; conteúdo indiferente</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>calloc</code></td>
+            <td style="padding: 8px;"><code>void *calloc(size_t n, size_t sz)</code></td>
+            <td style="padding: 8px;">Sim (zeros)</td>
+            <td style="padding: 8px;">Vetor acumulador <code>y[]</code></td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>realloc</code></td>
+            <td style="padding: 8px;"><code>void *realloc(void *p, size_t n)</code></td>
+            <td style="padding: 8px;">Preserva dados anteriores</td>
+            <td style="padding: 8px;">Redimensionamento de buffer</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px;"><code>free</code></td>
+            <td style="padding: 8px;"><code>void free(void *p)</code></td>
+            <td style="padding: 8px;">—</td>
+            <td style="padding: 8px;">Libera bloco alocado</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <pre><code><span class="hl-com">/* Matriz N×N armazenada como vetor 1-D (row-major) */</span>
+<span class="hl-type">double</span> *A = <span class="hl-fn">malloc</span>((<span class="hl-type">size_t</span>)N * N * <span class="hl-kw">sizeof</span>(<span class="hl-type">double</span>));
+<span class="hl-type">double</span> *x = <span class="hl-fn">malloc</span>(N * <span class="hl-kw">sizeof</span>(<span class="hl-type">double</span>));
+<span class="hl-type">double</span> *y = <span class="hl-fn">calloc</span>(N, <span class="hl-kw">sizeof</span>(<span class="hl-type">double</span>));  <span class="hl-com">/* inicializado com zero */</span>
+
+<span class="hl-com">/* Verificação obrigatória em código de produção */</span>
+<span class="hl-kw">if</span> (!A || !x || !y) { <span class="hl-fn">perror</span>(<span class="hl-str">"malloc"</span>); <span class="hl-kw">return</span> <span class="hl-num">1</span>; }
+
+<span class="hl-fn">free</span>(A); <span class="hl-fn">free</span>(x); <span class="hl-fn">free</span>(y);</code></pre>
+
+      <div class="callout" style="border-left-color: var(--accent); background-color: var(--card-bg);">
+        <div class="callout-title">Por que (size_t)N * N?</div>
+        <p style="margin: 0; font-family: 'Inter', sans-serif; font-size: 0.9rem;">
+          Se <code>N</code> é <code>int</code> (32 bits) e $N = 50\,000$, então <code>N * N = 2.5 × 10⁹</code> estoura um <code>int</code> com sinal. O cast <code>(size_t)</code> garante aritmética de 64 bits antes da multiplicação.
+        </p>
+      </div>
+    </section>
+
+    <!-- Seção 2: Aritmética de ponteiros -->
+    <section id="aritmetica">
+      <h2>2. Aritmética de ponteiros e indexa&ccedil;&atilde;o da matriz</h2>
+      <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; font-family: 'Inter', sans-serif; font-size: 0.88rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+            <th style="padding: 8px;">Express&atilde;o</th>
+            <th style="padding: 8px;">Endere&ccedil;o de mem&oacute;ria</th>
+            <th style="padding: 8px;">Padr&atilde;o de acesso</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>A[i*N + j]</code></td>
+            <td style="padding: 8px;"><code>base + (i*N + j)*8</code></td>
+            <td style="padding: 8px;">Row-major — sequencial em $j$</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>A[j*N + i]</code></td>
+            <td style="padding: 8px;"><code>base + (j*N + i)*8</code></td>
+            <td style="padding: 8px;">Column-major — salto de N em $i$</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>*(A + i*N + j)</code></td>
+            <td style="padding: 8px;">id&ecirc;ntico a <code>A[i*N+j]</code></td>
+            <td style="padding: 8px;">Acesso por ponteiro explícito</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px;"><code>A + i*N</code></td>
+            <td style="padding: 8px;">In&iacute;cio da linha $i$</td>
+            <td style="padding: 8px;">Ponteiro para a i-&eacute;sima linha</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="math-block">
+        $$A[i][j] \;\equiv\; A[i \cdot N + j] \quad (\text{row-major, C})$$
+      </div>
+
+      <pre><code><span class="hl-com">/* Row-major: laço interno em j → acesso sequencial (cache-friendly) */</span>
+<span class="hl-kw">for</span> (<span class="hl-type">int</span> i = <span class="hl-num">0</span>; i &lt; N; i++) {
+    <span class="hl-type">double</span> s = <span class="hl-num">0.0</span>;
+    <span class="hl-kw">for</span> (<span class="hl-type">int</span> j = <span class="hl-num">0</span>; j &lt; N; j++)
+        s += A[i * N + j] * x[j];
+    y[i] = s;
+}
+
+<span class="hl-com">/* Column-major: laço interno em i → stride = N×8 bytes (cache-unfriendly) */</span>
+<span class="hl-kw">for</span> (<span class="hl-type">int</span> j = <span class="hl-num">0</span>; j &lt; N; j++) {
+    <span class="hl-kw">for</span> (<span class="hl-type">int</span> i = <span class="hl-num">0</span>; i &lt; N; i++)
+        y[i] += A[i * N + j] * x[j];
+}</code></pre>
+    </section>
+
+    <!-- Seção 3: Medição de tempo -->
+    <section id="medicao">
+      <h2>3. Medi&ccedil;&atilde;o de tempo com <code>clock()</code></h2>
+      <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; font-family: 'Inter', sans-serif; font-size: 0.88rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+            <th style="padding: 8px;">S&iacute;mbolo / tipo</th>
+            <th style="padding: 8px;">Descri&ccedil;&atilde;o</th>
+            <th style="padding: 8px;">Valor t&iacute;pico (Linux)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>clock_t</code></td>
+            <td style="padding: 8px;">Tipo inteiro para ticks de CPU</td>
+            <td style="padding: 8px;"><code>long int</code></td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>clock()</code></td>
+            <td style="padding: 8px;">Retorna ticks de CPU consumidos</td>
+            <td style="padding: 8px;">Definido em <code>&lt;time.h&gt;</code></td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>CLOCKS_PER_SEC</code></td>
+            <td style="padding: 8px;">Ticks por segundo</td>
+            <td style="padding: 8px;">1 000 000 (10⁶)</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px;"><code>(fim - inicio) / CLOCKS_PER_SEC</code></td>
+            <td style="padding: 8px;">Tempo em segundos</td>
+            <td style="padding: 8px;">Precis&atilde;o de ~1 &micro;s</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <pre><code><span class="hl-prep">#include</span> <span class="hl-str">&lt;time.h&gt;</span>
+
+<span class="hl-type">clock_t</span> inicio = <span class="hl-fn">clock</span>();
+
+<span class="hl-com">/* ... trecho a medir ... */</span>
+
+<span class="hl-type">clock_t</span> fim = <span class="hl-fn">clock</span>();
+<span class="hl-type">double</span> tempo = (<span class="hl-type">double</span>)(fim - inicio) / CLOCKS_PER_SEC;
+<span class="hl-fn">printf</span>(<span class="hl-str">"tempo = %.6f s\n"</span>, tempo);</code></pre>
+    </section>
+
+    <!-- Seção 4: Flags de compilação -->
+    <section id="compilacao">
+      <h2>4. Flags de compila&ccedil;&atilde;o relevantes</h2>
+      <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; font-family: 'Inter', sans-serif; font-size: 0.88rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+            <th style="padding: 8px;">Flag</th>
+            <th style="padding: 8px;">Efeito</th>
+            <th style="padding: 8px;">Observa&ccedil;&atilde;o</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>-O0</code></td>
+            <td style="padding: 8px;">Sem otimização (linha de base)</td>
+            <td style="padding: 8px;">Facilita depuração com GDB</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>-O2</code></td>
+            <td style="padding: 8px;">Otimizações seguras (aliasing)</td>
+            <td style="padding: 8px;">Inline, loop unroll parcial</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>-O3</code></td>
+            <td style="padding: 8px;">Otimizações agressivas</td>
+            <td style="padding: 8px;">Vetorização SIMD autom&aacute;tica</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>-march=native</code></td>
+            <td style="padding: 8px;">Usa ISA do hardware local</td>
+            <td style="padding: 8px;">AVX2/AVX-512 se dispon&iacute;vel</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><code>-Wall</code></td>
+            <td style="padding: 8px;">Ativa avisos comuns</td>
+            <td style="padding: 8px;">Recomendado sempre</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px;"><code>-lm</code></td>
+            <td style="padding: 8px;">Liga a libm (funções matem.)</td>
+            <td style="padding: 8px;">Necess&aacute;rio para <code>sqrt</code>, <code>pow</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <pre><code><span class="hl-com"># Compilar e medir diferença de desempenho:</span>
+gcc -O2 -Wall -o row_major   row_major.c
+gcc -O2 -Wall -o collum_major collum_major.c
+
+./row_major   2000
+./collum_major 2000
+
+<span class="hl-com"># Com perf para contar cache misses (Linux):</span>
+perf stat -e cache-misses,cache-references ./row_major   2000
+perf stat -e cache-misses,cache-references ./collum_major 2000</code></pre>
+    </section>
+
+    <!-- Seção 5: Resumo de fórmulas -->
+    <section id="formulas">
+      <h2>5. Resumo executivo de f&oacute;rmulas</h2>
+      <div class="callout" style="border-left-color: var(--accent); background-color: var(--card-bg);">
+        <div class="callout-title">Regras pr&aacute;ticas — MxV e cache</div>
+        <ul style="margin-bottom: 0; font-family: 'Inter', sans-serif; font-size: 0.9rem;">
+          <li>Linha de cache = <strong>64 bytes = 8 doubles</strong>.</li>
+          <li>Row-major: 1 miss a cada 8 acessos à matriz $A$ ($\approx 12{,}5\%$).</li>
+          <li>Column-major: ~1 miss por acesso ($\approx 100\%$).</li>
+          <li>Stride column-major: $N \times 8$ bytes ($= 16\,000$ B para $N=2000$).</li>
+          <li>Intensidade aritmética MxV: $I = 0{,}25$ FLOP/byte.</li>
+          <li>Teto de desempenho (Roofline): $I \times B_{\text{mem}}$ GFLOP/s.</li>
+          <li>Cast <code>(size_t)</code> antes de multiplicar dimensões grandes.</li>
+          <li>Use <code>calloc</code> para vetores que devem começar em zero.</li>
+        </ul>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer-nav">
+    <a href="02-teoria-hierarquia-memoria-cache.html">&larr; Teoria 02</a>
+    <a href="../lessons/0002-tarefa02-mxv-cache.html">Li&ccedil;&atilde;o 02 &rarr;</a>
+  </footer>
+
+  <script>
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('theme', target);
+    }
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+  </script>
+</body>
+</html>

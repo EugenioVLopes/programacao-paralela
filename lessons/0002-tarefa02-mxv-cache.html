@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Lição prática 02: dissecando row_major.c e collum_major.c linha a linha. Cache misses, localidade espacial, poder computacional e quizzes interativos.">
+  <title>Lição 02: Multiplicação Matriz-Vetor e Cache</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function applyMath(el = document.body) {
+      if (window.renderMathInElement) {
+        renderMathInElement(el, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+    document.addEventListener("DOMContentLoaded", () => applyMath());
+    window.addEventListener("load", () => applyMath());
+  </script>
+</head>
+<body>
+  <nav class="top-nav">
+    <div style="display: flex; gap: 16px;">
+      <a href="../reference/02-teoria-hierarquia-memoria-cache.html">&larr; Teoria 02</a>
+      <a href="../reference/02-mxv-cache-localidade.html">Refer&ecirc;ncia r&aacute;pida 02</a>
+      <a href="../reference/00-fundamentos-programacao-paralela.html">&Iacute;ndice geral</a>
+    </div>
+    <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+  </nav>
+
+  <header>
+    <div class="lesson-badge">Li&ccedil;&atilde;o 02 &bull; DCA3703</div>
+    <h1>Li&ccedil;&atilde;o 02: Multiplica&ccedil;&atilde;o Matriz-Vetor e o impacto do cache</h1>
+    <div class="metadata">
+      Tarefa 02 &bull; Dissec&ccedil;&atilde;o de <code>row_major.c</code> e <code>collum_major.c</code> &bull; Poder computacional, limites de hardware e quizzes
+    </div>
+  </header>
+
+  <main>
+
+    <!-- Seção 1: Poder computacional -->
+    <section id="poder-computacional">
+      <h2>1. Por que precisamos de poder computacional?</h2>
+      <p>
+        Muitos problemas reais exigem uma quantidade de c&aacute;lculos impratic&aacute;vel para um &uacute;nico processador sequencial. Alguns exemplos:
+      </p>
+      <ul>
+        <li><strong>Simula&ccedil;&otilde;es de din&acirc;mica molecular</strong>: modelar $10^{23}$ mol&eacute;culas de uma prote&iacute;na requer bilh&otilde;es de intera&ccedil;&otilde;es a cada passo de tempo.</li>
+        <li><strong>Previs&atilde;o do tempo</strong>: o modelo ECMWF divide a atm&oacute;sfera em $\sim10^9$ c&eacute;lulas 3D e recalcula temperatura, press&atilde;o e velocidade a cada minuto simulado.</li>
+        <li><strong>Modelos de linguagem</strong> (LLMs como o Gemini): o treinamento de um modelo com 100 bilh&otilde;es de par&acirc;metros exige $>10^{23}$ opera&ccedil;&otilde;es de ponto flutuante.</li>
+        <li><strong>Simula&ccedil;&otilde;es f&iacute;sicas de alta energia</strong>: o detector LHC gera ~1 PB de dados por segundo, exigindo filtragem e an&aacute;lise em tempo real.</li>
+      </ul>
+      <p>
+        A <strong>multiplica&ccedil;&atilde;o matriz-vetor (MxV)</strong> &eacute; o bloco fundamental de todos esses c&aacute;lculos. Redes neurais s&atilde;o compostas de centenas de camadas lineares (cada uma &eacute; uma MxV) seguidas de ativa&ccedil;&otilde;es. Solucionadores de equa&ccedil;&otilde;es diferenciais iterativos (m&eacute;todo de gradiente conjugado, GMRES) fazem uma MxV por itera&ccedil;&atilde;o.
+      </p>
+    </section>
+
+    <!-- Seção 2: Limitações do processador sequencial -->
+    <section id="limites-hardware">
+      <h2>2. Por que um processador sequencial n&atilde;o basta?</h2>
+      <p>
+        Durante as d&eacute;cadas de 1970 a 2004, a Lei de Moore e a Escala de Dennard garantiam um aumento de frequência de ~52% ao ano. Um programa sequencial ficava automaticamente duas vezes mais r&aacute;pido a cada 18 meses sem nenhuma modifica&ccedil;&atilde;o no c&oacute;digo.
+      </p>
+      <p>
+        Dois muros f&iacute;sicos quebraram essa traje&oacute;ria:
+      </p>
+      <ul>
+        <li>
+          <strong>Power Wall (barreira t&eacute;rmica)</strong>: a pot&ecirc;ncia din&acirc;mica de um transistor &eacute; $P = C \cdot V^2 \cdot f$. Com transistores em escala nanom&eacute;trica, a corrente de fuga impediu a redu&ccedil;&atilde;o da tens&atilde;o $V$. Aumentar $f$ causou picos de calor insuport&aacute;veis — o clock ficou travado entre 3 e 5 GHz a partir de 2005.
+        </li>
+        <li>
+          <strong>Memory Wall</strong>: a velocidade da CPU cresceu mais r&aacute;pido que a velocidade da RAM. Um acesso &agrave; mem&oacute;ria principal que demora ~80 ns representa 240 ciclos de CPU parada esperando dados. A MxV acessa $N^2$ elementos da matriz; sem cache eficiente, o barramento satura.
+        </li>
+      </ul>
+
+      <div class="math-block">
+        $$P_{\text{din}} = C \cdot V^2 \cdot f \quad\Rightarrow\quad \text{dobrar } f \text{ quadruplica a pot&ecirc;ncia dissipada}$$
+      </div>
+
+      <h3>N&uacute;cleos l&oacute;gicos como sa&iacute;da</h3>
+      <p>
+        A solu&ccedil;&atilde;o da ind&uacute;stria foi manter a frequência est&aacute;vel e multiplicar o n&uacute;mero de n&uacute;cleos no mesmo chip. Processadores modernos possuem 8 a 192 n&uacute;cleos f&iacute;sicos. Cada n&uacute;cleo pode executar um fluxo independente de instru&ccedil;&otilde;es — mas somente se o programa for <strong>escrito para isso</strong>. C&oacute;digo sequencial usa apenas um n&uacute;cleo; os outros ficam ociosos.
+      </p>
+      <p>
+        Antes de paralelizar, por&eacute;m, &eacute; essencial entender <em>onde o tempo vai</em> na vers&atilde;o sequencial. A Tarefa 02 faz exatamente isso: mede a diferen&ccedil;a entre dois padr&otilde;es de acesso &agrave; mem&oacute;ria que realizam a mesma computa&ccedil;&atilde;o — e revela que o gargalo &eacute; o barramento, n&atilde;o a CPU.
+      </p>
+    </section>
+
+    <!-- Seção 3: Análise de row_major.c -->
+    <section id="row-major">
+      <h2>3. Dissec&ccedil;&atilde;o de <code>row_major.c</code></h2>
+
+      <h3>Cabe&ccedil;alho e macros</h3>
+      <pre><code><span class="hl-prep">#include</span> <span class="hl-str">&lt;stdio.h&gt;</span>   <span class="hl-com">// printf</span>
+<span class="hl-prep">#include</span> <span class="hl-str">&lt;stdlib.h&gt;</span>  <span class="hl-com">// malloc, calloc, free, atoi</span>
+<span class="hl-prep">#include</span> <span class="hl-str">&lt;time.h&gt;</span>    <span class="hl-com">// clock_t, clock(), CLOCKS_PER_SEC</span></code></pre>
+      <p>
+        Tr&ecirc;s headers da biblioteca padr&atilde;o C. N&atilde;o h&aacute; depend&ecirc;ncias externas — o c&oacute;digo compila em qualquer sistema POSIX com <code>gcc row_major.c -o row_major</code>.
+      </p>
+
+      <h3>Leitura do tamanho da matriz</h3>
+      <pre><code><span class="hl-type">int</span> N = <span class="hl-num">2000</span>;
+<span class="hl-kw">if</span> (argc &gt; <span class="hl-num">1</span>) N = <span class="hl-fn">atoi</span>(argv[<span class="hl-num">1</span>]);</code></pre>
+      <p>
+        <code>N = 2000</code> &eacute; o padr&atilde;o. Passando um argumento na linha de comando (<code>./row_major 4000</code>), a fun&ccedil;&atilde;o <code>atoi</code> converte a <em>string</em> do argv para inteiro. Isso permite medir o impacto do tamanho sem recompilar.
+      </p>
+
+      <h3>Aloca&ccedil;&atilde;o din&acirc;mica da matriz e vetores</h3>
+      <pre><code><span class="hl-type">double</span> *A = <span class="hl-fn">malloc</span>((<span class="hl-type">size_t</span>)N * N * <span class="hl-kw">sizeof</span>(<span class="hl-type">double</span>));
+<span class="hl-type">double</span> *x = <span class="hl-fn">malloc</span>(N * <span class="hl-kw">sizeof</span>(<span class="hl-type">double</span>));
+<span class="hl-type">double</span> *y = <span class="hl-fn">calloc</span>(N, <span class="hl-kw">sizeof</span>(<span class="hl-type">double</span>));</code></pre>
+      <ul>
+        <li><code>A</code>: ponteiro para a matriz $N \times N$ armazenada como vetor 1-D (row-major). Para $N = 2000$: $2000^2 \times 8 = 32$ MB.</li>
+        <li><code>x</code>: vetor de entrada, $N$ doubles = 16 KB para $N = 2000$.</li>
+        <li><code>y</code>: vetor resultado, inicializado com zeros via <code>calloc</code> — equivalente a escrever um la&ccedil;o <code>for</code> com <code>y[i] = 0.0</code>, mas mais conciso e potencialmente mais r&aacute;pido (implementado via <code>memset</code> internamente).</li>
+        <li>O cast <code>(size_t)</code> evita overflow para $N$ grande: se <code>N = 50000</code>, <code>N*N = 2,5&times;10<sup>9</sup></code> estoura um <code>int</code> de 32 bits.</li>
+      </ul>
+
+      <h3>Inicializa&ccedil;&atilde;o dos dados</h3>
+      <pre><code><span class="hl-kw">for</span> (<span class="hl-type">int</span> i = <span class="hl-num">0</span>; i &lt; N * N; i++) A[i] = <span class="hl-num">1.0</span>;
+<span class="hl-kw">for</span> (<span class="hl-type">int</span> i = <span class="hl-num">0</span>; i &lt; N; i++) x[i] = <span class="hl-num">1.0</span>;</code></pre>
+      <p>
+        Todos os elementos s&atilde;o 1,0 para facilitar a verifica&ccedil;&atilde;o: o resultado esperado &eacute; <code>y[i] = N</code> para todo $i$. O la&ccedil;o de inicializa&ccedil;&atilde;o tamb&eacute;m &ldquo;aquece&rdquo; a mem&oacute;ria, mapeando as p&aacute;ginas virtuais para p&aacute;ginas f&iacute;sicas (page fault de primeira escrita).
+      </p>
+
+      <h3>Medi&ccedil;&atilde;o de tempo e o kernel central</h3>
+      <pre><code><span class="hl-type">clock_t</span> inicio = <span class="hl-fn">clock</span>();
+
+<span class="hl-kw">for</span> (<span class="hl-type">int</span> i = <span class="hl-num">0</span>; i &lt; N; i++) {
+    <span class="hl-type">double</span> s = <span class="hl-num">0.0</span>;
+    <span class="hl-kw">for</span> (<span class="hl-type">int</span> j = <span class="hl-num">0</span>; j &lt; N; j++)
+        s += A[i * N + j] * x[j];
+    y[i] = s;
+}
+
+<span class="hl-type">clock_t</span> fim = <span class="hl-fn">clock</span>();
+<span class="hl-type">double</span> tempo = (<span class="hl-type">double</span>)(fim - inicio) / CLOCKS_PER_SEC;</code></pre>
+      <ul>
+        <li><strong>Acumulador escalar <code>s</code></strong>: cada itera&ccedil;&atilde;o do la&ccedil;o $j$ faz uma multiplica&ccedil;&atilde;o e uma adi&ccedil;&atilde;o (FMA). O resultado parcial fica em registrador — sem escrita na mem&oacute;ria a cada passo.</li>
+        <li><strong><code>A[i * N + j]</code></strong>: com $i$ fixo no la&ccedil;o externo, $j$ varia de 0 a $N-1$. Os endere&ccedil;os <code>A + i*N + 0</code>, <code>A + i*N + 1</code>, ..., <code>A + i*N + N-1</code> s&atilde;o <strong>contíguos</strong> — acesso sequencial perfecto para o hardware prefetcher.</li>
+        <li><strong><code>x[j]</code></strong>: o vetor $x$ (16 KB para $N=2000$) cabe em L1 cache, portanto &eacute; acessado sempre com latência m&iacute;nima ap&oacute;s a primeira volta do la&ccedil;o externo.</li>
+        <li><strong>Escrita em <code>y[i]</code></strong>: ocorre apenas uma vez por itera&ccedil;&atilde;o de $i$ — m&iacute;nimo de escritas.</li>
+      </ul>
+
+      <div class="callout" style="border-left-color: #1b7a43; background-color: var(--success-bg);">
+        <div class="callout-title" style="color: var(--success);">Padr&atilde;o de acesso row-major: cache-friendly</div>
+        <p style="margin: 0; font-family: 'Inter', sans-serif; font-size: 0.9rem;">
+          A cada miss em L1, uma linha de cache de <strong>64 bytes = 8 doubles</strong> &eacute; carregada. Os pr&oacute;ximos 7 acessos (<code>A[i*N+j+1]</code> at&eacute; <code>A[i*N+j+7]</code>) j&aacute; est&atilde;o em cache — sem nova lat&ecirc;ncia. Raz&atilde;o de miss: ~12,5%.
+        </p>
+      </div>
+    </section>
+
+    <!-- Seção 4: Análise de collum_major.c -->
+    <section id="col-major">
+      <h2>4. Dissec&ccedil;&atilde;o de <code>collum_major.c</code></h2>
+
+      <h3>O la&ccedil;o transposto</h3>
+      <pre><code><span class="hl-type">clock_t</span> inicio = <span class="hl-fn">clock</span>();
+
+<span class="hl-kw">for</span> (<span class="hl-type">int</span> j = <span class="hl-num">0</span>; j &lt; N; j++) {
+    <span class="hl-kw">for</span> (<span class="hl-type">int</span> i = <span class="hl-num">0</span>; i &lt; N; i++)
+        y[i] += A[i * N + j] * x[j];
+}
+
+<span class="hl-type">clock_t</span> fim = <span class="hl-fn">clock</span>();</code></pre>
+      <p>
+        A aloca&ccedil;&atilde;o, inicializa&ccedil;&atilde;o e medi&ccedil;&atilde;o s&atilde;o id&ecirc;nticas ao <code>row_major.c</code>. Apenas a ordem dos la&ccedil;os muda: o la&ccedil;o externo varre <strong>colunas</strong> ($j$) e o interno varre <strong>linhas</strong> ($i$).
+      </p>
+
+      <h3>Por que isso &eacute; desastroso para a cache?</h3>
+      <p>
+        O acesso <code>A[i * N + j]</code> com $j$ fixo e $i$ variando produz os endere&ccedil;os:
+      </p>
+      <pre><code>A[0*N + j]   →  base + j*8
+A[1*N + j]   →  base + (N+j)*8        <span class="hl-com">// salto de N×8 bytes</span>
+A[2*N + j]   →  base + (2N+j)*8       <span class="hl-com">// salto de N×8 bytes</span>
+...
+A[(N-1)*N+j] →  base + ((N-1)N+j)*8  <span class="hl-com">// salto de N×8 bytes</span></code></pre>
+      <p>
+        Para $N = 2000$, cada salto &eacute; de $2000 \times 8 = 16\,000$ bytes — <strong>250 linhas de cache</strong> entre acessos consecutivos. A cache L1 (tipicamente 32–64 KB) n&atilde;o consegue manter 250 linhas simultaneamente: cada acesso expulsa as anteriores antes de serem reutilizadas.
+      </p>
+
+      <div class="callout" style="border-left-color: #b91c1c; background-color: var(--error-bg);">
+        <div class="callout-title" style="color: var(--error);">Padr&atilde;o de acesso column-major: cache-unfriendly</div>
+        <p style="margin: 0; font-family: 'Inter', sans-serif; font-size: 0.9rem;">
+          Cada acesso a <code>A[i*N+j]</code> provavelmente gera um <strong>cache miss</strong> em L1 e L2, for&ccedil;ando uma busca na DRAM (lat&ecirc;ncia &gt;200 ciclos). Raz&atilde;o de miss: ~100%.
+        </p>
+      </div>
+
+      <h3>Diferen&ccedil;a de acumulador</h3>
+      <p>
+        No <code>collum_major.c</code> n&atilde;o h&aacute; acumulador escalar local: <code>y[i] += ...</code> l&ecirc; e escreve em <code>y[i]</code> a cada itera&ccedil;&atilde;o do la&ccedil;o interno. O vetor <code>y</code> (16 KB) permanece em cache (pois &eacute; acessado sequencialmente no la&ccedil;o interno), mas o custo da matriz j&aacute; &eacute; proibitivo.
+      </p>
+    </section>
+
+    <!-- Seção 5: Comparação de desempenho -->
+    <section id="desempenho">
+      <h2>5. Comparativo de desempenho e interpreta&ccedil;&atilde;o</h2>
+
+      <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; font-family: 'Inter', sans-serif; font-size: 0.9rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+            <th style="padding: 8px;">M&eacute;trica</th>
+            <th style="padding: 8px;">Row-major</th>
+            <th style="padding: 8px;">Column-major</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">FLOPs realizados</td>
+            <td style="padding: 8px;">$2N^2$ (id&ecirc;ntico)</td>
+            <td style="padding: 8px;">$2N^2$ (id&ecirc;ntico)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Padr&atilde;o de acesso a $A$</td>
+            <td style="padding: 8px;">Sequencial (stride = 8 B)</td>
+            <td style="padding: 8px;">Strided (stride = $N\times8$ B)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">L1 cache misses (estimado)</td>
+            <td style="padding: 8px;">$N^2/8$</td>
+            <td style="padding: 8px;">$\approx N^2$</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;">Tempo t&iacute;pico ($N=2000$)</td>
+            <td style="padding: 8px;">~0,015 s</td>
+            <td style="padding: 8px;">~0,080 s</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px;">Speedup observado</td>
+            <td style="padding: 8px;">1,0&times; (baseline)</td>
+            <td style="padding: 8px;">~5&ndash;10&times; mais lento</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        A diferen&ccedil;a n&atilde;o vem de opera&ccedil;&otilde;es aritm&eacute;ticas a mais — o n&uacute;mero de FLOPs &eacute; <em>id&ecirc;ntico</em>. Ela vem exclusivamente de <strong>onde os dados est&atilde;o</strong> no momento do acesso. Esse &eacute; o princ&iacute;pio central do Memory Wall: a banda de mem&oacute;ria, e n&atilde;o a pot&ecirc;ncia da FPU, determina o desempenho.
+      </p>
+    </section>
+
+    <!-- Seção 6: Quizzes -->
+    <section id="quizzes">
+      <h2>6. Quizzes</h2>
+
+      <!-- Quiz 1 -->
+      <div class="quiz-container" id="quiz1">
+        <div class="quiz-header">
+          <span>Quest&atilde;o 1 de 4</span>
+          <span id="q1-badge" style="font-size: 0.8rem; font-family: 'Inter', sans-serif;"></span>
+        </div>
+        <div class="quiz-question">
+          Qual propriedade do hardware explica o fato de o acesso <em>row-major</em> ser muito mais r&aacute;pido que o <em>column-major</em> em C, mesmo realizando o mesmo n&uacute;mero de opera&ccedil;&otilde;es aritm&eacute;ticas?
+        </div>
+        <div class="quiz-options" id="q1-opts">
+          <button class="quiz-option-btn" onclick="answer('q1', 0, false)">O processador executa mais instru&ccedil;&otilde;es por ciclo no modo row-major</button>
+          <button class="quiz-option-btn" onclick="answer('q1', 1, true)">A linha de cache de 64 bytes carrega 8 doubles cont&iacute;guos; o row-major os reutiliza todos, o column-major n&atilde;o</button>
+          <button class="quiz-option-btn" onclick="answer('q1', 2, false)">O compilador otimiza automaticamente row-major para usar instru&ccedil;&otilde;es SIMD especiais</button>
+          <button class="quiz-option-btn" onclick="answer('q1', 3, false)">A soma parcial <code>s</code> em row-major reduz o n&uacute;mero de multiplica&ccedil;&otilde;es necess&aacute;rias</button>
+        </div>
+        <div class="quiz-explanation" id="q1-exp">
+          <strong>Correto.</strong> Quando a cache carrega <code>A[i*N+j]</code>, ela traz os pr&oacute;ximos 7 doubles (<code>A[i*N+j+1]</code> a <code>A[i*N+j+7]</code>) gratuitamente na mesma linha. Em row-major, todos os 8 s&atilde;o usados nos pr&oacute;ximos 7 passos do la&ccedil;o interno. Em column-major, o pr&oacute;ximo acesso pula $N$ posi&ccedil;&otilde;es — a linha &eacute; carregada e descartada sem reuso.
+        </div>
+        <button class="quiz-reset-btn" id="q1-reset" onclick="resetQuiz('q1')" style="display:none;">Tentar novamente</button>
+      </div>
+
+      <!-- Quiz 2 -->
+      <div class="quiz-container" id="quiz2">
+        <div class="quiz-header">
+          <span>Quest&atilde;o 2 de 4</span>
+          <span id="q2-badge" style="font-size: 0.8rem; font-family: 'Inter', sans-serif;"></span>
+        </div>
+        <div class="quiz-question">
+          Para $N = 2000$, qual &eacute; o stride (distância em bytes entre dois acessos consecutivos a $A$) no padr&atilde;o <em>column-major</em>?
+        </div>
+        <div class="quiz-options" id="q2-opts">
+          <button class="quiz-option-btn" onclick="answer('q2', 0, false)">64 bytes, igual ao tamanho de uma linha de cache</button>
+          <button class="quiz-option-btn" onclick="answer('q2', 1, false)">8 bytes, pois <code>double</code> ocupa 8 bytes em C</button>
+          <button class="quiz-option-btn" onclick="answer('q2', 2, true)">16 000 bytes, correspondendo a $N \times 8$ bytes por linha da matriz</button>
+          <button class="quiz-option-btn" onclick="answer('q2', 3, false)">32 megabytes, o tamanho total da matriz para $N = 2000$</button>
+        </div>
+        <div class="quiz-explanation" id="q2-exp">
+          <strong>Correto.</strong> O acesso column-major percorre $i = 0, 1, \ldots, N-1$ com $j$ fixo, acessando <code>A[0*N+j]</code>, <code>A[1*N+j]</code>, ..., em endere&ccedil;os espa&ccedil;ados por $N \times 8 = 2000 \times 8 = 16\,000$ bytes — 250 linhas de cache entre acessos consecutivos.
+        </div>
+        <button class="quiz-reset-btn" id="q2-reset" onclick="resetQuiz('q2')" style="display:none;">Tentar novamente</button>
+      </div>
+
+      <!-- Quiz 3 -->
+      <div class="quiz-container" id="quiz3">
+        <div class="quiz-header">
+          <span>Quest&atilde;o 3 de 4</span>
+          <span id="q3-badge" style="font-size: 0.8rem; font-family: 'Inter', sans-serif;"></span>
+        </div>
+        <div class="quiz-question">
+          A multiplica&ccedil;&atilde;o matriz-vetor (MxV) &eacute; classificada como um algoritmo <em>memory-bound</em>. Qual afirma&ccedil;&atilde;o melhor justifica essa classifica&ccedil;&atilde;o?
+        </div>
+        <div class="quiz-options" id="q3-opts">
+          <button class="quiz-option-btn" onclick="answer('q3', 0, false)">A MxV exige muita mem&oacute;ria para armazenar a matriz, tornando o armazenamento o fator limitante</button>
+          <button class="quiz-option-btn" onclick="answer('q3', 1, true)">A intensidade aritm&eacute;tica &eacute; baixa (0,25 FLOP/byte), ent&atilde;o a largura de banda de mem&oacute;ria satura antes da capacidade da FPU</button>
+          <button class="quiz-option-btn" onclick="answer('q3', 2, false)">A MxV utiliza ponteiros e aloca&ccedil;&atilde;o din&acirc;mica, que s&atilde;o inerentemente mais lentos que arrays est&aacute;ticos</button>
+          <button class="quiz-option-btn" onclick="answer('q3', 3, false)">O compilador n&atilde;o consegue vetorizar la&ccedil;os com depend&ecirc;ncias de dados como os da MxV</button>
+        </div>
+        <div class="quiz-explanation" id="q3-exp">
+          <strong>Correto.</strong> A intensidade aritm&eacute;tica &eacute; $I = 2N \text{ FLOPs} / (8N \text{ bytes}) = 0{,}25$ FLOP/byte. Uma banda de 100 GB/s entrega apenas $0{,}25 \times 100 = 25$ GFLOP/s efetivos — muito abaixo dos TFLOP/s de pico da FPU. O modelo Roofline confirma: a MxV fica no lado memory-bound.
+        </div>
+        <button class="quiz-reset-btn" id="q3-reset" onclick="resetQuiz('q3')" style="display:none;">Tentar novamente</button>
+      </div>
+
+      <!-- Quiz 4 -->
+      <div class="quiz-container" id="quiz4">
+        <div class="quiz-header">
+          <span>Quest&atilde;o 4 de 4</span>
+          <span id="q4-badge" style="font-size: 0.8rem; font-family: 'Inter', sans-serif;"></span>
+        </div>
+        <div class="quiz-question">
+          Por que a tarefa usa <code>calloc</code> para alocar <code>y[]</code>, mas <code>malloc</code> para <code>A[]</code> e <code>x[]</code>?
+        </div>
+        <div class="quiz-options" id="q4-opts">
+          <button class="quiz-option-btn" onclick="answer('q4', 0, false)"><code>calloc</code> &eacute; mais r&aacute;pido que <code>malloc</code> para vetores de ponto flutuante de precis&atilde;o dupla</button>
+          <button class="quiz-option-btn" onclick="answer('q4', 1, false)"><code>malloc</code> n&atilde;o pode alocar mais de 16 KB de uma vez, limitando seu uso para matrizes grandes</button>
+          <button class="quiz-option-btn" onclick="answer('q4', 2, false)"><code>calloc</code> alinha os dados em linhas de 64 bytes automaticamente, enquanto <code>malloc</code> n&atilde;o garante isso</button>
+          <button class="quiz-option-btn" onclick="answer('q4', 3, true)"><code>y[]</code> &eacute; o vetor acumulador: seus valores s&atilde;o somados (<code>y[i] += ...</code>) e precisam come&ccedil;ar em zero; <code>calloc</code> garante isso</button>
+        </div>
+        <div class="quiz-explanation" id="q4-exp">
+          <strong>Correto.</strong> O vetor <code>y</code> acumula produtos parciais: <code>y[i] += A[i*N+j] * x[j]</code>. Se <code>y</code> contivesse lixo de mem&oacute;ria, o resultado final seria incorreto. <code>A</code> e <code>x</code> s&atilde;o inicializados explicitamente com <code>for</code> antes de serem usados, portanto <code>malloc</code> &eacute; suficiente — o <code>calloc</code> seria apenas redundante.
+        </div>
+        <button class="quiz-reset-btn" id="q4-reset" onclick="resetQuiz('q4')" style="display:none;">Tentar novamente</button>
+      </div>
+    </section>
+
+    <!-- Seção 7: Navegação -->
+    <section id="navegacao">
+      <h2>7. Pr&oacute;ximos passos</h2>
+      <div class="source-card">
+        <ul style="margin: 0; padding-left: 1.2em;">
+          <li><a href="../reference/02-teoria-hierarquia-memoria-cache.html">Teoria 02</a> — gargalo de von Neumann, Memory Wall, modelo Roofline e NUMA</li>
+          <li><a href="../reference/02-mxv-cache-localidade.html">Refer&ecirc;ncia r&aacute;pida 02</a> — tabelas de sintaxe C: <code>malloc</code>, <code>calloc</code>, aritmética de ponteiros, flags GCC e <code>clock()</code></li>
+          <li><a href="../reference/00-fundamentos-programacao-paralela.html">Conceitos gerais</a> — taxonomia de Flynn, leis de Amdahl e Gustafson, hierarquia de mem&oacute;ria</li>
+          <li><a href="0003-tarefa03-ilp-acumuladores.html"><strong>Lição 03</strong></a>: Paralelismo ao Nível de Instrução (ILP) com múltiplos acumuladores e níveis de otimização.</li>
+        </ul>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer-nav">
+    <a href="../lessons/0001-tarefa01-leibniz-pi.html">&larr; Li&ccedil;&atilde;o 01 (Leibniz)</a>
+    <a href="0003-tarefa03-ilp-acumuladores.html">Lição 03 (ILP) &rarr;</a>
+  </footer>
+
+  <script>
+    /* -------- Theme toggle -------- */
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('theme', target);
+    }
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+
+    /* -------- Quiz engine -------- */
+    function answer(qid, idx, correct) {
+      const opts = document.querySelectorAll('#' + qid + '-opts .quiz-option-btn');
+      opts.forEach(b => b.disabled = true);
+      opts[idx].classList.add(correct ? 'correct' : 'wrong');
+      if (!correct) {
+        opts.forEach((b, i) => { if (b.onclick.toString().includes(', true)')) b.classList.add('correct'); });
+      }
+      const exp = document.getElementById(qid + '-exp');
+      exp.classList.add('visible');
+      const badge = document.getElementById(qid + '-badge');
+      badge.textContent = correct ? '✓ Acertou' : '✗ Errou';
+      badge.style.color = correct ? 'var(--success)' : 'var(--error)';
+      document.getElementById(qid + '-reset').style.display = 'inline-block';
+    }
+
+    function resetQuiz(qid) {
+      const opts = document.querySelectorAll('#' + qid + '-opts .quiz-option-btn');
+      opts.forEach(b => { b.disabled = false; b.classList.remove('correct', 'wrong'); });
+      document.getElementById(qid + '-exp').classList.remove('visible');
+      document.getElementById(qid + '-badge').textContent = '';
+      document.getElementById(qid + '-reset').style.display = 'none';
+    }
+  </script>
+</body>
+</html>
