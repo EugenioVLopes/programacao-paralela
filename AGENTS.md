@@ -27,19 +27,32 @@ Arquivo HTML autocontido focado na prática e na teoria aplicada, contendo:
 3. **Quizzes simétricos**: Questões de múltipla escolha com opções de tamanho e contagem de palavras idênticos.
 4. **Navegação**: Links relativos para o documento de teoria da tarefa, referência rápida da tarefa e documento geral `reference/00-fundamentos-programacao-paralela.html`.
 
-## 2. Portabilidade e links relativos
+## 2. Portabilidade, GitHub Pages e links
 
-- **Caminhos relativos**: Todo link em arquivos Markdown ou HTML deve usar caminhos relativos (ex: `../assets/style.css`, `reference/01-ponto-flutuante-e-leibniz.html`, `../tarefa01/tarefa01.c`).
-- **Proibição de caminhos absolutos**: Não use caminhos absolutos do sistema (como `/home/...` ou `file:///...`) para manter o repositório funcional ao ser clonado do GitHub.
+- **Caminhos relativos internos**: Todo link dentro dos arquivos HTML deve usar caminhos relativos (ex: `../assets/style.css`, `reference/01-ponto-flutuante-e-leibniz.html`, `../tarefa01/tarefa01.c`).
+- **Links no README.md**:
+  - Materiais HTML (lições, teoria e referência rápida) devem usar URLs absolutas do GitHub Pages: `https://eugeniovlopes.github.io/programacao-paralela/...` para abrir a página renderizada diretamente no navegador.
+  - Códigos C e relatórios PDF devem usar links relativos do repositório (`tarefaXX/` e `tarefaXX/relatorio.pdf`).
+- **Atualização contínua de índices**: Ao concluir qualquer tarefa, atualizar obrigatoriamente:
+  1. `index.html` na raiz (adicionar o card da tarefa com links para a lição, teoria, referência e relatório).
+  2. `reference/00-fundamentos-programacao-paralela.html` (adicionar a linha da tarefa na tabela de mapeamento).
+  3. `README.md` (adicionar a linha na tabela de tarefas com links para o GitHub Pages).
 
-## 3. Padrões de código e compilação
+## 3. Padrões de Git e arquivos ignorados
+
+- **Commits atômicos por tarefa**: Estruturar mensagens no padrão Conventional Commits (`feat(tarefaXX): ...`, `docs: ...`, `chore: ...`).
+- **Arquivos não versionados**:
+  - Roteiros de apresentação e podcast (`*roteiro*.md`, `*podcast*.md`) não devem ser commitados.
+  - Binários compilados e artefatos de build LaTeX (`.aux`, `.log`, `.out`, `.fls`, `.fdb_latexmk`) devem permanecer ignorados via `.gitignore`.
+
+## 4. Padrões de código e compilação
 
 - **Linguagem**: C (padrão C99 ou C11) em ambiente Linux x86_64.
 - **Compilador**: GCC ou Clang com flags explícitas (`-O0`, `-O2`, `-O3`, `-fopenmp`, `-lm`, `-Wall`).
 - **Medição de tempo**: Usar `clock_gettime(CLOCK_MONOTONIC)` com `#define _POSIX_C_SOURCE 199309L`.
 - **Ambiente de execução**: Nós de computação do NPAD/UFRN (suporte a NUMA e políticas `OMP_PROC_BIND` e `OMP_PLACES`).
 
-## 4. Padrões visuais e HTML
+## 5. Padrões visuais e HTML
 
 - **Estilos**: Usar a folha de estilo compartilhada [assets/style.css](assets/style.css).
 - **Matemática**: Renderização com KaTeX configurado para reconhecer delimitadores `$ ... $` e `$$ ... $$` via `applyMath()`.
