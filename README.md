@@ -6,9 +6,11 @@ Implementações, relatórios e lições práticas da disciplina DCA3703 (Progra
 
 ## Portal de lições
 
-Os materiais de estudo podem ser abertos no navegador:
+Os materiais de estudo podem ser acessados diretamente no GitHub Pages:
 
-[Acessar o portal no GitHub Pages](index.html) ou abra [`index.html`](index.html) localmente.
+🔗 **[https://eugeniovlopes.github.io/programacao-paralela/](https://eugeniovlopes.github.io/programacao-paralela/)**
+
+*(Para visualização local, abra [`index.html`](index.html) no navegador)*
 
 ---
 
