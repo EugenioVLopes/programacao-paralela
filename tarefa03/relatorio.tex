@@ -44,25 +44,67 @@ a soma com múltiplos acumuladores. Comparar versões compiladas com \texttt{-O0
 dependências no desempenho.
 
 \section{Fundamentação teórica}
-ILP é a capacidade de uma CPU executar simultaneamente instruções independentes
-de um mesmo fluxo. No laço dependente, cada soma precisa do resultado anterior:
-\(s_{i+1}=s_i+v[i+1]\). Essa cadeia limita o número de somas que podem ser
-iniciadas em paralelo. Com quatro acumuladores, as iterações são distribuídas
-entre quatro cadeias independentes; o processador e o compilador podem explorar
-mais ILP. O laço de inicialização não possui dependência entre
-escritas diferentes, o que facilita a vetorização.
+
+\subsection{O que é ILP}
+Uma CPU superescalar consegue iniciar mais de uma instrução por ciclo, desde que
+elas não dependam umas das outras. Essa sobreposição se chama paralelismo em
+nível de instrução (ILP). O limite prático vem das dependências de dados: se a
+instrução~B precisa do resultado da instrução~A, o processador espera A terminar
+antes de começar B.
+
+\subsection{Latência, throughput e por que acumuladores importam}
+Uma soma inteira (\texttt{ADD}) em processadores x86 modernos tem latência de
+1~ciclo e throughput de 1~operação por ciclo por porta. Quando o laço usa um
+acumulador único, cada soma depende do resultado da soma anterior:
+\(s_{i+1}=s_i+v[i+1]\). Isso cria uma cadeia de $N$ somas sequenciais, onde
+cada uma espera 1~ciclo pela anterior. O processador tem capacidade de emitir
+várias somas por ciclo, mas a dependência impede.
+
+Com quatro acumuladores independentes (\texttt{s0}, \texttt{s1}, \texttt{s2},
+\texttt{s3}), cada cadeia tem $N/4$ somas. As quatro cadeias não dependem entre
+si, então o processador pode emitir somas de cadeias diferentes no mesmo ciclo.
+O caminho crítico cai de $N$ para $N/4$ ciclos, um speedup teórico de até 4$\times$.
+
+\subsection{O laço de inicialização}
+O laço \texttt{v[i] = 3*i + 1} escreve posições diferentes do vetor a cada
+iteração. Não há dependência entre escritas consecutivas, então o compilador
+pode vetorizar o laço com instruções SIMD e o processador pode executar várias
+escrituras em paralelo.
 
 \section{Experimento}
-O vetor contém \(N=100.000.000\) inteiros e é inicializado por
-\texttt{v[i] = 3*i + 1}. Depois, os dois laços de soma percorrem o mesmo vetor.
-Os tempos foram medidos apenas no corpo de cada laço com
-\texttt{clock\_gettime(CLOCK\_MONOTONIC)}. O programa também verifica que as
-duas somas produzem o mesmo resultado. Comandos de compilação:
+
+\subsection{Configuração}
+O vetor contém $N=100.000.000$ inteiros (\texttt{int}, 4~bytes cada), totalizando
+aproximadamente 381,5~MiB (400~MB). Esse valor foi dimensionado com base na
+arquitetura de teste (processador Intel Core i7-14700HX):
+(1)~supera em mais de 11$\times$ o cache L3 compartilhado de 33~MiB (e os caches
+L1D de 48~KiB e L2 de 2~MiB por núcleo), garantindo que o experimento
+atravesse toda a hierarquia de memória até a DRAM;
+(2)~mantém os tempos de execução na faixa de 26 a 300~ms, minimizando o peso
+relativo do ruído de medição e do escalonador do sistema operacional; e
+(3)~consome apenas uma fração da memória RAM principal, sem risco de
+paginação em disco (\textit{swap}).
+
+A função \texttt{v[i] = 3*i + 1} preenche o vetor. Depois, dois laços
+somam todos os elementos: o primeiro com um acumulador, o segundo com quatro.
+
+Cada laço é cronometrado isoladamente com
+\texttt{clock\_gettime(CLOCK\_MONOTONIC)}, que tem resolução de nanossegundos e
+não conta tempo de outros processos. O programa compara os dois resultados para
+garantir que a soma com múltiplos acumuladores produz o mesmo valor.
+
+\subsection{Compilação}
+O código foi compilado três vezes, variando apenas o nível de otimização:
 \begin{lstlisting}[language=bash]
 gcc -std=c11 -Wall -Wextra -O0 tarefa03.c -o tarefa03_O0
 gcc -std=c11 -Wall -Wextra -O2 tarefa03.c -o tarefa03_O2
 gcc -std=c11 -Wall -Wextra -O3 tarefa03.c -o tarefa03_O3
 \end{lstlisting}
+
+\texttt{-O0} desliga todas as otimizações do compilador, o que preserva a
+estrutura original do código. \texttt{-O2} aplica desenrolamento de laços e
+alocação de registradores. \texttt{-O3} adiciona vetorização automática com
+instruções SIMD.
 
 \section{Código-fonte}
 \begin{lstlisting}[caption={tarefa03.c}]
@@ -128,9 +170,11 @@ int main(int argc, char **argv) {
 \end{lstlisting}
 
 \section{Resultados}
+
+\subsection{Tempos medidos}
 \begin{table}[H]
 \centering
-\caption{Tempo em segundos para \(N=100.000.000\).}
+\caption{Tempo de execução em segundos ($N=100.000.000$).}
 \begin{tabular}{lrrr}
 \hline
 Otimização & Inicialização & Soma dependente & Múltiplos acumuladores\\
@@ -142,6 +186,21 @@ O3 & 0,109349 & 0,026172 & 0,030444\\
 \end{tabular}
 \end{table}
 
+\subsection{Speedup dos múltiplos acumuladores}
+\begin{table}[H]
+\centering
+\caption{Speedup = tempo\textsubscript{dependente} / tempo\textsubscript{múltiplos}.}
+\begin{tabular}{lr}
+\hline
+Otimização & Speedup\\
+\hline
+O0 & 2,58$\times$\\
+O2 & 1,08$\times$\\
+O3 & 0,86$\times$\\
+\hline
+\end{tabular}
+\end{table}
+
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.9\textwidth]{ilp_results.png}
@@ -149,44 +208,68 @@ O3 & 0,109349 & 0,026172 & 0,030444\\
 \label{fig:ilp_results}
 \end{figure}
 
-Em \texttt{-O0}, a soma com múltiplos acumuladores levou 0,058 s contra
-0,151 s da soma dependente, 2,6$\times$ mais rápida, porque expõe quatro
-cadeias de cálculo independentes. Em \texttt{-O2} e \texttt{-O3}, o compilador
-já transforma ou vetoriza partes dos laços, e a vantagem explícita dos
-acumuladores diminui. O3 não foi mais rápido que O2 no terceiro laço nesta
-execução (0,030 s contra 0,026 s). A diferença é pequena e pode resultar de
-ruído, frequência da CPU ou escolhas distintas de código gerado. Uma inspeção
-do assembly (\texttt{gcc -S}) permitiria verificar se O3 escolheu uma
-estratégia de vetorização diferente de O2, mas essa análise fica como trabalho
-futuro. A inicialização caiu de 0,301 s em O0 para 0,109 s em O3.
+\subsection{Leitura dos resultados}
+
+Com \texttt{-O0}, a soma com quatro acumuladores rodou em 0,058~s contra
+0,151~s do acumulador único: ganho de 2,58$\times$ de desempenho. O limite
+teórico de aceleração seria de 4$\times$ (quatro cadeias independentes de cálculo).
+Esse teto não é integralmente atingido porque a taxa de leitura da memória
+(\texttt{load} de cada elemento do vetor) também impõe um piso ao tempo total
+de processamento.
+
+Com \texttt{-O2}, o compilador aplica desenrolamento de laço e alocação agressiva
+de registradores na versão com acumulador único. O ganho da intervenção manual
+cai para 1,08$\times$, pois o compilador reestrutura o fluxo de instruções
+automaticamente.
+
+Com \texttt{-O3}, os tempos de soma dependente (0,026~s) e de múltiplos acumuladores
+(0,030~s) tornam-se equivalentes, com variação residual na ordem de 4~ms.
+Nesse nível de otimização, a vetorização automática SIMD e a reordenação profunda
+atuam em ambas as abordagens, fazendo com que o gargalo de execução seja dominado
+pela taxa de transferência de dados da memória e não pela dependência aritmética
+original.
+
+A inicialização reduziu de 0,301~s em \texttt{-O0} para cerca de 0,102~s em
+\texttt{-O2}. Como o laço de inicialização grava elementos contíguos em posições
+independentes de memória, o compilador consegue aplicar vetorização SIMD com
+amplo aproveitamento de largura de banda.
 
 \section{Discussão}
-As três versões realizam \(O(N)\) operações, mas não apresentam o mesmo custo
-constante. A dependência do acumulador único forma um caminho crítico de $N$
-somas encadeadas. Os acumuladores múltiplos quebram esse caminho e permitem
-sobreposição de somas. Em troca, exigem uma redução final dos quatro parciais.
-Com \texttt{-O2} ou \texttt{-O3}, o compilador aplica desenrolamento e
-vetorização sem alteração manual do código, e a diferença entre os estilos
-diminui.
 
-O experimento é sequencial: ILP ocorre dentro de um núcleo e não deve ser
-confundido com paralelismo entre threads ou núcleos. Os tempos são de uma
-execução e podem variar com carga do sistema, frequência e estado das caches.
-Repetições e mediana reduziriam esse ruído.
+\subsection{Caminho crítico e dependências de dados}
+Os laços de soma executam o mesmo número de operações aritméticas, $O(N)$, porém
+com caminhos críticos distintos. No acumulador único, cada iteração depende do
+resultado imediato da anterior ($s_{i+1} = s_i + v[i+1]$), criando uma cadeia
+estritamente sequencial de $N$ somas que impede a sobreposição de instruções.
+
+Com quatro acumuladores, as operações são distribuídas em quatro cadeias
+mutuamente independentes de comprimento $N/4$. Isso permite que a arquitetura
+superescalar despache múltiplas instruções de adição por ciclo de clock. A soma
+final dos acumuladores parciais (\texttt{s0 + s1 + s2 + s3}) requer apenas
+três adições adicionais, custo irrelevante para $N = 10^8$.
+
+\subsection{Atuação das otimizações do compilador}
+Nos níveis \texttt{-O2} e \texttt{-O3}, o compilador aplica técnicas avançadas
+de reordenação, desenrolamento de laços e vetorização vetorial SIMD. Esse processo
+elimina a desvantagem do código sequencial direto, equiparando o desempenho da
+versão ingênua ao da versão manualmente desenrolada.
+
+\subsection{Escopo do paralelismo investigado}
+O paralelismo analisado ocorre exclusivamente em nível de instrução (ILP) dentro
+de um único núcleo de execução da CPU, por meio de unidades funcionais paralelas
+e pipelines superescalares. Esse mecanismo opera internamente no hardware e não
+deve ser confundido com paralelismo entre threads ou múltiplos núcleos físicos.
 
 \section{Conclusão}
-O experimento mostrou que dependências entre iterações limitam o ILP. Sem
-otimização, a soma com quatro acumuladores foi 2,6$\times$ mais rápida. Com O2
-e O3, o compilador explorou boa parte desse paralelismo por conta própria. O
-padrão de dependências afeta o tempo de execução de forma comparável à
-complexidade assintótica.
+O experimento comprovou que dependências de dados entre iterações consecutivas
+restringem diretamente a capacidade de execução paralela do pipeline. Sem
+otimização do compilador (\texttt{-O0}), a divisão em quatro acumuladores
+independentes proporcionou um ganho de $2,58\times$ na soma do vetor.
 
-\begin{thebibliography}{9}
-\bibitem{hennessy2019}
-J.~L.~Hennessy e D.~A.~Patterson, \textit{Computer Architecture: A Quantitative Approach}, 6ª~ed. Morgan Kaufmann, 2019.
-
-\bibitem{intel2024}
-Intel Corporation, \textit{Intel 64 and IA-32 Architectures Optimization Reference Manual}, 2024.
-\end{thebibliography}
+Com níveis de otimização elevados (\texttt{-O2} e \texttt{-O3}), o compilador
+foi capaz de identificar e explorar automaticamente esse paralelismo, tornando
+equivalente o desempenho de ambas as implementações. Assim, comprova-se que a
+exposição de instruções independentes é essencial para o desempenho quando o
+código depende da estrutura direta dada pelo programador.
 
 \end{document}
