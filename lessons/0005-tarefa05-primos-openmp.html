@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Lição prática 05: dissecando tarefa05.c linha a linha. Race conditions e reduction em laços OpenMP.">
+  <title>Lição 05: Paralelismo de laços e correção (Race Conditions)</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function applyMath(el = document.body) {
+      if (window.renderMathInElement) {
+        renderMathInElement(el, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+    document.addEventListener("DOMContentLoaded", () => applyMath());
+    window.addEventListener("load", () => applyMath());
+  </script>
+</head>
+<body>
+  <nav class="top-nav">
+    <div style="display: flex; gap: 16px;">
+      <a href="../reference/05-teoria-primos-openmp.html">&larr; Teoria 05</a>
+      <a href="../reference/05-primos-openmp.html">Referência rápida 05</a>
+      <a href="../reference/00-fundamentos-programacao-paralela.html">Índice geral</a>
+    </div>
+    <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+  </nav>
+
+  <header>
+    <div class="lesson-badge">Lição 05 &bull; DCA3703</div>
+    <h1>Lição 05: Race Conditions e Loop Parallelism</h1>
+    <div class="metadata">
+      Tarefa 05 &bull; Dissecção de <code>tarefa05.c</code> &bull; O perigo do estado compartilhado
+    </div>
+  </header>
+
+  <main>
+    <section id="problema">
+      <h2>1. O Teste de Primalidade e a Natureza do Laço</h2>
+      <p>
+        O programa conta primos no intervalo $[2, N]$. O teste para o número $i$ não depende do teste para $i+1$. Esse isolamento mecânico é o paralelismo trivial (<strong>embarrassingly parallel</strong>).
+      </p>
+    </section>
+
+    <section id="disseccao-codigo">
+      <h2>2. Dissecção linha a linha de <code>tarefa05.c</code></h2>
+
+      <h3>A Tentativa Ingênua (Race Condition)</h3>
+      <pre><code><span class="hl-type">int</span> count = <span class="hl-num">0</span>;
+<span class="hl-prep">#pragma</span> omp parallel for
+<span class="hl-kw">for</span> (<span class="hl-type">int</span> i = <span class="hl-num">2</span>; i &lt;= n; i++) {
+    <span class="hl-kw">if</span> (<span class="hl-fn">is_prime</span>(i)) {
+        count++;
+    }
+}</code></pre>
+      <ul>
+        <li>O OpenMP divide os índices e os envia para as threads.</li>
+        <li>O problema está na variável global <code>count</code>. Todas as threads tentam escrever nela ao mesmo tempo. As instruções de leitura e escrita da CPU colidem no barramento de memória.</li>
+        <li>O resultado final é incorreto. De 348.513 primos esperados, o código reporta valores como 81.795. Os incrementos se sobrepõem e desaparecem.</li>
+      </ul>
+
+      <h3>A Solução Correta (Reduction)</h3>
+      <pre><code><span class="hl-type">int</span> count = <span class="hl-num">0</span>;
+<span class="hl-prep">#pragma</span> omp parallel for reduction(+:count)
+<span class="hl-kw">for</span> (<span class="hl-type">int</span> i = <span class="hl-num">2</span>; i &lt;= n; i++) {
+    <span class="hl-kw">if</span> (<span class="hl-fn">is_prime</span>(i)) {
+        count++;
+    }
+}</code></pre>
+      <ul>
+        <li>O compilador cria uma cópia local de <code>count</code> para cada thread, valendo 0.</li>
+        <li>As threads incrementam a cópia local sem colidir. No fim, o OpenMP soma os subtotais na variável global.</li>
+      </ul>
+    </section>
+
+    <section id="quizzes">
+      <h2>3. Quizzes interativos</h2>
+
+      <!-- Quiz 1 -->
+      <div class="quiz-container" id="quiz1">
+        <div class="quiz-header">
+          <span>Questão 1 de 2</span>
+          <span id="q1-badge" style="font-size: 0.8rem; font-family: 'Inter', sans-serif;"></span>
+        </div>
+        <div class="quiz-question">
+          O que é uma Race Condition (condição de corrida) no contexto da programação paralela, como observado no código ingênuo?
+        </div>
+        <div class="quiz-options" id="q1-opts">
+          <button class="quiz-option-btn" onclick="answer('q1', 0, false)">Quando o escalonador do SO remove uma thread do núcleo antes que ela conclua seu laço.</button>
+          <button class="quiz-option-btn" onclick="answer('q1', 1, false)">Quando o compilador executa unroll do loop for provocando uma quebra nas barreiras lógicas.</button>
+          <button class="quiz-option-btn" onclick="answer('q1', 2, true)">Quando múltiplas threads modificam uma mesma variável compartilhada de forma não sincronizada.</button>
+          <button class="quiz-option-btn" onclick="answer('q1', 3, false)">Quando uma thread tenta alocar memória heap dinamicamente dentro de um bloco omp paralelo.</button>
+        </div>
+        <div class="quiz-explanation" id="q1-exp">
+          <strong>Correto!</strong> Sem a sincronização (como reduction ou atomic), a operação <code>count++</code> sofre interrupções e sobreposições nos acessos em memória de baixo nível, causando corrupção do valor global.
+        </div>
+        <button class="quiz-reset-btn" id="q1-reset" onclick="resetQuiz('q1')" style="display:none;">Tentar novamente</button>
+      </div>
+
+      <!-- Quiz 2 -->
+      <div class="quiz-container" id="quiz2">
+        <div class="quiz-header">
+          <span>Questão 2 de 2</span>
+          <span id="q2-badge" style="font-size: 0.8rem; font-family: 'Inter', sans-serif;"></span>
+        </div>
+        <div class="quiz-question">
+          Como a cláusula <code>reduction</code> do OpenMP evita o custo extremo de sincronização global a cada incremento?
+        </div>
+        <div class="quiz-options" id="q2-opts">
+          <button class="quiz-option-btn" onclick="answer('q2', 0, true)">Criando cópias privadas locais para cada thread e somando-as ao final sem travamento.</button>
+          <button class="quiz-option-btn" onclick="answer('q2', 1, false)">Suspendendo os ciclos de barramento das caches de dados exclusivas para o controlador.</button>
+          <button class="quiz-option-btn" onclick="answer('q2', 2, false)">Mudando a variável global para um registrador SIMD dedicado processando vetorialmente.</button>
+          <button class="quiz-option-btn" onclick="answer('q2', 3, false)">Convertendo todas as variáveis inteiras atômicas para que não exijam leitura prévia ALU.</button>
+        </div>
+        <div class="quiz-explanation" id="q2-exp">
+          <strong>Correto!</strong> O `reduction` isola a variável, evitando que o tráfego da cache colida repetidamente a cada passo. A integração global acontece apenas uma vez no final do laço.
+        </div>
+        <button class="quiz-reset-btn" id="q2-reset" onclick="resetQuiz('q2')" style="display:none;">Tentar novamente</button>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer-nav">
+    <a href="../reference/05-teoria-primos-openmp.html">&larr; Teoria 05 (Paralelismo de Laços)</a>
+    <a href="../reference/05-primos-openmp.html">Referência Rápida &rarr;</a>
+  </footer>
+
+  <script>
+    /* -------- Theme toggle -------- */
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('theme', target);
+    }
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+
+    /* -------- Symmetric Quiz Engine -------- */
+    function answer(qid, idx, correct) {
+      const opts = document.querySelectorAll('#' + qid + '-opts .quiz-option-btn');
+      opts.forEach(b => b.disabled = true);
+      opts[idx].classList.add(correct ? 'correct' : 'wrong');
+      if (!correct) {
+        opts.forEach(b => {
+          if (b.getAttribute('onclick').includes(', true)')) {
+            b.classList.add('correct');
+          }
+        });
+      }
+      const exp = document.getElementById(qid + '-exp');
+      exp.classList.add('visible');
+      const badge = document.getElementById(qid + '-badge');
+      badge.textContent = correct ? '✓ Acertou' : '✗ Errou';
+      badge.style.color = correct ? 'var(--success)' : 'var(--error)';
+      document.getElementById(qid + '-reset').style.display = 'inline-block';
+    }
+
+    function resetQuiz(qid) {
+      const opts = document.querySelectorAll('#' + qid + '-opts .quiz-option-btn');
+      opts.forEach(b => {
+        b.disabled = false;
+        b.classList.remove('correct', 'wrong');
+      });
+      document.getElementById(qid + '-exp').classList.remove('visible');
+      document.getElementById(qid + '-badge').textContent = '';
+      document.getElementById(qid + '-reset').style.display = 'none';
+    }
+  </script>
+</body>
+</html>

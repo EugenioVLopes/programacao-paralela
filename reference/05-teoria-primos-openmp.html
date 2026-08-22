@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Teoria 05: Paralelismo de laços com OpenMP, condições de corrida (Race Conditions), escalonamento e redução.">
+  <title>Teoria 05: Paralelismo de Laços e Condições de Corrida</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function applyMath(el = document.body) {
+      if (window.renderMathInElement) {
+        renderMathInElement(el, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+    document.addEventListener("DOMContentLoaded", () => applyMath());
+    window.addEventListener("load", () => applyMath());
+  </script>
+</head>
+<body>
+  <nav class="top-nav">
+    <div style="display: flex; gap: 16px;">
+      <a href="00-fundamentos-programacao-paralela.html">&larr; Índice Geral</a>
+      <a href="05-primos-openmp.html">Referência Rápida 05</a>
+      <a href="../lessons/0005-tarefa05-primos-openmp.html">Lição 05</a>
+    </div>
+    <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+  </nav>
+
+  <header>
+    <div class="lesson-badge">Teoria 05 &bull; DCA3703</div>
+    <h1>Teoria: Paralelismo de Laços e Condições de Corrida</h1>
+    <div class="metadata">
+      OpenMP &bull; Paralelismo de Dados &bull; Race Conditions &bull; Redução
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. Introdução ao Paralelismo de Laços (Loop-Level Parallelism)</h2>
+      <p>
+        Muitos códigos passam a maior parte do tempo em laços. O padrão do OpenMP para acelerar esse processo é dividir as iterações entre as threads disponíveis.
+      </p>
+      <p>
+        O <code>#pragma omp parallel for</code> cria as threads e corta o laço. Se o código tem 1000 iterações e usa 4 threads, o escalonamento estático manda 250 iterações para cada thread logo no início.
+      </p>
+    </section>
+
+    <section>
+      <h2>2. O Problema: Race Conditions (Condições de Corrida)</h2>
+      <p>
+        Uma <strong>Race Condition</strong> acontece quando threads escrevem na mesma memória sem regras. O hardware sobrepõe as operações e o resultado quebra.
+      </p>
+      <p>
+        A CPU não processa <code>count++</code> em um só passo. Ela executa três:
+      </p>
+      <ol>
+        <li><strong>LOAD:</strong> Lê o valor atual da memória para o registrador.</li>
+        <li><strong>ADD:</strong> Soma 1 no registrador.</li>
+        <li><strong>STORE:</strong> Salva o valor na memória.</li>
+      </ol>
+      <p>
+        Se a Thread A e a Thread B executam o <strong>LOAD</strong> no mesmo ciclo, ambas leem 10. Ambas somam e salvam 11. O programa perde um incremento.
+      </p>
+    </section>
+
+    <section>
+      <h2>3. A Solução: Cláusula de Redução (Reduction)</h2>
+      <p>
+        A cláusula <code>reduction(operador:variável)</code> resolve o problema sem travar as threads.
+      </p>
+      <p>
+        <strong>Como funciona nos bastidores:</strong>
+      </p>
+      <ol>
+        <li>O compilador cria uma cópia local da variável para <em>cada thread</em>, com valor zero.</li>
+        <li>Cada thread incrementa a própria cópia. Não há disputa de barramento nem espera.</li>
+        <li>No fim do laço, o OpenMP soma os resultados locais na variável global.</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2>4. Balanceamento de Carga (Load Balancing) e o caso dos Primos</h2>
+      <p>
+        Testar se 4 é primo custa pouco: falha na primeira divisão. Testar se 4.999.999 é primo gasta muitos laços.
+      </p>
+      <p>
+        Se o OpenMP divide os números com o <strong>static</strong> padrão:
+        <br>
+        Thread 1: Testa de 2 até 2.500.000<br>
+        Thread 2: Testa de 2.500.001 até 5.000.000
+      </p>
+      <p>
+        A Thread 2 processa os maiores números e gasta mais ciclos de CPU. A Thread 1 termina cedo e fica ociosa. Esse desequilíbrio é o <strong>desbalanceamento de carga (Load Imbalance)</strong>, e ele corta a escalabilidade do código.
+      </p>
+    </section>
+
+  </main>
+
+  <footer class="footer-nav">
+    <a href="../lessons/0005-tarefa05-primos-openmp.html">&larr; Lição Prática 05</a>
+    <a href="05-primos-openmp.html">Referência Rápida &rarr;</a>
+  </footer>
+
+  <script>
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('theme', target);
+    }
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+  </script>
+</body>
+</html>

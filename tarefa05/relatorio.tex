@@ -1,0 +1,170 @@
+\documentclass[11pt,letterpaper]{article}
+\usepackage{../assets/scientific_report}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{geometry}
+\geometry{headheight=23pt, top=2cm, bottom=2cm, left=2.5cm, right=2.5cm}
+\setlength{\parskip}{0.5em}
+\setlength{\parindent}{0pt}
+
+\lstset{
+    language=C,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{green!60!black}\itshape,
+    stringstyle=\color{red!80!black},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    numbersep=8pt,
+    frame=single,
+    breaklines=true,
+    captionpos=b,
+    tabsize=4,
+    showstringspaces=false
+}
+
+\begin{document}
+\pagestyle{plain}
+
+\begin{center}
+    {\LARGE\bfseries Contagem de Primos e Race Conditions}\\[0.4em]
+    {\large Paralelismo de Laços e Cláusula Reduction com OpenMP}\\[1em]
+    {\normalsize Eugênio Vitor Lopes dos Santos}\\[0.3em]
+    {\small DCA3703 -- Programação Paralela, Universidade Federal do Rio Grande do Norte}\\[0.3em]
+    {\small \today}
+\end{center}
+
+
+\section{Enunciado}
+Implementar um programa em C que conte quantos números primos existem entre 2 e um valor máximo $N$. Depois, paralelizar o laço principal usando a diretiva \texttt{\#pragma omp parallel for} sem alterar a lógica original. Comparar o tempo de execução e os resultados das versões sequencial e paralela. Observar possíveis diferenças no resultado e no desempenho, refletindo sobre desafios como correção e distribuição de carga.
+
+\section{Fundamentação teórica}
+
+\subsection{Paralelismo de Laços (Loop Parallelism)}
+Na programação paralela, é comum distribuir iterações independentes de um laço \texttt{for} entre diferentes threads. A diretiva \texttt{\#pragma omp parallel for} divide as iterações automaticamente. Sob o escalonamento padrão (\texttt{static}), o compilador divide os índices em blocos iguais e os distribui para as threads em tempo de compilação.
+
+\subsection{Condição de Corrida (Race Condition)}
+Uma \textit{Race Condition} surge quando múltiplas threads operam sem sincronização sobre uma mesma variável em memória compartilhada, e pelo menos uma altera o dado. 
+A CPU não incrementa \texttt{count++} em um único ciclo. O hardware quebra a instrução em três passos: lê a memória para o registrador (\texttt{LOAD}), soma no registrador (\texttt{ADD}) e escreve de volta na memória (\texttt{STORE}). Se duas threads executam o \texttt{LOAD} juntas, ambas leem o mesmo número. Elas somam 1 localmente e escrevem o mesmo resultado. O programa perde um incremento e retorna um valor incorreto.
+
+\subsection{Reduction}
+Se o código travar a variável global com \texttt{critical} em cada iteração, as threads formarão uma fila e a execução ficará mais lenta que a versão sequencial. 
+A diretiva \texttt{reduction(op:var)} resolve isso criando uma cópia privada da variável para cada thread no escopo do laço, com valor zero. As threads incrementam suas cópias locais na cache sem travar o barramento. Ao final do bloco paralelo, o OpenMP soma os subtotais na variável global.
+
+\section{Experimento}
+
+\subsection{Configuração}
+O código utiliza $N=5.000.000$ elementos. A função verifica os divisores ímpares até $\sqrt{n}$. Testar números maiores consome mais ciclos de CPU. Isso desequilibra a carga de trabalho no laço.
+
+O script executa três versões com as flags \texttt{-O3} e \texttt{-fopenmp}:
+\begin{enumerate}
+    \item \textbf{Sequencial}: 1 thread. Sem OpenMP.
+    \item \textbf{OpenMP Naive}: Usa \texttt{\#pragma omp parallel for}. As threads modificam a variável global de contagem \texttt{count} causando corrupção de memória.
+    \item \textbf{OpenMP Correct}: Usa \texttt{reduction(+:count)} protegendo o somatório.
+\end{enumerate}
+
+\section{Código-fonte}
+
+\begin{lstlisting}[caption={tarefa05.c}]
+#define _POSIX_C_SOURCE 199309L
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <omp.h>
+
+#define DEFAULT_N 5000000L
+
+static double agora(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return t.tv_sec + t.tv_nsec / 1e9;
+}
+
+int is_prime(long n) {
+    if (n <= 1) return 0;
+    if (n == 2) return 1;
+    if (n % 2 == 0) return 0;
+    for (long i = 3; i * i <= n; i += 2) {
+        if (n % i == 0) return 0;
+    }
+    return 1;
+}
+
+int main(int argc, char **argv) {
+    long n = argc > 1 ? atol(argv[1]) : DEFAULT_N;
+    if (n <= 0) return 1;
+
+    int n_threads = omp_get_max_threads();
+    double inicio_seq = agora();
+    long count_seq = 0;
+    
+    for (long i = 2; i <= n; ++i) {
+        if (is_prime(i)) {
+            count_seq++;
+        }
+    }
+    double tempo_seq = agora() - inicio_seq;
+
+    double inicio_omp_naive = agora();
+    long count_omp_naive = 0;
+
+    #pragma omp parallel for
+    for (long i = 2; i <= n; ++i) {
+        if (is_prime(i)) {
+            count_omp_naive++;
+        }
+    }
+    double tempo_omp_naive = agora() - inicio_omp_naive;
+
+    double inicio_omp_red = agora();
+    long count_omp_red = 0;
+
+    #pragma omp parallel for reduction(+:count_omp_red)
+    for (long i = 2; i <= n; ++i) {
+        if (is_prime(i)) {
+            count_omp_red++;
+        }
+    }
+    double tempo_omp_red = agora() - inicio_omp_red;
+
+    printf("N=%ld threads=%d seq_time=%.9f omp_naive_time=%.9f omp_red_time=%.9f seq_count=%ld omp_naive_count=%ld omp_red_count=%ld\n", 
+           n, n_threads, tempo_seq, tempo_omp_naive, tempo_omp_red, count_seq, count_omp_naive, count_omp_red);
+
+    return 0;
+}
+\end{lstlisting}
+
+\section{Resultados}
+
+A execução no shell (variando de 1 a 28 threads) obteve o seguinte perfil para a busca de primos até $N=5.000.000$.
+
+\subsection{Speedup e Observação de Race Conditions}
+O programa identificou $348.513$ primos nas versões Sequencial e Reduction. A versão Naive falhou: rodando em 2 threads relatou apenas $165.441$, e em 8 threads caiu para $40.786$. Os incrementos se sobreescreveram milhares de vezes na memória.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{speedup_plot.png}
+\caption{Gráfico de Speedup para a contagem de primos com Reduction. O desbalanceamento de carga (testar números maiores demora mais) impede que a curva atinja a diagonal ideal linear (linha preta tracejada).}
+\label{fig:speedup}
+\end{figure}
+
+\section{Discussão}
+
+Este problema roda estritamente dentro da CPU e da cache L1. É totalmente CPU-bound e deve escalar. Contudo, há dois problemas mecânicos:
+
+\subsection{Erros Silenciosos}
+Falhas de memória geralmente quebram a aplicação (\textit{segmentation fault}). As Race Conditions não. O software compila, executa rápido e imprime um número no terminal. Só sabemos que o resultado está errado porque comparamos com o sequencial. É o programador quem deve garantir a corretude usando reduções locais ou estados imutáveis, em vez de compartilhar contadores nuzos.
+
+\subsection{O Desbalanceamento de Carga (Load Imbalance)}
+A Figura \ref{fig:speedup} mostra que a linha verde fica abaixo da reta tracejada de speedup perfeito. A responsabilidade disso recai sobre o escalonamento estático do compilador. 
+
+Se o OpenMP quebra um vetor de $10.000$ iterações no meio, a Thread 0 julga os menores números e resolve tudo muito rápido. A Thread 1 fica com números maiores, roda divisões longas, e passa muito mais tempo na ALU. A Thread 0 termina o lote e fica ociosa esperando, desperdiçando potencial do processador.
+
+\section{Conclusão}
+
+O \texttt{\#pragma omp parallel for} expõe as threads sem que precisemos reescrever a lógica interna do for. Ainda assim, precisamos tratar a memória usando \texttt{reduction} e balancear a carga. Em problemas onde as iterações têm durações diferentes, o escalonador \texttt{static} perde eficiência. Para corrigir o problema na Figura \ref{fig:speedup}, o código pode usar escalonamento dinâmico (\texttt{schedule(dynamic, 100)}). Assim, as threads que acabam mais rápido buscam mais lotes de trabalho, evitando ociosidade.
+
+\end{document}

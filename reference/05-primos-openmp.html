@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Referência rápida 05: OpenMP loop parallelism e reduction.">
+  <title>Referência Rápida: OpenMP Parallel For</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function applyMath(el = document.body) {
+      if (window.renderMathInElement) {
+        renderMathInElement(el, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+    document.addEventListener("DOMContentLoaded", () => applyMath());
+    window.addEventListener("load", () => applyMath());
+  </script>
+</head>
+<body>
+  <nav class="top-nav">
+    <div style="display: flex; gap: 16px;">
+      <a href="05-teoria-primos-openmp.html">&larr; Teoria 05</a>
+      <a href="00-fundamentos-programacao-paralela.html">Índice Geral</a>
+      <a href="../lessons/0005-tarefa05-primos-openmp.html">Lição 05 &rarr;</a>
+    </div>
+    <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+  </nav>
+
+  <header>
+    <div class="lesson-badge">Referência 05 &bull; DCA3703</div>
+    <h1>Cheatsheet: Loop Parallelism & Reduction</h1>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. Sintaxe Básica</h2>
+      <pre><code><span class="hl-prep">#pragma</span> omp parallel for
+<span class="hl-kw">for</span> (<span class="hl-type">int</span> i = <span class="hl-num">0</span>; i &lt; n; i++) {
+    <span class="hl-comment">// Operações independentes sobre o dado 'i'</span>
+}</code></pre>
+      <ul>
+        <li>O laço <code>for</code> precisa ser estruturado de forma previsível (limites de iteração fixos e verificáveis no início, como <code>i &lt; n</code>).</li>
+        <li>Variáveis declaradas dentro do escopo do laço <code>for</code> são privadas para cada thread por padrão.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>2. Cláusula Reduction</h2>
+      <pre><code><span class="hl-type">int</span> soma = <span class="hl-num">0</span>;
+<span class="hl-prep">#pragma</span> omp parallel for reduction(+:soma)
+<span class="hl-kw">for</span> (<span class="hl-type">int</span> i = <span class="hl-num">0</span>; i &lt; n; i++) {
+    soma += vetor[i];
+}</code></pre>
+      <table>
+        <tr>
+          <th>Operador</th>
+          <th>Elemento Neutro (Início Privado)</th>
+        </tr>
+        <tr><td><code>+</code></td><td>0</td></tr>
+        <tr><td><code>*</code></td><td>1</td></tr>
+        <tr><td><code>-</code></td><td>0</td></tr>
+        <tr><td><code>&amp;</code> (AND lógico)</td><td>1 (true)</td></tr>
+        <tr><td><code>|</code> (OR lógico)</td><td>0 (false)</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>3. Escalonamento Básico (Schedule)</h2>
+      <p>A cláusula <code>schedule(tipo, chunk)</code> controla como as iterações são divididas.</p>
+      <ul>
+        <li><code>schedule(static)</code> (Padrão) <br>Divide as iterações em blocos de tamanho igual em tempo de compilação. Perfeito para laços regulares. Baixíssimo custo.</li>
+        <li><code>schedule(dynamic, chunk_size)</code> <br>Threads requisitam blocos menores (<code>chunk_size</code>) sob demanda. Ótimo para carga desbalanceada, mas tem overhead em runtime.</li>
+      </ul>
+    </section>
+  </main>
+
+  <script>
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('theme', target);
+    }
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+  </script>
+</body>
+</html>
