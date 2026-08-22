@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teoria 04: Aplicações limitadas por CPU e memória</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function applyMath(el = document.body) {
+      if (window.renderMathInElement) {
+        renderMathInElement(el, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+    document.addEventListener("DOMContentLoaded", () => applyMath());
+    window.addEventListener("load", () => applyMath());
+  </script>
+</head>
+<body>
+  <nav class="top-nav">
+    <div style="display: flex; gap: 16px;">
+      <a href="../reference/00-fundamentos-programacao-paralela.html">Índice geral</a>
+      <a href="04-memory-bound-cpu-bound.html">Referência rápida 04 &rarr;</a>
+    </div>
+    <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+  </nav>
+
+  <header>
+    <div class="lesson-badge">Teoria 04</div>
+    <h1>Aplicações limitadas por CPU e memória</h1>
+    <div class="metadata">O gargalo de von Neumann, saturação de barramento e efeitos do multithreading</div>
+  </header>
+
+  <main>
+    <section>
+      <h2>O gargalo de von Neumann</h2>
+      <p>
+        A arquitetura de von Neumann é caracterizada pela separação física entre a unidade de processamento (CPU) e a memória onde residem os dados e instruções. O canal de comunicação entre esses dois componentes, o barramento frontal (FSB) ou interconexões modernas como o QPI/UPI, possui uma largura de banda máxima finita (em GB/s).
+      </p>
+      <p>
+        Devido à lei de Moore e ao aumento das frequências de clock e do paralelismo de instruções (ILP) interno, o poder de processamento das CPUs escalou em uma taxa muito mais rápida do que a velocidade das memórias DRAM. Essa discrepância cria o chamado <strong>gargalo de von Neumann</strong> (ou memory wall).
+      </p>
+    </section>
+
+    <section>
+      <h2>Intensidade aritmética</h2>
+      <p>
+        A <strong>intensidade aritmética (IA)</strong> é definida como a razão entre as operações de ponto flutuante (FLOPs) realizadas e a quantidade de bytes transferidos da memória principal:
+      </p>
+      <div class="math-block">
+        $$IA = \frac{\text{FLOPs}}{\text{Bytes transferidos}}$$
+      </div>
+      <p>
+        Algoritmos com IA baixa (ex: somar dois vetores, onde para 1 adição carregamos 16 bytes e escrevemos 8 bytes) exaurem rapidamente a banda de memória. Algoritmos com IA alta (ex: multiplicação de matrizes em blocos no nível de cache, ou fractais de Mandelbrot) mantêm os dados próximos à CPU e estressam os circuitos de cálculo.
+      </p>
+    </section>
+
+    <section>
+      <h2>Memory-bound vs CPU-bound</h2>
+      <ul>
+        <li>
+          <strong>Memory-Bound (Limitado por Memória)</strong>: O tempo de execução do programa é dominado pelo tempo gasto esperando os dados chegarem da RAM. As unidades lógicas e aritméticas (ALUs) da CPU passam a maior parte do tempo ociosas.
+        </li>
+        <li>
+          <strong>CPU-Bound (Limitado por Processamento)</strong>: O tempo de execução é dominado pelo tempo necessário para calcular as instruções. A CPU está em 100% de uso contínuo, e o acesso à memória é infrequente ou os dados cabem completamente na cache L1/L2.
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Efeitos do multithreading e OpenMP</h2>
+      <p>
+        A paralelização com diretivas como <code>#pragma omp parallel for</code> possui resultados drasticamente diferentes dependendo da natureza da carga de trabalho:
+      </p>
+      <div class="callout" style="border-left-color: var(--accent); background-color: var(--card-bg);">
+        <div class="callout-title">Em aplicações CPU-bound</div>
+        <p style="margin-bottom: 0;">
+          Aumentar o número de threads (OMP_NUM_THREADS) gera speedup linear quase ideal até o número de núcleos físicos da máquina. Como cada núcleo está focado em calcular e não sobrecarrega o barramento, o desempenho escala perfeitamente.
+        </p>
+      </div>
+
+      <div class="callout" style="border-left-color: #b91c1c; background-color: var(--error-bg);">
+        <div class="callout-title" style="color: var(--error);">Em aplicações memory-bound</div>
+        <p style="margin-bottom: 0;">
+          Aumentar o número de threads piora o gargalo. Um único núcleo moderno já é capaz de saturar sozinho boa parte da banda de memória RAM. Adicionar mais threads causa saturação do controlador de memória, aumento na latência de acesso (contenção), e o speedup estagna precocemente ou até <strong>diminui</strong> em altos níveis de concorrência.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer-nav">
+    <span>DCA3703 &bull; UFRN</span>
+  </footer>
+
+  <script>
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('theme', target);
+    }
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+  </script>
+</body>
+</html>

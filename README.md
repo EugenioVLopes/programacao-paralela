@@ -24,6 +24,7 @@ Cada tarefa tem lição prática, teoria dedicada, guia de consulta rápida, có
 | 01 | Série de Leibniz e precisão numérica | [Lição 01](https://eugeniovlopes.github.io/programacao-paralela/lessons/0001-tarefa01-leibniz-pi.html) | [Teoria 01](https://eugeniovlopes.github.io/programacao-paralela/reference/01-teoria-ponto-flutuante-hardware.html) | [Referência 01](https://eugeniovlopes.github.io/programacao-paralela/reference/01-ponto-flutuante-e-leibniz.html) | [`tarefa01/`](tarefa01/) e [PDF](tarefa01/relatorio.pdf) |
 | 02 | Multiplicação matriz-vetor e cache | [Lição 02](https://eugeniovlopes.github.io/programacao-paralela/lessons/0002-tarefa02-mxv-cache.html) | [Teoria 02](https://eugeniovlopes.github.io/programacao-paralela/reference/02-teoria-hierarquia-memoria-cache.html) | [Referência 02](https://eugeniovlopes.github.io/programacao-paralela/reference/02-mxv-cache-localidade.html) | [`tarefa02/`](tarefa02/) e [PDF](tarefa02/relatorio.pdf) |
 | 03 | Paralelismo em nível de instrução (ILP) | [Lição 03](https://eugeniovlopes.github.io/programacao-paralela/lessons/0003-tarefa03-ilp-acumuladores.html) | [Teoria 03](https://eugeniovlopes.github.io/programacao-paralela/reference/03-teoria-ilp-pipeline-superscalar.html) | [Referência 03](https://eugeniovlopes.github.io/programacao-paralela/reference/03-ilp-acumuladores-otimizacao.html) | [`tarefa03/`](tarefa03/) e [PDF](tarefa03/relatorio.pdf) |
+| 04 | Limitações por Memória e CPU | [Lição 04](https://eugeniovlopes.github.io/programacao-paralela/lessons/0004-tarefa04-memory-cpu-bound.html) | [Teoria 04](https://eugeniovlopes.github.io/programacao-paralela/reference/04-teoria-memory-bound-cpu-bound.html) | [Referência 04](https://eugeniovlopes.github.io/programacao-paralela/reference/04-memory-bound-cpu-bound.html) | [`tarefa04/`](tarefa04/) e [PDF](tarefa04/relatorio.pdf) |
 
 ---
 
@@ -38,7 +39,8 @@ Cada tarefa tem lição prática, teoria dedicada, guia de consulta rápida, có
 ├── lessons/                     # Lições com quizzes
 │   ├── 0001-tarefa01-leibniz-pi.html
 │   ├── 0002-tarefa02-mxv-cache.html
-│   └── 0003-tarefa03-ilp-acumuladores.html
+│   ├── 0003-tarefa03-ilp-acumuladores.html
+│   └── 0004-tarefa04-memory-cpu-bound.html
 ├── reference/                   # Teoria de hardware e tabelas de consulta
 │   ├── 00-fundamentos-programacao-paralela.html
 │   ├── 01-teoria-ponto-flutuante-hardware.html
@@ -46,7 +48,9 @@ Cada tarefa tem lição prática, teoria dedicada, guia de consulta rápida, có
 │   ├── 02-teoria-hierarquia-memoria-cache.html
 │   ├── 02-mxv-cache-localidade.html
 │   ├── 03-teoria-ilp-pipeline-superscalar.html
-│   └── 03-ilp-acumuladores-otimizacao.html
+│   ├── 03-ilp-acumuladores-otimizacao.html
+│   ├── 04-teoria-memory-bound-cpu-bound.html
+│   └── 04-memory-bound-cpu-bound.html
 ├── tarefa01/                    # Código C, script de teste e relatório de Leibniz
 │   ├── tarefa01.c
 │   ├── execute.sh
@@ -60,6 +64,11 @@ Cada tarefa tem lição prática, teoria dedicada, guia de consulta rápida, có
 │   └── relatorio.tex
 └── tarefa03/                    # Código C, teste e relatório de ILP com acumuladores
     ├── tarefa03.c
+    ├── execute.sh
+    ├── plot_results.py
+    └── relatorio.tex
+└── tarefa04/                    # Código C, teste e relatório de Memory e CPU bound
+    ├── tarefa04.c
     ├── execute.sh
     ├── plot_results.py
     └── relatorio.tex

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Lição prática 04: dissecando tarefa04.c linha a linha. Gargalo de von Neumann, memory-bound vs cpu-bound e OpenMP.">
+  <title>Lição 04: Aplicações limitadas por CPU e memória</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function applyMath(el = document.body) {
+      if (window.renderMathInElement) {
+        renderMathInElement(el, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+    document.addEventListener("DOMContentLoaded", () => applyMath());
+    window.addEventListener("load", () => applyMath());
+  </script>
+</head>
+<body>
+  <nav class="top-nav">
+    <div style="display: flex; gap: 16px;">
+      <a href="../reference/04-teoria-memory-bound-cpu-bound.html">&larr; Teoria 04</a>
+      <a href="../reference/04-memory-bound-cpu-bound.html">Referência rápida 04</a>
+      <a href="../reference/00-fundamentos-programacao-paralela.html">Índice geral</a>
+    </div>
+    <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+  </nav>
+
+  <header>
+    <div class="lesson-badge">Lição 04 &bull; DCA3703</div>
+    <h1>Lição 04: Limites de memória e CPU com OpenMP</h1>
+    <div class="metadata">
+      Tarefa 04 &bull; Dissecção de <code>tarefa04.c</code> &bull; O gargalo de von Neumann e saturação de barramento
+    </div>
+  </header>
+
+  <main>
+
+    <!-- Seção 1: Von Neumann -->
+    <section id="von-neumann">
+      <h2>1. O gargalo de von Neumann</h2>
+      <p>
+        Na computação de alto desempenho, o processador e a memória principal residem em chips distintos. A comunicação entre eles ocorre através de um barramento que possui um limite máximo de banda (medido em GB/s).
+      </p>
+      <ul>
+        <li><strong>Memory-bound</strong>: Quando a CPU é rápida o suficiente para que a aplicação sature a leitura de dados da memória, o gargalo se move para o barramento. A CPU passa a maior parte do tempo <em>ociosa</em> esperando a chegada da informação (gargalo de von Neumann).</li>
+        <li><strong>CPU-bound</strong>: Quando a aplicação calcula valores de forma intensa reutilizando poucos dados armazenados nas caches próximas (L1/L2), o gargalo é o próprio poder de processamento da ALU.</li>
+      </ul>
+      <p>
+        A paralelização multi-thread tem impactos radicalmente distintos nesses dois perfis.
+      </p>
+    </section>
+
+    <!-- Seção 2: Dissecção -->
+    <section id="disseccao-codigo">
+      <h2>2. Dissecção linha a linha de <code>tarefa04.c</code></h2>
+
+      <h3>1. Teste memory-bound (soma de vetores)</h3>
+      <pre><code><span class="hl-prep">#pragma</span> omp parallel for
+<span class="hl-kw">for</span> (<span class="hl-type">long</span> i = <span class="hl-num">0</span>; i &lt; n; ++i) {
+    C[i] = A[i] + B[i];
+}</code></pre>
+      <ul>
+        <li><code>#pragma omp parallel for</code>: Instrui o OpenMP a gerar uma equipe de threads e dividir o laço entre elas (ex: se 4 threads operam sobre $1000$ elementos, cada uma pega $250$).</li>
+        <li>A intensidade aritmética é baixíssima: executa-se apenas 1 FLOP (uma adição) para cada 3 acessos à memória (leitura de A e B, escrita de C).</li>
+        <li>O gargalo será rapidamente deslocado para o barramento de memória, fazendo com que o aumento de threads eventualmente deixe de gerar aceleração.</li>
+      </ul>
+
+      <h3>2. Teste CPU-bound (operações transcendentes)</h3>
+      <pre><code><span class="hl-prep">#pragma</span> omp parallel for
+<span class="hl-kw">for</span> (<span class="hl-type">long</span> i = <span class="hl-num">0</span>; i &lt; n; ++i) {
+    <span class="hl-type">double</span> val = V[i];
+    <span class="hl-kw">for</span> (<span class="hl-type">int</span> j = <span class="hl-num">0</span>; j &lt; <span class="hl-num">50</span>; ++j) {
+        val = <span class="hl-fn">sqrt</span>(val + j * <span class="hl-num">0.01</span>) + <span class="hl-fn">sin</span>(val);
+    }
+    V[i] = val;
+}</code></pre>
+      <ul>
+        <li>Esta estrutura lê 1 valor <code>V[i]</code> da memória para um registrador local (<code>val</code>).</li>
+        <li>Em seguida, submete este registrador a 50 laços de operações pesadíssimas no nível do hardware da ALU (<code>sqrt</code> e <code>sin</code>).</li>
+        <li>Só após muita computação (alta intensidade aritmética), o resultado é salvo novamente na memória principal. O limitante absoluto é o clock da CPU. Adicionar threads gerará escalabilidade ideal.</li>
+      </ul>
+    </section>
+
+    <section id="multithreading">
+      <h2>3. O efeito do hardware multithreading</h2>
+      <p>
+        Muitas CPUs modernas oferecem SMT (Simultaneous Multithreading, ou Hyper-threading na Intel). Eles dobram o número de <em>núcleos lógicos</em> apresentados ao sistema operacional, mas sem dobrar as unidades físicas de execução (ALUs, FPUs).
+      </p>
+      <ul>
+        <li><strong>Ajudando no CPU-bound</strong>: Em programas computacionalmente intensos, se uma thread lógica trava esperando uma instrução, a outra thread lógica no mesmo núcleo físico pode preencher o pipeline e executar computação, aumentando o throughput global.</li>
+        <li><strong>Atrapalhando no Memory-bound</strong>: SMT agrava a competição. As threads extras geram ainda mais tráfego na cache e no controlador de barramento, exaurindo a largura de banda. Nestes casos, usar todas as threads lógicas costuma ser mais lento que usar apenas as threads físicas.</li>
+      </ul>
+    </section>
+
+    <section id="quizzes">
+      <h2>4. Quizzes interativos</h2>
+
+      <!-- Quiz 1 -->
+      <div class="quiz-container" id="quiz1">
+        <div class="quiz-header">
+          <span>Questão 1 de 2</span>
+          <span id="q1-badge" style="font-size: 0.8rem; font-family: 'Inter', sans-serif;"></span>
+        </div>
+        <div class="quiz-question">
+          O que define o gargalo de von Neumann (memory wall) nas arquiteturas de alto desempenho atuais?
+        </div>
+        <div class="quiz-options" id="q1-opts">
+          <button class="quiz-option-btn" onclick="answer('q1', 0, false)">A temperatura do silício impede frequências de clock além de determinados limites causando estagnação na velocidade.</button>
+          <button class="quiz-option-btn" onclick="answer('q1', 1, false)">O escalonamento do sistema operacional não consegue gerenciar adequadamente múltiplos núcleos virtuais ou físicos.</button>
+          <button class="quiz-option-btn" onclick="answer('q1', 2, true)">O processador tem taxa de cálculo infinitamente superior à largura de banda máxima do barramento da memória principal.</button>
+          <button class="quiz-option-btn" onclick="answer('q1', 3, false)">A compilação de código vetorial é severamente limitada pela complexidade semântica da linguagem C padronizada.</button>
+        </div>
+        <div class="quiz-explanation" id="q1-exp">
+          <strong>Correto!</strong> Devido ao fosso tecnológico, as CPUs processam dados muito mais rapidamente do que os barramentos de memória DRAM conseguem transferir, mantendo a CPU faminta por dados.
+        </div>
+        <button class="quiz-reset-btn" id="q1-reset" onclick="resetQuiz('q1')" style="display:none;">Tentar novamente</button>
+      </div>
+
+      <!-- Quiz 2 -->
+      <div class="quiz-container" id="quiz2">
+        <div class="quiz-header">
+          <span>Questão 2 de 2</span>
+          <span id="q2-badge" style="font-size: 0.8rem; font-family: 'Inter', sans-serif;"></span>
+        </div>
+        <div class="quiz-question">
+          Por que a adição de mais threads via SMT (Hardware Multithreading) frequentemente piora o desempenho de programas do tipo memory-bound?
+        </div>
+        <div class="quiz-options" id="q2-opts">
+          <button class="quiz-option-btn" onclick="answer('q2', 0, true)">As threads adicionais disputam agressivamente o mesmo barramento de memória limitando drasticamente as latências.</button>
+          <button class="quiz-option-btn" onclick="answer('q2', 1, false)">As funções de matemática transcendente sobrecarregam as unidades de ponto flutuante independentemente da memória.</button>
+          <button class="quiz-option-btn" onclick="answer('q2', 2, false)">A camada de gerenciamento de cache isola cada thread impedindo absolutamente qualquer compartilhamento paralelo real.</button>
+          <button class="quiz-option-btn" onclick="answer('q2', 3, false)">O sistema operacional reserva ciclos redundantes de rede provocando starvation nas unidades de processamento lógico.</button>
+        </div>
+        <div class="quiz-explanation" id="q2-exp">
+          <strong>Correto!</strong> Como as threads competem ativamente pelo mesmo recurso gargalo (largura de banda da memória) que já estava saturado pelos núcleos físicos, o tráfego gerado pela contenção causa atrasos extremos para todos.
+        </div>
+        <button class="quiz-reset-btn" id="q2-reset" onclick="resetQuiz('q2')" style="display:none;">Tentar novamente</button>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer-nav">
+    <a href="../reference/04-teoria-memory-bound-cpu-bound.html">&larr; Teoria 04 (O Gargalo)</a>
+    <a href="../reference/04-memory-bound-cpu-bound.html">Referência Rápida &rarr;</a>
+  </footer>
+
+  <script>
+    /* -------- Theme toggle -------- */
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('theme', target);
+    }
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+
+    /* -------- Symmetric Quiz Engine -------- */
+    function answer(qid, idx, correct) {
+      const opts = document.querySelectorAll('#' + qid + '-opts .quiz-option-btn');
+      opts.forEach(b => b.disabled = true);
+      opts[idx].classList.add(correct ? 'correct' : 'wrong');
+      if (!correct) {
+        opts.forEach(b => {
+          if (b.getAttribute('onclick').includes(', true)')) {
+            b.classList.add('correct');
+          }
+        });
+      }
+      const exp = document.getElementById(qid + '-exp');
+      exp.classList.add('visible');
+      const badge = document.getElementById(qid + '-badge');
+      badge.textContent = correct ? '✓ Acertou' : '✗ Errou';
+      badge.style.color = correct ? 'var(--success)' : 'var(--error)';
+      document.getElementById(qid + '-reset').style.display = 'inline-block';
+    }
+
+    function resetQuiz(qid) {
+      const opts = document.querySelectorAll('#' + qid + '-opts .quiz-option-btn');
+      opts.forEach(b => {
+        b.disabled = false;
+        b.classList.remove('correct', 'wrong');
+      });
+      document.getElementById(qid + '-exp').classList.remove('visible');
+      document.getElementById(qid + '-badge').textContent = '';
+      document.getElementById(qid + '-reset').style.display = 'none';
+    }
+  </script>
+</body>
+</html>
