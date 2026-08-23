@@ -43,28 +43,28 @@ Implementar dois programas paralelos em C com OpenMP: um limitado por memória (
 \section{Fundamentação teórica}
 
 \subsection{O gargalo de von Neumann}
-A arquitetura de von Neumann clássica separa a memória principal da unidade de processamento. Para que a CPU calcule algo, ela precisa buscar dados na RAM através do barramento do sistema. Com a evolução do hardware, os núcleos das CPUs tornaram-se capazes de realizar operações lógicas e aritméticas em uma taxa absurdamente mais alta do que a taxa de transferência suportada pelo barramento de memória (largura de banda máxima). Essa disparidade de velocidade gera o \textbf{gargalo de von Neumann}, também chamado de \textit{Memory Wall}.
+A arquitetura de von Neumann separa a memória principal da unidade de processamento. A CPU busca dados na RAM pelo barramento do sistema. Com a evolução do hardware, os núcleos passaram a executar operações aritméticas ordens de grandeza mais rápido do que o barramento consegue entregar dados. Em um processador moderno, a ALU pode consumir centenas de GFLOP/s, enquanto a largura de banda da memória não passa de dezenas de GB/s. Essa disparidade é o \textbf{gargalo de von Neumann}, ou \textit{Memory Wall}.
 
 \subsection{Intensidade aritmética e limites de escalabilidade}
-A classificação de um algoritmo como \textit{memory-bound} (limitado por memória) ou \textit{cpu-bound} (limitado por processamento) depende de sua intensidade aritmética: a razão entre as operações aritméticas executadas e os bytes transferidos.
+A intensidade aritmética é a razão entre operações aritméticas executadas e bytes transferidos da memória. Esse número classifica o algoritmo como \textit{memory-bound} ou \textit{cpu-bound}.
 
-Em um cenário \textit{memory-bound}, a intensidade aritmética é muito baixa. Por exemplo, a soma de dois vetores $C[i] = A[i] + B[i]$ realiza uma operação (\texttt{ADD}) para três acessos à memória (leitura de $A$, leitura de $B$, e gravação em $C$). A CPU processa essa soma instantaneamente e passa a maior parte do tempo ociosa, esperando a RAM. 
+Um algoritmo \textit{memory-bound} tem intensidade aritmética baixa. A soma de vetores $C[i] = A[i] + B[i]$ executa 1 operação para 24 bytes transferidos (2 leituras + 1 escrita de \texttt{double}). A CPU termina a soma em poucos ciclos e fica ociosa esperando o próximo dado chegar da RAM.
 
-Em um cenário \textit{cpu-bound}, a intensidade aritmética é alta. Um dado é carregado da memória (ou reside diretamente nos registradores e no cache L1) e sofre uma série de cálculos pesados sequenciais (ex.: séries de Taylor, raiz quadrada, trigonometria). O limitante passa a ser a capacidade da Unidade Lógica e Aritmética (ALU).
+Um algoritmo \textit{cpu-bound} tem intensidade aritmética alta. O dado é carregado uma vez e passa por muitas operações antes de voltar à memória. Séries de Taylor, raiz quadrada e trigonometria são exemplos. O limitante é a capacidade da ALU, não a largura de banda.
 
 \subsection{O efeito do Simultaneous Multithreading (SMT)}
-CPUs modernas apresentam núcleos lógicos extras usando SMT (\textit{Hyper-threading} na Intel). Isso significa que um único núcleo físico gerencia duas linhas de execução concorrentes. Em programas \textit{cpu-bound}, isso ajuda, pois quando uma thread sofre latência de pipeline, a segunda mantém a ALU ocupada. Porém, em programas \textit{memory-bound}, as duas threads lógicas começam a disputar o mesmo barramento saturado e a mesma cache L1, frequentemente piorando o tempo total de resposta por contenção (\textit{thrashing}).
+CPUs modernas expõem núcleos lógicos extras via SMT (\textit{Hyper-threading} na Intel). Um único núcleo físico gerencia duas threads. Em código \textit{cpu-bound}, a segunda thread aproveita ciclos ociosos do pipeline e mantém a ALU ocupada. Em código \textit{memory-bound}, o efeito é o oposto: as duas threads disputam o mesmo barramento já saturado e a mesma cache L1, aumentando a contenção e piorando o tempo total.
 
 \section{Experimento}
 
 \subsection{Configuração}
-O código utiliza $N=50.000.000$ de elementos. Foram alocados quatro vetores do tipo \texttt{double}: três para o teste \textit{memory-bound} e um para o teste \textit{cpu-bound}. 
+O programa aloca quatro vetores de \texttt{double} com $N = 50.000.000$ elementos: três para o teste \textit{memory-bound} (A, B, C) e um para o teste \textit{cpu-bound} (V).
 
-No teste \textit{memory-bound}, a iteração calcula uma simples soma de vetores, forçando leituras e escritas sem reuso temporal no nível da cache, estressando a capacidade de leitura sequencial da RAM.
+O teste \textit{memory-bound} calcula $C[i] = A[i] + B[i]$. O laço lê dois vetores e escreve um terceiro, sem reuso temporal de cache. Toda a pressão recai sobre a largura de banda da RAM.
 
-No teste \textit{cpu-bound}, itera-se sobre um único vetor. Cada elemento é carregado para uma variável local (\texttt{double val}), submetido a 50 iterações computacionais pesadas de funções trigonométricas (\texttt{sin}) e radiciação (\texttt{sqrt}), e só então o valor consolidado é salvo de volta na memória, minimizando os acessos ao barramento.
+O teste \textit{cpu-bound} carrega cada \texttt{V[i]} para uma variável local e aplica 50 iterações de \texttt{sqrt} e \texttt{sin}. Só ao final das 50 iterações o resultado volta à memória. O acesso à RAM é mínimo; o gargalo é a ALU.
 
-As medições foram feitas utilizando \texttt{clock\_gettime(CLOCK\_MONOTONIC)} e a compilação foi gerada via GCC (sinalizador \texttt{-O3} e \texttt{-fopenmp}). O número de threads foi variado externamente pelo script de execução utilizando a variável de ambiente \texttt{OMP\_NUM\_THREADS}.
+O programa mede o tempo com \texttt{clock\_gettime(CLOCK\_MONOTONIC)}. O GCC compilou o código com \texttt{-O3} e \texttt{-fopenmp}. Um script externo variou \texttt{OMP\_NUM\_THREADS} de 1 a 28.
 
 \section{Código-fonte}
 
@@ -157,24 +157,52 @@ Threads & Tempo CPU-bound & Speedup CPU & Tempo Memory-bound & Speedup Mem\\
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.9\textwidth]{speedup_plot.png}
-\caption{Gráfico de Speedup versus número de threads lógicas ($N=10.000.000$). O limite ideal de escalabilidade linear é a diagonal (preta tracejada).}
+\caption{Tempo de execução em escala logarítmica versus número de threads ($N = 50.000.000$). A linha pontilhada marca o limite de 14 núcleos físicos.}
 \label{fig:speedup}
 \end{figure}
+
+\subsection{Roofline Model}
+A Figura~\ref{fig:roofline} plota o desempenho medido de cada kernel contra os tetos de hardware da máquina.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\textwidth]{roofline_plot.png}
+\caption{Roofline Model, Intel i7-14700HX. Pontos azuis: kernel \textit{memory-bound} ($\text{AI} \approx 0{,}042$ FLOP/byte). Pontos vermelhos: kernel \textit{cpu-bound} ($\text{AI} \approx 65{,}6$ FLOP/byte). Teto sólido: multinúcleo (350~GFLOP/s, 55~GB/s de largura de banda). Teto tracejado: núcleo único.}
+\label{fig:roofline}
+\end{figure}
+
+A \textbf{intensidade aritmética} (AI) de cada kernel foi calculada como:
+
+\begin{itemize}
+    \item \textbf{Memory-bound} ($C[i] = A[i] + B[i]$): 1 FLOP por elemento, com 3 acessos de 8 bytes (2 leituras + 1 escrita = 24 bytes). Portanto $\text{AI} = 1/24 \approx 0{,}042$ FLOP/byte.
+    \item \textbf{CPU-bound} (50 iterações de \texttt{sqrt} + \texttt{sin}): aproximadamente 1050 FLOPs por elemento (50 $\times$ 21 FLOPs/iteração), com apenas 16 bytes transferidos (1 leitura + 1 escrita). Portanto $\text{AI} = 1050/16 \approx 65{,}6$ FLOP/byte.
+\end{itemize}
+
+Os pontos do kernel \textit{memory-bound} ficam à esquerda do ponto de crista (AI $\approx 6{,}4$), na região inclinada do roofline, onde a largura de banda limita o desempenho. Os pontos do kernel \textit{cpu-bound} ficam à direita, na região plana, limitados pelo pico computacional.
 
 \section{Discussão}
 
 \subsection{Escalabilidade e limitação da memória}
-Os dados empíricos atestam nitidamente que o escalonamento sofre de patologias dependentes da intensidade aritmética. Para a tarefa \textit{cpu-bound}, a curva de aceleração sobe progressivamente e mantém-se relativamente próxima do limite ideal. Quando atingimos o total de 14 núcleos físicos da máquina, o speedup já marca 7$\times$, com a capacidade da CPU de ponto flutuante dividindo de forma razoavelmente consistente a carga de trabalho.
+A escalabilidade dos dois kernels diverge porque o recurso disputado é diferente. No kernel \textit{cpu-bound}, cada núcleo traz sua própria ALU. Dobrar os núcleos dobra a capacidade de processamento disponível, e o speedup acompanha a curva ideal enquanto houver núcleos físicos livres.
 
-Já a tarefa \textit{memory-bound}, que simplesmente soma vetores, apresenta um rápido platô. Após cerca de 4 threads, a velocidade estaciona em valores marginais (próximos de 0,01 s). Adicionar 8, 14 ou 28 threads não melhora substancialmente o desempenho. Isso comprova o gargalo de von Neumann: a máquina chegou ao limite de quantos gigabytes por segundo consegue despachar através da hierarquia de memória para alimentar as unidades lógicas; as ALUs estão esfomeadas (\textit{data starvation}) aguardando a latência de memória.
+No kernel \textit{memory-bound}, todos os núcleos compartilham o mesmo barramento de memória. A partir do momento em que o barramento atinge sua vazão máxima, núcleos extras ficam ociosos esperando dados. O tempo estabiliza independentemente de quantas threads sejam criadas. O gráfico de tempo de execução (Figura~\ref{fig:speedup}) mostra essa estagnação com clareza.
+
+\subsection{Interpretação do Roofline Model}
+O Roofline Model (Figura~\ref{fig:roofline}) explica essa diferença de forma estrutural. Cada kernel ocupa uma posição fixa no eixo horizontal, determinada pela sua intensidade aritmética. O teto de desempenho nessa posição define o máximo que o hardware pode entregar.
+
+O kernel \textit{memory-bound} tem AI tão baixa que fica na rampa inclinada do gráfico, limitado pela largura de banda. Nessa região, adicionar mais poder de processamento não adianta: o gargalo é a velocidade com que os dados chegam da RAM. Para melhorar, seria preciso mudar o algoritmo para reutilizar dados em cache.
+
+O kernel \textit{cpu-bound} tem AI alta o suficiente para ficar na região plana, limitado pela capacidade das ALUs. Aqui, mais núcleos significa mais capacidade real, e o paralelismo funciona.
 
 \subsection{Regressão de desempenho por SMT (Hyper-threading)}
-Fica muito claro na tabela, no salto entre os núcleos físicos e lógicos (até a thread 28), que o multithreading de hardware pode ser prejudicial para operações limitadas por memória. Ao sobrecarregar a fila de acesso à RAM com ainda mais requisições concorrentes disparadas por threads lógicas (threads 15 a 28) compartilhando o mesmo núcleo físico e cache L1 das físicas, a contenção do barramento se exacerba. 
+O SMT permite que dois fluxos de execução compartilhem o mesmo núcleo físico. Em código \textit{cpu-bound}, a segunda thread ocupa ciclos que a primeira desperdiça com latência de pipeline, e o desempenho melhora. Em código \textit{memory-bound}, ambas as threads geram requisições ao mesmo barramento já saturado. O resultado é contenção: as requisições se enfileiram, e o tempo piora em vez de melhorar.
 
-Como visto na tabela, o tempo do \textit{memory-bound} com 28 threads ativas sofreu regressão (0,015 s, um speedup de 5,20$\times$), sendo consideravelmente mais lento do que quando rodou em apenas 14 ou 8 threads (0,009 s e 0,011 s). No modelo \textit{cpu-bound}, o SMT proveu vantagens secundárias e ajudou o speedup a alcançar cerca de 8,91$\times$.
+Os dados confirmam esse comportamento. Acima de 14 threads, o kernel \textit{memory-bound} regride enquanto o \textit{cpu-bound} ainda extrai ganho marginal do SMT.
 
 \section{Conclusão}
 
-A alocação massiva de \textit{threads} não soluciona restrições estruturais de velocidade. O programador precisa classificar a intensidade aritmética do seu algoritmo: caso a aplicação seja intensiva em memória, as otimizações necessárias devem focar em padronizar o acesso aos dados para otimizar as linhas de cache e minimizar os \textit{cache misses}, em vez de cegamente empregar mais \textit{threads} simultâneas. O \texttt{\#pragma omp parallel for} escala de forma ideal apenas para lógicas onde os dados necessários se mantêm temporalmente nos registradores por múltiplos ciclos da ALU.
+Adicionar threads não resolve gargalos de largura de banda. Neste experimento, o kernel \textit{memory-bound} parou de escalar com 4 threads e piorou com 28. O kernel \textit{cpu-bound} escalou até 8,91$\times$ com 28 threads. A diferença é a intensidade aritmética: 0,042 contra 65,6 FLOP/byte.
+
+Antes de paralelizar com \texttt{\#pragma omp parallel for}, vale identificar o gargalo. Se for largura de banda, o caminho é melhorar o padrão de acesso à memória e aumentar o reuso de cache. Se for capacidade de processamento, mais threads resolvem.
 
 \end{document}

@@ -3,54 +3,50 @@ import matplotlib.pyplot as plt
 import os
 
 def main():
-    # Caminho do diretório atual (tarefa04)
     base_dir = os.path.dirname(os.path.abspath(__file__))
     csv_path = os.path.join(base_dir, 'results.csv')
-    
+
     if not os.path.exists(csv_path):
         print(f"Erro: Arquivo {csv_path} não encontrado.")
         return
 
     df = pd.read_csv(csv_path)
 
-    # Pegando os tempos com 1 thread (base para speedup)
-    t1_mem = df.loc[df['threads'] == 1, 'memory_bound'].values[0]
-    t1_cpu = df.loc[df['threads'] == 1, 'cpu_bound'].values[0]
+    fig, ax = plt.subplots(figsize=(10, 6))
 
-    # Calculando Speedup
-    df['speedup_mem'] = t1_mem / df['memory_bound']
-    df['speedup_cpu'] = t1_cpu / df['cpu_bound']
+    ax.plot(df['threads'], df['cpu_bound'], 'r-s', markersize=5,
+            label='Limitado por CPU (sqrt+sin ×50)')
+    ax.plot(df['threads'], df['memory_bound'], 'b-o', markersize=5,
+            label='Limitado por memória (C=A+B)')
 
-    plt.figure(figsize=(10, 6))
-    
-    # Plota Speedup Ideal
-    plt.plot(df['threads'], df['threads'], 'k--', label='Speedup Ideal')
-    
-    # Plota Memory-bound
-    plt.plot(df['threads'], df['speedup_mem'], 'b-o', label='Memory-bound (Soma de vetores)')
-    
-    # Plota CPU-bound
-    plt.plot(df['threads'], df['speedup_cpu'], 'r-s', label='CPU-bound (Operações intensas)')
+    ax.set_yscale('log')
+    ax.set_xlabel('Número de threads', fontsize=12)
+    ax.set_ylabel('Tempo de execução (s)', fontsize=12)
+    ax.set_title('Tempo de execução vs. número de threads', fontsize=14,
+                 fontweight='bold')
 
-    plt.title('Speedup vs Número de Threads', fontsize=14)
-    plt.xlabel('Número de Threads', fontsize=12)
-    plt.ylabel('Speedup $S(p)$', fontsize=12)
-    plt.grid(True, linestyle='--', alpha=0.7)
-    plt.legend(fontsize=12)
-    
-    plt.xticks(df['threads'])
-    
-    # Adicionando linha indicando provável transição para threads lógicas (SMT)
-    # nproc/2 costuma ser o número de cores físicos
+    ax.grid(True, which='both', linestyle='--', alpha=0.3)
+    ax.legend(fontsize=11)
+
+    ax.set_xticks(df['threads'])
+    ax.set_xticklabels([str(t) if t in [1,2,4,8,14,20,28] else ''
+                        for t in df['threads']], fontsize=9)
+
+    # Linha vertical no limite de núcleos físicos
     import multiprocessing
     physical_cores = multiprocessing.cpu_count() // 2
     if physical_cores > 0 and physical_cores < max(df['threads']):
-        plt.axvline(x=physical_cores, color='grey', linestyle=':', label='Limite de núcleos físicos')
-        plt.legend(fontsize=12)
+        ax.axvline(x=physical_cores, color='grey', linestyle=':',
+                   linewidth=1.2, alpha=0.7)
+        ax.text(physical_cores + 0.4, ax.get_ylim()[1] * 0.5,
+                f'{physical_cores} núcleos\nfísicos', fontsize=8,
+                color='grey', va='top')
 
+    plt.tight_layout()
     plot_path = os.path.join(base_dir, 'speedup_plot.png')
-    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+    fig.savefig(plot_path, dpi=300, bbox_inches='tight')
     print(f"Gráfico salvo em {plot_path}")
+    plt.close()
 
 if __name__ == '__main__':
     main()
