@@ -31,7 +31,7 @@ PEAK_BW_GBS = 55.0        # GB/s prática (STREAM-like, não teórica)
 PEAK_GFLOPS_1CORE = 28.0  # 1 P-core, ~3.5 GHz, escalar FP64
 PEAK_BW_1CORE_GBS = 20.0  # BW efetiva de 1 core (limitada por latência)
 
-N = 50_000_000            # Número de elementos usado nos experimentos
+N = 5_000_000             # Número de elementos usado nos experimentos
 
 # ──────────────────────────────────────────────────────────────
 # Cálculo da intensidade aritmética dos kernels
@@ -68,8 +68,8 @@ def main():
     df = pd.read_csv(csv_path)
 
     # ── Pontos operacionais para cada contagem de threads ──
-    # Vamos plotar pontos selecionados: 1, 4, 8, 14, 28 threads
-    threads_sel = [1, 4, 8, 14, 28]
+    # Pontos que mostram o início, a escala e a saturação.
+    threads_sel = [1, 4, 8, 14, 26, 28]
 
     mem_points = []  # (AI, GFLOP/s, label)
     cpu_points = []

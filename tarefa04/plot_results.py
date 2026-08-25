@@ -32,16 +32,6 @@ def main():
     ax.set_xticklabels([str(t) if t in [1,2,4,8,14,20,28] else ''
                         for t in df['threads']], fontsize=9)
 
-    # Linha vertical no limite de núcleos físicos
-    import multiprocessing
-    physical_cores = multiprocessing.cpu_count() // 2
-    if physical_cores > 0 and physical_cores < max(df['threads']):
-        ax.axvline(x=physical_cores, color='grey', linestyle=':',
-                   linewidth=1.2, alpha=0.7)
-        ax.text(physical_cores + 0.4, ax.get_ylim()[1] * 0.5,
-                f'{physical_cores} núcleos\nfísicos', fontsize=8,
-                color='grey', va='top')
-
     plt.tight_layout()
     plot_path = os.path.join(base_dir, 'speedup_plot.png')
     fig.savefig(plot_path, dpi=300, bbox_inches='tight')

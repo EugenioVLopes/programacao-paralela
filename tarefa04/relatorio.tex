@@ -8,201 +8,68 @@
 \geometry{headheight=23pt, top=2cm, bottom=2cm, left=2.5cm, right=2.5cm}
 \setlength{\parskip}{0.5em}
 \setlength{\parindent}{0pt}
-
-\lstset{
-    language=C,
-    basicstyle=\ttfamily\small,
-    keywordstyle=\color{blue}\bfseries,
-    commentstyle=\color{green!60!black}\itshape,
-    stringstyle=\color{red!80!black},
-    numbers=left,
-    numberstyle=\tiny\color{gray},
-    numbersep=8pt,
-    frame=single,
-    breaklines=true,
-    captionpos=b,
-    tabsize=4,
-    showstringspaces=false
-}
-
+\lstset{language=C,basicstyle=\ttfamily\small,keywordstyle=\color{blue}\bfseries,commentstyle=\color{green!60!black}\itshape,numbers=left,numberstyle=\tiny\color{gray},numbersep=8pt,frame=single,breaklines=true,captionpos=b,tabsize=4,showstringspaces=false}
 \begin{document}
 \pagestyle{plain}
-
 \begin{center}
-    {\LARGE\bfseries Aplicações Limitadas por Memória e CPU}\\[0.4em]
-    {\large Gargalo de von Neumann e Saturação de Barramento com OpenMP}\\[1em]
-    {\normalsize Eugênio Vitor Lopes dos Santos}\\[0.3em]
-    {\small DCA3703 -- Programação Paralela, Universidade Federal do Rio Grande do Norte}\\[0.3em]
-    {\small \today}
+{\LARGE\bfseries Aplicações Limitadas por Memória e por CPU}\\[0.4em]
+{\large Medição de desempenho com OpenMP}\\[1em]
+{\normalsize Eugênio Vitor Lopes dos Santos}\\[0.3em]
+{\small DCA3703 -- Programação Paralela, Universidade Federal do Rio Grande do Norte}\\[0.3em]
+{\small \today}
 \end{center}
 
-
 \section{Enunciado}
-Implementar dois programas paralelos em C com OpenMP: um limitado por memória (somas simples em vetores) e outro limitado por CPU (cálculos matemáticos intensivos iterativos locais). Paralelizar ambos com \texttt{\#pragma omp parallel for} e medir o tempo de execução variando o número de threads. Analisar quando o desempenho melhora, estabiliza ou piora, refletindo sobre como o multithreading de hardware pode ajudar em programas \textit{cpu-bound}, mas atrapalhar em programas \textit{memory-bound} devido à competição por recursos.
+Implemente dois programas paralelos em C com OpenMP: um limitado por memória, com somas simples em vetores, e outro limitado por CPU, com cálculos matemáticos intensivos. Paralelize com \texttt{\#pragma omp parallel for} e meça o tempo de execução variando o número de threads. Analise quando o desempenho melhora, estabiliza ou piora. Reflita sobre como o multithreading de hardware pode ajudar programas memory-bound e atrapalhar programas compute-bound pela competição por recursos.
 
-\section{Fundamentação teórica}
+\section{Fundamentação}
+Uma aplicação memory-bound transfere muitos dados e realiza poucas operações por byte. Neste caso, cada iteração lê dois valores e escreve um valor. O limite principal é a largura de banda da memória. A soma realiza uma operação de ponto flutuante para cerca de 24 bytes transferidos, sem considerar efeitos de cache.
 
-\subsection{O gargalo de von Neumann}
-A arquitetura de von Neumann separa a memória principal da unidade de processamento. A CPU busca dados na RAM pelo barramento do sistema. Com a evolução do hardware, os núcleos passaram a executar operações aritméticas ordens de grandeza mais rápido do que o barramento consegue entregar dados. Em um processador moderno, a ALU pode consumir centenas de GFLOP/s, enquanto a largura de banda da memória não passa de dezenas de GB/s. Essa disparidade é o \textbf{gargalo de von Neumann}, ou \textit{Memory Wall}.
+Uma aplicação compute-bound realiza muitas operações antes de acessar novos dados. Neste trabalho, cada elemento executa 50 repetições de \texttt{sqrt} e \texttt{sin}. Essas funções exigem mais tempo de cálculo do que a leitura e a escrita de um único elemento. Não é correto atribuir um número exato de FLOPs a essas funções sem conhecer a implementação da biblioteca matemática. Por isso, a classificação é feita pelo comportamento do laço, e não por uma estimativa exata de FLOPs.
 
-\subsection{Intensidade aritmética e limites de escalabilidade}
-A intensidade aritmética é a razão entre operações aritméticas executadas e bytes transferidos da memória. Esse número classifica o algoritmo como \textit{memory-bound} ou \textit{cpu-bound}.
+O multithreading de hardware pode ajudar uma aplicação memory-bound porque outra thread pode executar enquanto a primeira espera dados da memória. Esse ganho depende da latência e da largura de banda disponíveis. Quando a largura de banda está saturada, novas threads passam a competir pelo mesmo recurso. Em uma aplicação compute-bound, threads lógicas compartilham unidades de execução, caches e outros recursos do núcleo físico. Por isso, elas podem não produzir ganho e podem aumentar o tempo por causa da competição.
 
-Um algoritmo \textit{memory-bound} tem intensidade aritmética baixa. A soma de vetores $C[i] = A[i] + B[i]$ executa 1 operação para 24 bytes transferidos (2 leituras + 1 escrita de \texttt{double}). A CPU termina a soma em poucos ciclos e fica ociosa esperando o próximo dado chegar da RAM.
+\section{Implementação}
+Embora o enunciado use a expressão ``dois programas'', esta implementação usa um único arquivo e um único executável. Ele contém dois testes independentes, executados e medidos separadamente. Essa escolha evita repetir o código de alocação, inicialização, medição e configuração de threads. Ela não altera os dois casos exigidos: o primeiro laço é memory-bound e o segundo é compute-bound.
 
-Um algoritmo \textit{cpu-bound} tem intensidade aritmética alta. O dado é carregado uma vez e passa por muitas operações antes de voltar à memória. Séries de Taylor, raiz quadrada e trigonometria são exemplos. O limitante é a capacidade da ALU, não a largura de banda.
+O teste memory-bound aloca os vetores \texttt{A}, \texttt{B} e \texttt{C} e calcula \texttt{C[i] = A[i] + B[i]}. Cada thread escreve em uma posição diferente de \texttt{C}. O teste compute-bound aplica 50 repetições de \texttt{sqrt} e \texttt{sin} a cada elemento de \texttt{V}. O valor temporário \texttt{val} é privado de cada iteração. A alocação e o preenchimento dos vetores ocorrem antes dos cronômetros. Cada tempo cobre somente o seu laço paralelo.
+\lstinputlisting[caption={Testes limitado pela memória e limitado pela CPU}]{tarefa04.c}
 
-\subsection{O efeito do Simultaneous Multithreading (SMT)}
-CPUs modernas expõem núcleos lógicos extras via SMT (\textit{Hyper-threading} na Intel). Um único núcleo físico gerencia duas threads. Em código \textit{cpu-bound}, a segunda thread aproveita ciclos ociosos do pipeline e mantém a ALU ocupada. Em código \textit{memory-bound}, o efeito é o oposto: as duas threads disputam o mesmo barramento já saturado e a mesma cache L1, aumentando a contenção e piorando o tempo total.
+O arquivo é compilado com GCC, \texttt{-fopenmp} e \texttt{-lm}. O programa recebe o número de elementos como argumento e usa $N=50.000.000$ como valor padrão. Os testes deste relatório usam $N=5.000.000$. Para cada quantidade de threads, o programa é executado três vezes e a mediana de cada teste é registrada. A medição usa \texttt{CLOCK\_MONOTONIC}, que não é afetado por alterações no relógio do sistema.
 
-\section{Experimento}
+\begin{lstlisting}[caption={Compilação e execução dos testes}]
+gcc -std=c11 -Wall -Wextra -fopenmp tarefa04.c -o tarefa04 -lm
 
-\subsection{Configuração}
-O programa aloca quatro vetores de \texttt{double} com $N = 50.000.000$ elementos: três para o teste \textit{memory-bound} (A, B, C) e um para o teste \textit{cpu-bound} (V).
-
-O teste \textit{memory-bound} calcula $C[i] = A[i] + B[i]$. O laço lê dois vetores e escreve um terceiro, sem reuso temporal de cache. Toda a pressão recai sobre a largura de banda da RAM.
-
-O teste \textit{cpu-bound} carrega cada \texttt{V[i]} para uma variável local e aplica 50 iterações de \texttt{sqrt} e \texttt{sin}. Só ao final das 50 iterações o resultado volta à memória. O acesso à RAM é mínimo; o gargalo é a ALU.
-
-O programa mede o tempo com \texttt{clock\_gettime(CLOCK\_MONOTONIC)}. O GCC compilou o código com \texttt{-O3} e \texttt{-fopenmp}. Um script externo variou \texttt{OMP\_NUM\_THREADS} de 1 a 28.
-
-\section{Código-fonte}
-
-\begin{lstlisting}[caption={tarefa04.c}]
-#define _POSIX_C_SOURCE 199309L
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-#include <math.h>
-#include <omp.h>
-
-#define DEFAULT_N 50000000L
-
-static double agora(void) {
-    struct timespec t;
-    clock_gettime(CLOCK_MONOTONIC, &t);
-    return t.tv_sec + t.tv_nsec / 1e9;
-}
-
-int main(int argc, char **argv) {
-    long n = argc > 1 ? atol(argv[1]) : DEFAULT_N;
-    if (n <= 0) {
-        fprintf(stderr, "Uso: %s [numero]\n", argv[0]);
-        return 1;
-    }
-
-    double *A = malloc((size_t)n * sizeof(*A));
-    double *B = malloc((size_t)n * sizeof(*B));
-    double *C = malloc((size_t)n * sizeof(*C));
-    double *V = malloc((size_t)n * sizeof(*V));
-
-    if (!A || !B || !C || !V) return 1;
-
-    for (long i = 0; i < n; ++i) {
-        A[i] = i * 0.5; B[i] = i * 0.25; V[i] = i * 0.1;
-    }
-
-    int n_threads = omp_get_max_threads();
-
-    double inicio_mem = agora();
-    #pragma omp parallel for
-    for (long i = 0; i < n; ++i) {
-        C[i] = A[i] + B[i];
-    }
-    double tempo_mem = agora() - inicio_mem;
-
-    double inicio_cpu = agora();
-    #pragma omp parallel for
-    for (long i = 0; i < n; ++i) {
-        double val = V[i];
-        for (int j = 0; j < 50; ++j) {
-            val = sqrt(val + j * 0.01) + sin(val);
-        }
-        V[i] = val;
-    }
-    double tempo_cpu = agora() - inicio_cpu;
-
-    printf("N=%ld threads=%d memory_bound=%.9f cpu_bound=%.9f\n", 
-           n, n_threads, tempo_mem, tempo_cpu);
-
-    double soma_check = C[n/2] + V[n/2];
-    if (soma_check == 0.0) printf(" \n");
-
-    free(A); free(B); free(C); free(V);
-    return 0;
-}
+OMP_NUM_THREADS=1 ./tarefa04 5000000
+OMP_NUM_THREADS=28 ./tarefa04 5000000
 \end{lstlisting}
 
-\section{Resultados}
-
-\subsection{Tempos medidos e Speedup}
-\begin{table}[H]
-\centering
-\caption{Tempo de execução em segundos e Speedup relativo para $N=10.000.000$ em amostras selecionadas.}
-\begin{tabular}{c|rr|rr}
-\hline
-Threads & Tempo CPU-bound & Speedup CPU & Tempo Memory-bound & Speedup Mem\\
-\hline
-1 & 7,372 s & 1,00$\times$ & 0,078 s & 1,00$\times$\\
-2 & 4,154 s & 1,77$\times$ & 0,017 s & 4,59$\times$\\
-4 & 2,310 s & 3,19$\times$ & 0,011 s & 7,09$\times$\\
-8 & 1,427 s & 5,17$\times$ & 0,011 s & 7,09$\times$\\
-14 & 1,049 s & 7,03$\times$ & 0,009 s & 8,67$\times$\\
-28 & 0,827 s & 8,91$\times$ & 0,015 s & 5,20$\times$\\
-\hline
-\end{tabular}
-\end{table}
-
+\section{Resultados e Discussão}
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.9\textwidth]{speedup_plot.png}
-\caption{Tempo de execução em escala logarítmica versus número de threads ($N = 50.000.000$). A linha pontilhada marca o limite de 14 núcleos físicos.}
-\label{fig:speedup}
+\caption{Tempo de execução em função do número de threads. Os tempos são as medianas de três execuções.}
+\label{fig:tempos}
 \end{figure}
 
-\subsection{Roofline Model}
-A Figura~\ref{fig:roofline} plota o desempenho medido de cada kernel contra os tetos de hardware da máquina.
+O programa memory-bound melhora quando o número de threads aumenta no início do experimento. Depois, o tempo apresenta pouca redução e oscila. Em alguns pontos, o tempo aumenta. Esse comportamento indica saturação ou disputa pela largura de banda da memória.
+
+O programa compute-bound também melhora com o aumento de threads enquanto existem recursos de CPU disponíveis. Após esse ponto, o ganho diminui e pode desaparecer. Se threads lógicas compartilham o mesmo núcleo físico, a competição por unidades de cálculo pode causar estabilidade ou piora.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.95\textwidth]{roofline_plot.png}
-\caption{Roofline Model, Intel i7-14700HX. Pontos azuis: kernel \textit{memory-bound} ($\text{AI} \approx 0{,}042$ FLOP/byte). Pontos vermelhos: kernel \textit{cpu-bound} ($\text{AI} \approx 65{,}6$ FLOP/byte). Teto sólido: multinúcleo (350~GFLOP/s, 55~GB/s de largura de banda). Teto tracejado: núcleo único.}
+\includegraphics[width=0.9\textwidth]{roofline_plot.png}
+\caption{Modelo Roofline ajustado aos resultados com $N=5.000.000$. Os tetos são estimativas de pico do sistema de referência.}
 \label{fig:roofline}
 \end{figure}
 
-A \textbf{intensidade aritmética} (AI) de cada kernel foi calculada como:
+O gráfico Roofline reforça essa diferença. A intensidade aritmética do programa memory-bound é $1/24 \approx 0{,}042$ FLOP por byte. Esse valor está à esquerda do ponto de crista. Portanto, a largura de banda da memória limita o desempenho antes do pico de cálculo da CPU. O ponto medido sobe quando mais threads são usadas, mas permanece abaixo do teto de largura de banda.
 
-\begin{itemize}
-    \item \textbf{Memory-bound} ($C[i] = A[i] + B[i]$): 1 FLOP por elemento, com 3 acessos de 8 bytes (2 leituras + 1 escrita = 24 bytes). Portanto $\text{AI} = 1/24 \approx 0{,}042$ FLOP/byte.
-    \item \textbf{CPU-bound} (50 iterações de \texttt{sqrt} + \texttt{sin}): aproximadamente 1050 FLOPs por elemento (50 $\times$ 21 FLOPs/iteração), com apenas 16 bytes transferidos (1 leitura + 1 escrita). Portanto $\text{AI} = 1050/16 \approx 65{,}6$ FLOP/byte.
-\end{itemize}
+O ponto do programa compute-bound está à direita do ponto de crista. Logo, o teto de cálculo da CPU é mais importante do que o teto de memória. O gráfico usa uma estimativa de operações equivalentes para \texttt{sqrt} e \texttt{sin}. Essa estimativa serve para posicionar o ponto no modelo. Ela não representa uma contagem exata de FLOPs da biblioteca matemática. O resultado abaixo do teto mostra que o programa não atinge o pico teórico do processador, especialmente sem otimizações de compilação.
 
-Os pontos do kernel \textit{memory-bound} ficam à esquerda do ponto de crista (AI $\approx 6{,}4$), na região inclinada do roofline, onde a largura de banda limita o desempenho. Os pontos do kernel \textit{cpu-bound} ficam à direita, na região plana, limitados pelo pico computacional.
-
-\section{Discussão}
-
-\subsection{Escalabilidade e limitação da memória}
-A escalabilidade dos dois kernels diverge porque o recurso disputado é diferente. No kernel \textit{cpu-bound}, cada núcleo traz sua própria ALU. Dobrar os núcleos dobra a capacidade de processamento disponível, e o speedup acompanha a curva ideal enquanto houver núcleos físicos livres.
-
-No kernel \textit{memory-bound}, todos os núcleos compartilham o mesmo barramento de memória. A partir do momento em que o barramento atinge sua vazão máxima, núcleos extras ficam ociosos esperando dados. O tempo estabiliza independentemente de quantas threads sejam criadas. O gráfico de tempo de execução (Figura~\ref{fig:speedup}) mostra essa estagnação com clareza.
-
-\subsection{Interpretação do Roofline Model}
-O Roofline Model (Figura~\ref{fig:roofline}) explica essa diferença de forma estrutural. Cada kernel ocupa uma posição fixa no eixo horizontal, determinada pela sua intensidade aritmética. O teto de desempenho nessa posição define o máximo que o hardware pode entregar.
-
-O kernel \textit{memory-bound} tem AI tão baixa que fica na rampa inclinada do gráfico, limitado pela largura de banda. Nessa região, adicionar mais poder de processamento não adianta: o gargalo é a velocidade com que os dados chegam da RAM. Para melhorar, seria preciso mudar o algoritmo para reutilizar dados em cache.
-
-O kernel \textit{cpu-bound} tem AI alta o suficiente para ficar na região plana, limitado pela capacidade das ALUs. Aqui, mais núcleos significa mais capacidade real, e o paralelismo funciona.
-
-\subsection{Regressão de desempenho por SMT (Hyper-threading)}
-O SMT permite que dois fluxos de execução compartilhem o mesmo núcleo físico. Em código \textit{cpu-bound}, a segunda thread ocupa ciclos que a primeira desperdiça com latência de pipeline, e o desempenho melhora. Em código \textit{memory-bound}, ambas as threads geram requisições ao mesmo barramento já saturado. O resultado é contenção: as requisições se enfileiram, e o tempo piora em vez de melhorar.
-
-Os dados confirmam esse comportamento. Acima de 14 threads, o kernel \textit{memory-bound} regride enquanto o \textit{cpu-bound} ainda extrai ganho marginal do SMT.
+Os resultados dependem do processador, da memória, da afinidade das threads e da carga do sistema. Portanto, a posição exata do ponto de saturação não deve ser tratada como uma propriedade universal. Para estudar especificamente SMT, é necessário conhecer a quantidade de núcleos físicos e controlar a afinidade com \texttt{OMP\_PROC\_BIND} e \texttt{OMP\_PLACES}.
 
 \section{Conclusão}
-
-Adicionar threads não resolve gargalos de largura de banda. Neste experimento, o kernel \textit{memory-bound} parou de escalar com 4 threads e piorou com 28. O kernel \textit{cpu-bound} escalou até 8,91$\times$ com 28 threads. A diferença é a intensidade aritmética: 0,042 contra 65,6 FLOP/byte.
-
-Antes de paralelizar com \texttt{\#pragma omp parallel for}, vale identificar o gargalo. Se for largura de banda, o caminho é melhorar o padrão de acesso à memória e aumentar o reuso de cache. Se for capacidade de processamento, mais threads resolvem.
+Os dois testes paralelos usam OpenMP e permitem comparar dois tipos de gargalo. O paralelismo reduz o tempo quando há trabalho independente e recursos disponíveis. No caso memory-bound, o limite aparece quando a memória não consegue fornecer dados mais rapidamente. No caso compute-bound, o limite aparece quando as unidades de execução da CPU ficam ocupadas. O uso de threads deve ser escolhido com base no recurso que limita a aplicação.
 
 \end{document}
