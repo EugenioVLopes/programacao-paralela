@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Teoria 05: Paralelismo de laços com OpenMP, condições de corrida (Race Conditions), escalonamento e redução.">
-  <title>Teoria 05: Paralelismo de Laços e Condições de Corrida</title>
+  <meta name="description" content="Teoria 05: Paralelismo de laços com OpenMP, race conditions e balanceamento de carga.">
+  <title>Teoria 05: Paralelismo de Laços e Race Conditions</title>
   <link rel="stylesheet" href="../assets/style.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
@@ -39,69 +39,66 @@
 
   <header>
     <div class="lesson-badge">Teoria 05 &bull; DCA3703</div>
-    <h1>Teoria: Paralelismo de Laços e Condições de Corrida</h1>
+    <h1>Teoria: Paralelismo de Laços e Race Conditions</h1>
     <div class="metadata">
-      OpenMP &bull; Paralelismo de Dados &bull; Race Conditions &bull; Redução
+      OpenMP &bull; Paralelismo de Dados &bull; Race Conditions &bull; Balanceamento de Carga
     </div>
   </header>
 
   <main>
     <section>
-      <h2>1. Introdução ao Paralelismo de Laços (Loop-Level Parallelism)</h2>
+      <h2>1. Paralelismo de laços</h2>
       <p>
-        Muitos códigos passam a maior parte do tempo em laços. O padrão do OpenMP para acelerar esse processo é dividir as iterações entre as threads disponíveis.
+        A maioria dos programas numéricos gasta tempo em laços.
+        O OpenMP distribui as iterações de um laço entre as threads disponíveis.
       </p>
       <p>
-        O <code>#pragma omp parallel for</code> cria as threads e corta o laço. Se o código tem 1000 iterações e usa 4 threads, o escalonamento estático manda 250 iterações para cada thread logo no início.
+        A diretiva <code>#pragma omp parallel for</code> cria as threads e divide os índices.
+        Com 1000 iterações e 4 threads, o escalonamento estático atribui 250 iterações a cada thread.
       </p>
     </section>
 
     <section>
-      <h2>2. O Problema: Race Conditions (Condições de Corrida)</h2>
+      <h2>2. Race conditions</h2>
       <p>
-        Uma <strong>Race Condition</strong> acontece quando threads escrevem na mesma memória sem regras. O hardware sobrepõe as operações e o resultado quebra.
+        Uma <strong>race condition</strong> ocorre quando threads escrevem na mesma variável sem sincronização.
+        O hardware sobrepõe as operações e corrompe o resultado.
       </p>
       <p>
-        A CPU não processa <code>count++</code> em um só passo. Ela executa três:
+        A CPU executa <code>total_primos_paralelo++</code> em três passos:
       </p>
       <ol>
-        <li><strong>LOAD:</strong> Lê o valor atual da memória para o registrador.</li>
-        <li><strong>ADD:</strong> Soma 1 no registrador.</li>
-        <li><strong>STORE:</strong> Salva o valor na memória.</li>
+        <li><strong>LOAD:</strong> A CPU lê o valor da memória para o registrador.</li>
+        <li><strong>ADD:</strong> A CPU soma 1 no registrador.</li>
+        <li><strong>STORE:</strong> A CPU grava o resultado na memória.</li>
       </ol>
       <p>
-        Se a Thread A e a Thread B executam o <strong>LOAD</strong> no mesmo ciclo, ambas leem 10. Ambas somam e salvam 11. O programa perde um incremento.
+        Duas threads executam o LOAD ao mesmo tempo.
+        Ambas leem o valor 10.
+        Ambas somam 1 e gravam 11.
+        O programa perde um incremento.
+        O erro não gera aviso nem segfault.
       </p>
     </section>
 
     <section>
-      <h2>3. A Solução: Cláusula de Redução (Reduction)</h2>
+      <h2>3. Balanceamento de carga</h2>
       <p>
-        A cláusula <code>reduction(operador:variável)</code> resolve o problema sem travar as threads.
+        Testar se 4 é primo custa poucos ciclos.
+        Testar se 4.999.999 é primo custa muitos ciclos.
+        A carga de trabalho varia entre iterações.
       </p>
       <p>
-        <strong>Como funciona nos bastidores:</strong>
+        O escalonamento <strong>static</strong> divide os índices em blocos contíguos iguais:
       </p>
-      <ol>
-        <li>O compilador cria uma cópia local da variável para <em>cada thread</em>, com valor zero.</li>
-        <li>Cada thread incrementa a própria cópia. Não há disputa de barramento nem espera.</li>
-        <li>No fim do laço, o OpenMP soma os resultados locais na variável global.</li>
-      </ol>
-    </section>
-
-    <section>
-      <h2>4. Balanceamento de Carga (Load Balancing) e o caso dos Primos</h2>
+      <ul>
+        <li>Thread 0: testa de 2 até 2.500.000.</li>
+        <li>Thread 1: testa de 2.500.001 até 5.000.000.</li>
+      </ul>
       <p>
-        Testar se 4 é primo custa pouco: falha na primeira divisão. Testar se 4.999.999 é primo gasta muitos laços.
-      </p>
-      <p>
-        Se o OpenMP divide os números com o <strong>static</strong> padrão:
-        <br>
-        Thread 1: Testa de 2 até 2.500.000<br>
-        Thread 2: Testa de 2.500.001 até 5.000.000
-      </p>
-      <p>
-        A Thread 2 processa os maiores números e gasta mais ciclos de CPU. A Thread 1 termina cedo e fica ociosa. Esse desequilíbrio é o <strong>desbalanceamento de carga (Load Imbalance)</strong>, e ele corta a escalabilidade do código.
+        A Thread 1 processa números maiores e gasta mais ciclos.
+        A Thread 0 termina antes e fica ociosa.
+        Esse desequilíbrio reduz o speedup abaixo do ideal.
       </p>
     </section>
 

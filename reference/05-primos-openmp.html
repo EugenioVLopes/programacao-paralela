@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Referência rápida 05: OpenMP loop parallelism e reduction.">
+  <meta name="description" content="Referência rápida 05: sintaxe de parallel for e schedule no OpenMP.">
   <title>Referência Rápida: OpenMP Parallel For</title>
   <link rel="stylesheet" href="../assets/style.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
@@ -39,49 +39,39 @@
 
   <header>
     <div class="lesson-badge">Referência 05 &bull; DCA3703</div>
-    <h1>Cheatsheet: Loop Parallelism & Reduction</h1>
+    <h1>Cheatsheet: Parallel For</h1>
   </header>
 
   <main>
     <section>
-      <h2>1. Sintaxe Básica</h2>
+      <h2>1. Sintaxe básica</h2>
       <pre><code><span class="hl-prep">#pragma</span> omp parallel for
-<span class="hl-kw">for</span> (<span class="hl-type">int</span> i = <span class="hl-num">0</span>; i &lt; n; i++) {
-    <span class="hl-comment">// Operações independentes sobre o dado 'i'</span>
+<span class="hl-kw">for</span> (<span class="hl-type">long</span> numero_atual = <span class="hl-num">0</span>; numero_atual &lt; limite_superior; numero_atual++) {
+    <span class="hl-comment">// Operações independentes sobre o número atual</span>
 }</code></pre>
       <ul>
-        <li>O laço <code>for</code> precisa ser estruturado de forma previsível (limites de iteração fixos e verificáveis no início, como <code>i &lt; n</code>).</li>
-        <li>Variáveis declaradas dentro do escopo do laço <code>for</code> são privadas para cada thread por padrão.</li>
+        <li>O laço precisa de limites fixos. O OpenMP calcula a divisão antes de executar.</li>
+        <li>Variáveis declaradas dentro do laço são privadas por padrão.</li>
       </ul>
     </section>
 
     <section>
-      <h2>2. Cláusula Reduction</h2>
-      <pre><code><span class="hl-type">int</span> soma = <span class="hl-num">0</span>;
-<span class="hl-prep">#pragma</span> omp parallel for reduction(+:soma)
-<span class="hl-kw">for</span> (<span class="hl-type">int</span> i = <span class="hl-num">0</span>; i &lt; n; i++) {
-    soma += vetor[i];
-}</code></pre>
-      <table>
-        <tr>
-          <th>Operador</th>
-          <th>Elemento Neutro (Início Privado)</th>
-        </tr>
-        <tr><td><code>+</code></td><td>0</td></tr>
-        <tr><td><code>*</code></td><td>1</td></tr>
-        <tr><td><code>-</code></td><td>0</td></tr>
-        <tr><td><code>&amp;</code> (AND lógico)</td><td>1 (true)</td></tr>
-        <tr><td><code>|</code> (OR lógico)</td><td>0 (false)</td></tr>
-      </table>
+      <h2>2. Escalonamento (schedule)</h2>
+      <p>A cláusula <code>schedule(tipo, tamanho_bloco)</code> controla a divisão das iterações.</p>
+      <ul>
+        <li><code>schedule(static)</code> — Divide as iterações em blocos iguais no início. Custo mínimo. Ideal para carga uniforme.</li>
+        <li><code>schedule(dynamic, tamanho_bloco)</code> — Cada thread requisita um bloco sob demanda. Mais overhead, mas equilibra carga desigual.</li>
+      </ul>
     </section>
 
     <section>
-      <h2>3. Escalonamento Básico (Schedule)</h2>
-      <p>A cláusula <code>schedule(tipo, chunk)</code> controla como as iterações são divididas.</p>
-      <ul>
-        <li><code>schedule(static)</code> (Padrão) <br>Divide as iterações em blocos de tamanho igual em tempo de compilação. Perfeito para laços regulares. Baixíssimo custo.</li>
-        <li><code>schedule(dynamic, chunk_size)</code> <br>Threads requisitam blocos menores (<code>chunk_size</code>) sob demanda. Ótimo para carga desbalanceada, mas tem overhead em runtime.</li>
-      </ul>
+      <h2>3. Race condition com variável compartilhada</h2>
+      <pre><code><span class="hl-type">long</span> total_primos = <span class="hl-num">0</span>;
+<span class="hl-prep">#pragma</span> omp parallel for
+<span class="hl-kw">for</span> (<span class="hl-type">long</span> numero_atual = <span class="hl-num">0</span>; numero_atual &lt; limite_superior; numero_atual++) {
+    <span class="hl-kw">if</span> (<span class="hl-fn">eh_primo</span>(numero_atual)) total_primos++;  <span class="hl-comment">// Race condition: resultado incorreto</span>
+}</code></pre>
+      <p>Múltiplas threads leem e escrevem <code>total_primos</code> ao mesmo tempo. O resultado fica corrompido.</p>
     </section>
   </main>
 

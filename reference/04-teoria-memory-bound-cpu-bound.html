@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Teoria 04: Aplicações limitadas por CPU e memória</title>
+  <meta name="description" content="Teoria 04: Gargalo de von Neumann, intensidade aritmética e impactos do multithreading.">
+  <title>Teoria 04: Aplicações Limitadas por Memória e CPU</title>
   <link rel="stylesheet" href="../assets/style.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
@@ -29,77 +30,74 @@
 <body>
   <nav class="top-nav">
     <div style="display: flex; gap: 16px;">
-      <a href="../reference/00-fundamentos-programacao-paralela.html">Índice geral</a>
-      <a href="04-memory-bound-cpu-bound.html">Referência rápida 04 &rarr;</a>
+      <a href="00-fundamentos-programacao-paralela.html">&larr; Índice Geral</a>
+      <a href="04-memory-bound-cpu-bound.html">Referência Rápida 04</a>
+      <a href="../lessons/0004-tarefa04-memory-cpu-bound.html">Lição 04</a>
     </div>
     <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
   </nav>
 
   <header>
-    <div class="lesson-badge">Teoria 04</div>
-    <h1>Aplicações limitadas por CPU e memória</h1>
-    <div class="metadata">O gargalo de von Neumann, saturação de barramento e efeitos do multithreading</div>
+    <div class="lesson-badge">Teoria 04 &bull; DCA3703</div>
+    <h1>Teoria: Aplicações Limitadas por Memória e CPU</h1>
+    <div class="metadata">Gargalo de von Neumann, Intensidade Aritmética e Multithreading</div>
   </header>
 
   <main>
     <section>
-      <h2>O gargalo de von Neumann</h2>
+      <h2>1. Gargalo de von Neumann</h2>
       <p>
-        A arquitetura de von Neumann é caracterizada pela separação física entre a unidade de processamento (CPU) e a memória onde residem os dados e instruções. O canal de comunicação entre esses dois componentes, o barramento frontal (FSB) ou interconexões modernas como o QPI/UPI, possui uma largura de banda máxima finita (em GB/s).
+        A arquitetura de von Neumann separa a unidade de processamento da memória principal.
+        O barramento de comunicação possui largura de banda finita.
       </p>
       <p>
-        Devido à lei de Moore e ao aumento das frequências de clock e do paralelismo de instruções (ILP) interno, o poder de processamento das CPUs escalou em uma taxa muito mais rápida do que a velocidade das memórias DRAM. Essa discrepância cria o chamado <strong>gargalo de von Neumann</strong> (ou memory wall).
+        O poder de cálculo da CPU aumentou mais rápido que a velocidade da memória DRAM.
+        Essa diferença cria o <strong>gargalo de von Neumann</strong>.
+        A CPU passa ciclos ociosa esperando a chegada dos dados.
       </p>
     </section>
 
     <section>
-      <h2>Intensidade aritmética</h2>
+      <h2>2. Intensidade aritmética</h2>
       <p>
-        A <strong>intensidade aritmética (IA)</strong> é definida como a razão entre as operações de ponto flutuante (FLOPs) realizadas e a quantidade de bytes transferidos da memória principal:
+        A <strong>intensidade aritmética</strong> mede as operações de ponto flutuante realizadas por byte transferido:
       </p>
       <div class="math-block">
-        $$IA = \frac{\text{FLOPs}}{\text{Bytes transferidos}}$$
+        $$\text{IA} = \frac{\text{FLOPs}}{\text{Bytes Transferidos}}$$
       </div>
       <p>
-        Algoritmos com IA baixa (ex: somar dois vetores, onde para 1 adição carregamos 16 bytes e escrevemos 8 bytes) exaurem rapidamente a banda de memória. Algoritmos com IA alta (ex: multiplicação de matrizes em blocos no nível de cache, ou fractais de Mandelbrot) mantêm os dados próximos à CPU e estressam os circuitos de cálculo.
+        Aplicações com baixa intensidade aritmética esgotam a largura de banda da memória.
+        Aplicações com alta intensidade aritmética ocupam as unidades de cálculo da CPU.
       </p>
     </section>
 
     <section>
-      <h2>Memory-bound vs CPU-bound</h2>
+      <h2>3. Limitado por memória vs Limitado por processamento</h2>
       <ul>
         <li>
-          <strong>Memory-Bound (Limitado por Memória)</strong>: O tempo de execução do programa é dominado pelo tempo gasto esperando os dados chegarem da RAM. As unidades lógicas e aritméticas (ALUs) da CPU passam a maior parte do tempo ociosas.
+          <strong>Limitado por memória:</strong> O tempo total depende da taxa de transferência da memória RAM. As unidades aritméticas passam tempo ociosas.
         </li>
         <li>
-          <strong>CPU-Bound (Limitado por Processamento)</strong>: O tempo de execução é dominado pelo tempo necessário para calcular as instruções. A CPU está em 100% de uso contínuo, e o acesso à memória é infrequente ou os dados cabem completamente na cache L1/L2.
+          <strong>Limitado por CPU:</strong> O tempo total depende da velocidade de execução das instruções na CPU. O acesso à memória é infrequente.
         </li>
       </ul>
     </section>
 
     <section>
-      <h2>Efeitos do multithreading e OpenMP</h2>
+      <h2>4. Efeitos do multithreading em hardware</h2>
       <p>
-        A paralelização com diretivas como <code>#pragma omp parallel for</code> possui resultados drasticamente diferentes dependendo da natureza da carga de trabalho:
+        O multithreading produz resultados opostos dependendo do perfil da carga de trabalho:
       </p>
-      <div class="callout" style="border-left-color: var(--accent); background-color: var(--card-bg);">
-        <div class="callout-title">Em aplicações CPU-bound</div>
-        <p style="margin-bottom: 0;">
-          Aumentar o número de threads (OMP_NUM_THREADS) gera speedup linear quase ideal até o número de núcleos físicos da máquina. Como cada núcleo está focado em calcular e não sobrecarrega o barramento, o desempenho escala perfeitamente.
-        </p>
-      </div>
-
-      <div class="callout" style="border-left-color: #b91c1c; background-color: var(--error-bg);">
-        <div class="callout-title" style="color: var(--error);">Em aplicações memory-bound</div>
-        <p style="margin-bottom: 0;">
-          Aumentar o número de threads piora o gargalo. Um único núcleo moderno já é capaz de saturar sozinho boa parte da banda de memória RAM. Adicionar mais threads causa saturação do controlador de memória, aumento na latência de acesso (contenção), e o speedup estagna precocemente ou até <strong>diminui</strong> em altos níveis de concorrência.
-        </p>
-      </div>
+      <ul>
+        <li><strong>Em aplicações limitadas por CPU:</strong> Mais threads ocupam unidades aritméticas livres e aumentam a taxa de processamento. O speedup escala com os núcleos.</li>
+        <li><strong>Em aplicações limitadas por memória:</strong> Mais threads disputam o mesmo barramento saturado. O tempo de execução estagna ou piora devido à contenção.</li>
+      </ul>
     </section>
   </main>
 
   <footer class="footer-nav">
-    <span>DCA3703 &bull; UFRN</span>
+    <a href="../lessons/0004-tarefa04-memory-cpu-bound.html">&larr; Lição Prática 04</a>
+    <a href="04-memory-bound-cpu-bound.html">Referência Rápida &rarr;</a>
   </footer>
 
   <script>

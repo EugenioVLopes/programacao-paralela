@@ -3,65 +3,62 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Referência 04: Sintaxe OpenMP e variáveis de ambiente</title>
+  <meta name="description" content="Referência rápida 04: sintaxe OpenMP, controle de threads e parallel for.">
+  <title>Referência Rápida: Sintaxe OpenMP</title>
   <link rel="stylesheet" href="../assets/style.css">
 </head>
 <body>
   <nav class="top-nav">
     <div style="display: flex; gap: 16px;">
       <a href="04-teoria-memory-bound-cpu-bound.html">&larr; Teoria 04</a>
+      <a href="00-fundamentos-programacao-paralela.html">Índice Geral</a>
       <a href="../lessons/0004-tarefa04-memory-cpu-bound.html">Lição 04 &rarr;</a>
     </div>
     <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
   </nav>
 
   <header>
-    <div class="lesson-badge">Referência rápida 04</div>
-    <h1>Sintaxe OpenMP</h1>
-    <div class="metadata">Diretivas pragma e controle de threads no terminal</div>
+    <div class="lesson-badge">Referência 04 &bull; DCA3703</div>
+    <h1>Cheatsheet: OpenMP e Variáveis de Ambiente</h1>
   </header>
 
   <main>
     <section>
-      <h2>Controle de execução no Terminal (Bash)</h2>
-      <p>A variável de ambiente <code>OMP_NUM_THREADS</code> define globalmente a quantidade de threads que o OpenMP irá utilizar durante a execução, sem precisar alterar o código fonte.</p>
+      <h2>1. Controle de threads no terminal</h2>
+      <p>A variável de ambiente <code>OMP_NUM_THREADS</code> define o total de threads da execução:</p>
       
       <pre><code><span class="hl-com"># Compilação padrão ativando OpenMP</span>
-$ gcc -O3 -fopenmp meuprog.c -o meuprog -lm
+$ gcc -std=c11 -Wall -Wextra -fopenmp programa.c -o programa -lm
 
 <span class="hl-com"># Define para 4 threads e executa</span>
 $ <span class="hl-kw">export</span> OMP_NUM_THREADS=4
-$ ./meuprog
+$ ./programa
 
-<span class="hl-com"># Executa definindo a variável para um único comando (inline)</span>
-$ OMP_NUM_THREADS=2 ./meuprog
+<span class="hl-com"># Executa definindo a variável inline</span>
+$ OMP_NUM_THREADS=2 ./programa
 </code></pre>
     </section>
 
     <section>
-      <h2>Diretivas Pragma em C</h2>
-      <p>As diretivas do compilador instruem como o código sequencial deve ser dividido.</p>
-      
-      <h3>Divisão de Laço (Parallel For)</h3>
+      <h2>2. Divisão de laços com OpenMP</h2>
       <pre><code><span class="hl-prep">#pragma</span> omp parallel for
-<span class="hl-kw">for</span> (<span class="hl-type">int</span> i = 0; i &lt; N; i++) {
-    <span class="hl-com">// O espaço de iteração [0, N) é dividido</span>
-    <span class="hl-com">// automaticamente entre as threads ativas.</span>
-    vetor[i] = vetor[i] * 2.0;
+<span class="hl-kw">for</span> (<span class="hl-type">long</span> i = 0; i &lt; total_elementos; ++i) {
+    C[i] = A[i] + B[i];
 }
 </code></pre>
       
       <h3>Funções da biblioteca OpenMP</h3>
       <pre><code><span class="hl-prep">#include</span> <span class="hl-str">&lt;omp.h&gt;</span>
 
-<span class="hl-type">int</span> n_threads = <span class="hl-fn">omp_get_max_threads</span>(); <span class="hl-com">// Lê o limite de threads</span>
-<span class="hl-type">int</span> thread_id = <span class="hl-fn">omp_get_thread_num</span>();  <span class="hl-com">// ID da thread atual (0 a N-1)</span>
+<span class="hl-type">int</span> total_threads = <span class="hl-fn">omp_get_max_threads</span>(); <span class="hl-com">// Retorna o limite de threads</span>
+<span class="hl-type">int</span> id_thread = <span class="hl-fn">omp_get_thread_num</span>();     <span class="hl-com">// Retorna o ID da thread atual (0 a N-1)</span>
 </code></pre>
     </section>
   </main>
 
   <footer class="footer-nav">
-    <span>DCA3703 &bull; UFRN</span>
+    <a href="04-teoria-memory-bound-cpu-bound.html">&larr; Teoria 04</a>
+    <a href="../lessons/0004-tarefa04-memory-cpu-bound.html">Lição 04 &rarr;</a>
   </footer>
 
   <script>
