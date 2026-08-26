@@ -5,70 +5,63 @@
 #include <time.h>
 #include <omp.h>
 
-#define DEFAULT_N 5000000L
+#define TOTAL_ELEMENTOS_PADRAO 5000000L
 
-static double agora(void) {
-    struct timespec t;
-    clock_gettime(CLOCK_MONOTONIC, &t);
-    return t.tv_sec + t.tv_nsec / 1e9;
+static double obter_tempo_segundos(void) {
+    struct timespec tempo_atual;
+    clock_gettime(CLOCK_MONOTONIC, &tempo_atual);
+    return (double)tempo_atual.tv_sec + (double)tempo_atual.tv_nsec / 1e9;
 }
 
-int is_prime(long n) {
-    if (n <= 1) return 0;
-    if (n == 2) return 1;
-    if (n % 2 == 0) return 0;
-    for (long i = 3; i * i <= n; i += 2) {
-        if (n % i == 0) return 0;
+int eh_primo(long numero) {
+    if (numero <= 1) return 0;
+    if (numero == 2) return 1;
+    if (numero % 2 == 0) return 0;
+
+    for (long divisor = 3; divisor * divisor <= numero; divisor += 2) {
+        if (numero % divisor == 0) return 0;
     }
+
     return 1;
 }
 
 int main(int argc, char **argv) {
-    long n = argc > 1 ? atol(argv[1]) : DEFAULT_N;
-    if (n <= 0) {
-        fprintf(stderr, "Uso: %s [numero_de_elementos]\n", argv[0]);
+    long total_elementos = argc > 1 ? atol(argv[1]) : TOTAL_ELEMENTOS_PADRAO;
+    
+    if (total_elementos <= 0) {
+        fprintf(stderr, "Uso: %s [total_elementos]\n", argv[0]);
         return 1;
     }
 
-    int n_threads = omp_get_max_threads();
+    int total_threads = omp_get_max_threads();
 
-    // TESTE 1: SEQUENCIAL
-    double inicio_seq = agora();
-    long count_seq = 0;
-    
-    for (long i = 2; i <= n; ++i) {
-        if (is_prime(i)) {
-            count_seq++;
+    // VERSÃO SEQUENCIAL
+    double tempo_inicio_sequencial = obter_tempo_segundos();
+    long total_primos_sequencial = 0;
+
+    for (long numero_atual = 2; numero_atual <= total_elementos; ++numero_atual) {
+        if (eh_primo(numero_atual)) {
+            total_primos_sequencial++;
         }
     }
-    double tempo_seq = agora() - inicio_seq;
+    double tempo_execucao_sequencial = obter_tempo_segundos() - tempo_inicio_sequencial;
 
-    // TESTE 2: OPENMP NAIVE (RACE CONDITION)
-    double inicio_omp_naive = agora();
-    long count_omp_naive = 0;
+    // VERSÃO PARALELA
+    double tempo_inicio_paralelo = obter_tempo_segundos();
+    long total_primos_paralelo = 0;
 
     #pragma omp parallel for
-    for (long i = 2; i <= n; ++i) {
-        if (is_prime(i)) {
-            count_omp_naive++;
+    for (long numero_atual = 2; numero_atual <= total_elementos; ++numero_atual) {
+        if (eh_primo(numero_atual)) {
+            total_primos_paralelo++;
         }
     }
-    double tempo_omp_naive = agora() - inicio_omp_naive;
+    double tempo_execucao_paralelo = obter_tempo_segundos() - tempo_inicio_paralelo;
 
-    // TESTE 3: OPENMP REDUCTION (CORRETO)
-    double inicio_omp_red = agora();
-    long count_omp_red = 0;
-
-    #pragma omp parallel for reduction(+:count_omp_red)
-    for (long i = 2; i <= n; ++i) {
-        if (is_prime(i)) {
-            count_omp_red++;
-        }
-    }
-    double tempo_omp_red = agora() - inicio_omp_red;
-
-    printf("N=%ld threads=%d seq_time=%.9f omp_naive_time=%.9f omp_red_time=%.9f seq_count=%ld omp_naive_count=%ld omp_red_count=%ld\n", 
-           n, n_threads, tempo_seq, tempo_omp_naive, tempo_omp_red, count_seq, count_omp_naive, count_omp_red);
+    printf("N=%ld threads=%d seq_time=%.9f par_time=%.9f seq_count=%ld par_count=%ld\n",
+           total_elementos, total_threads,
+           tempo_execucao_sequencial, tempo_execucao_paralelo,
+           total_primos_sequencial, total_primos_paralelo);
 
     return 0;
 }

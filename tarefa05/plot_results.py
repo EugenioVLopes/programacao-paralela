@@ -5,37 +5,30 @@ import os
 def main():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     csv_path = os.path.join(base_dir, 'results.csv')
-    
+
     if not os.path.exists(csv_path):
         print(f"Erro: Arquivo {csv_path} não encontrado.")
         return
 
     df = pd.read_csv(csv_path)
 
-    # Pegando os tempos com 1 thread (base para speedup)
     t1_seq = df.loc[df['threads'] == 1, 'seq_time'].values[0]
 
-    # Calculando Speedup
-    df['speedup_omp_red'] = t1_seq / df['omp_red_time']
-    # Não calculamos o speedup do naive porque ele está incorreto (condição de corrida)
+    df['speedup_par'] = t1_seq / df['par_time']
 
     plt.figure(figsize=(10, 6))
-    
-    # Plota Speedup Ideal
-    plt.plot(df['threads'], df['threads'], 'k--', label='Speedup Ideal')
-    
-    # Plota OpenMP Reduction
-    plt.plot(df['threads'], df['speedup_omp_red'], 'g-o', label='OpenMP Reduction (Correto)')
-    
+
+    plt.plot(df['threads'], df['threads'], 'k--', label='Speedup ideal')
+    plt.plot(df['threads'], df['speedup_par'], 'r-o', label='Paralelo (sem reduction)')
+
     plt.title('Speedup vs Número de Threads (Contagem de Primos)', fontsize=14)
     plt.xlabel('Número de Threads', fontsize=12)
     plt.ylabel('Speedup $S(p)$', fontsize=12)
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.legend(fontsize=12)
-    
+
     plt.xticks(df['threads'])
-    
-    # Adicionando linha indicando provável transição para threads lógicas (SMT)
+
     import multiprocessing
     physical_cores = multiprocessing.cpu_count() // 2
     if physical_cores > 0 and physical_cores < max(df['threads']):
