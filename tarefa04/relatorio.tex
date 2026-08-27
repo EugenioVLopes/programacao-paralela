@@ -56,19 +56,39 @@ O programa memory-bound melhora quando o número de threads aumenta no início d
 
 O programa compute-bound também melhora com o aumento de threads enquanto existem recursos de CPU disponíveis. Após esse ponto, o ganho diminui e pode desaparecer. Se threads lógicas compartilham o mesmo núcleo físico, a competição por unidades de cálculo pode causar estabilidade ou piora.
 
-% \begin{figure}[H]
-% \centering
-% \includegraphics[width=0.9\textwidth]{roofline_plot.png}
-% \caption{Modelo Roofline ajustado aos resultados com $N=5.000.000$. Os tetos são estimativas de pico do sistema de referência.}
-% \label{fig:roofline}
-% \end{figure}
-%
-% O gráfico Roofline reforça essa diferença. A intensidade aritmética do programa memory-bound é $1/24 \approx 0{,}042$ FLOP por byte. Esse valor está à esquerda do ponto de crista. Portanto, a largura de banda da memória limita o desempenho antes do pico de cálculo da CPU. O ponto medido sobe quando mais threads são usadas, mas permanece abaixo do teto de largura de banda.
-%
-% O ponto do programa compute-bound está à direita do ponto de crista. Logo, o teto de cálculo da CPU é mais importante do que o teto de memória. O gráfico usa uma estimativa de operações equivalentes para \texttt{sqrt} e \texttt{sin}. Essa estimativa serve para posicionar o ponto no modelo. Ela não representa uma contagem exata de FLOPs da biblioteca matemática. O resultado abaixo do teto mostra que o programa não atinge o pico teórico do processador, especialmente sem otimizações de compilação.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{roofline_plot.png}
+\caption{Modelo Roofline ajustado aos resultados com $N=5.000.000$. Os tetos são estimativas de pico do sistema de referência.}
+\label{fig:roofline}
+\end{figure}
 
-Os resultados dependem do processador, da memória, da afinidade das threads e da carga do sistema. Portanto, a posição exata do ponto de saturação não deve ser tratada como uma propriedade universal. 
-% Para estudar especificamente SMT, é necessário conhecer a quantidade de núcleos físicos e controlar a afinidade com \texttt{OMP\_PROC\_BIND} e \texttt{OMP\_PLACES}.
+O Roofline mostra onde o hardware travou o desempenho. O eixo X mede intensidade aritmética, quantas operações de ponto flutuante cada byte da memória rende. O eixo Y mostra GFLOP/s. A linha preta é o teto do sistema. À esquerda do ponto de crista, a memória é o gargalo. À direita, a CPU.
+
+O kernel \texttt{memory\_bound} faz uma adição por elemento.
+
+\begin{verbatim}
+C[i] = A[i] + B[i];
+// 1 FLOP, 3 acessos à memória (ler A, ler B, escrever C) = 24 bytes
+\end{verbatim}
+
+\noindent Intensidade: $1/24 \approx 0{,}042$ FLOP/byte. Bem à esquerda do ponto de crista. Com 16 threads os pontos sobem porque mais núcleos dividem a mesma largura de banda. A partir de 24 threads começam a cair. Threads extras competem pelo controlador de memória e reduzem o throughput efetivo.
+
+O kernel \texttt{cpu\_bound} roda 50 iterações pesadas por elemento.
+
+\begin{verbatim}
+for (j = 0; j < 50; ++j)
+    val = sqrt(val + j*0.01) + sin(val);
+
+// sqrt: ~8 FLOPs (libm, Newton-Raphson)
+// sin:  ~10 FLOPs (redução de argumento + polinômio minimax)
+// Total: (1 MUL + 1 ADD + 8 + 10 + 1 ADD) × 50 ≈ 1050 FLOPs
+// Bytes: 2 acessos × 8 = 16 bytes/elemento
+\end{verbatim}
+
+\noindent Intensidade: $\sim$1050/16 $\approx$ 65,6 FLOP/byte. Bem à direita do ponto de crista ($\sim$6,4), onde a CPU define o limite. Com 20 threads sobe a \(\sim\)120 GFLOP/s. Fica longe dos 350 GFLOP/s teóricos porque não usa vetorização AVX2/FMA e \texttt{sqrt}/\texttt{sin} rodam em software escalar.
+
+\texttt{sqrt} e \texttt{sin} não são 1 FLOP cada. São funções de biblioteca com dezenas de operações internas, Newton-Raphson, polinômios minimax. A contagem de $\sim$1050 FLOPs é uma estimativa razoável do custo real em software.
 
 \section{Conclusão}
 Os dois testes paralelos usam OpenMP e permitem comparar dois tipos de gargalo. Em uma aplicação memory-bound, o multithreading de hardware ajuda porque, enquanto uma thread aguarda dados da memória, outra thread pode executar. O ganho existe enquanto a largura de banda da memória não está saturada. Quando múltiplos núcleos lógicos compartilham o mesmo barramento de memória, threads adicionais competem pelo mesmo recurso e os ganhos se estabilizam ou diminuem. Em uma aplicação compute-bound, threads lógicas do mesmo núcleo físico compartilham unidades de execução, caches e etc. Por isso, o paralelismo pode não reduzir o tempo e até aumentá-lo: mais threads significam mais competição pelos mesmos recursos de cálculo, sem o benefício de esconder latência de memória.

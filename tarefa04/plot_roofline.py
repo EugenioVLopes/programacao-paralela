@@ -46,8 +46,8 @@ AI_MEM = 1.0 / 24.0       # ≈ 0.042 FLOP/byte
 #   Por iteração interna:
 #     j*0.01       → 1 MUL
 #     val + ...    → 1 ADD
-#     sqrt(...)    → ~8 FLOPs (implementação hw/sw)
-#     sin(val)     → ~10 FLOPs (série de Taylor/Chebyshev)
+#     sqrt(...)    → ~8 FLOPs (implementação em software via libm)
+#     sin(val)     → ~10 FLOPs (redução de argumento + polinômio minimax)
 #     + (soma)     → 1 ADD
 #   Total por iteração interna: ~21 FLOPs
 #   50 iterações: ~1050 FLOPs por elemento
