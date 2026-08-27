@@ -35,32 +35,32 @@ int main(int argc, char **argv) {
 
     int total_threads = omp_get_max_threads();
 
-    // VERSÃO SEQUENCIAL
-    double tempo_inicio_sequencial = obter_tempo_segundos();
+    // SEQUENCIAL
+    double tempo_sequencial = obter_tempo_segundos();
     long total_primos_sequencial = 0;
 
-    for (long numero_atual = 2; numero_atual <= total_elementos; ++numero_atual) {
-        if (eh_primo(numero_atual)) {
+    for (long i = 2; i <= total_elementos; ++i) {
+        if (eh_primo(i)) {
             total_primos_sequencial++;
         }
     }
-    double tempo_execucao_sequencial = obter_tempo_segundos() - tempo_inicio_sequencial;
+    tempo_sequencial = obter_tempo_segundos() - tempo_sequencial;
 
-    // VERSÃO PARALELA
-    double tempo_inicio_paralelo = obter_tempo_segundos();
+    // PARALELA
+    double tempo_paralelo = obter_tempo_segundos();
     long total_primos_paralelo = 0;
 
     #pragma omp parallel for
-    for (long numero_atual = 2; numero_atual <= total_elementos; ++numero_atual) {
-        if (eh_primo(numero_atual)) {
+    for (long i = 2; i <= total_elementos; ++i) {
+        if (eh_primo(i)) {
             total_primos_paralelo++;
         }
     }
-    double tempo_execucao_paralelo = obter_tempo_segundos() - tempo_inicio_paralelo;
+    tempo_paralelo = obter_tempo_segundos() - tempo_paralelo;
 
     printf("N=%ld threads=%d seq_time=%.9f par_time=%.9f seq_count=%ld par_count=%ld\n",
            total_elementos, total_threads,
-           tempo_execucao_sequencial, tempo_execucao_paralelo,
+           tempo_sequencial, tempo_paralelo,
            total_primos_sequencial, total_primos_paralelo);
 
     return 0;

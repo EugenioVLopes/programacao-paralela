@@ -12,18 +12,14 @@ def main():
 
     df = pd.read_csv(csv_path)
 
-    t1_seq = df.loc[df['threads'] == 1, 'seq_time'].values[0]
-
-    df['speedup_par'] = t1_seq / df['par_time']
-
     plt.figure(figsize=(10, 6))
 
-    plt.plot(df['threads'], df['threads'], 'k--', label='Speedup ideal')
-    plt.plot(df['threads'], df['speedup_par'], 'r-o', label='Paralelo (sem reduction)')
+    plt.plot(df['threads'], df['seq_time'], 'k--', label='Sequencial')
+    plt.plot(df['threads'], df['par_time'], 'r-o', label='Paralelo')
 
-    plt.title('Speedup vs Número de Threads (Contagem de Primos)', fontsize=14)
+    plt.title('Tempo de Execução vs Número de Threads (Contagem de Primos)', fontsize=14)
     plt.xlabel('Número de Threads', fontsize=12)
-    plt.ylabel('Speedup $S(p)$', fontsize=12)
+    plt.ylabel('Tempo (s)', fontsize=12)
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.legend(fontsize=12)
 
@@ -35,9 +31,30 @@ def main():
         plt.axvline(x=physical_cores, color='grey', linestyle=':', label='Limite de núcleos físicos')
         plt.legend(fontsize=12)
 
-    plot_path = os.path.join(base_dir, 'speedup_plot.png')
-    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
-    print(f"Gráfico salvo em {plot_path}")
+    tempo_path = os.path.join(base_dir, 'tempo_execucao_plot.png')
+    plt.savefig(tempo_path, dpi=300, bbox_inches='tight')
+    print(f"Gráfico salvo em {tempo_path}")
+
+    # Gráfico de contagem
+    plt.figure(figsize=(10, 6))
+
+    plt.axhline(y=df['seq_count'].iloc[0], color='k', linestyle='--', label='Sequencial (348.513)')
+    plt.plot(df['threads'], df['par_count'], 'r-o', label='Paralelo')
+
+    plt.title('Contagem de Primos vs Número de Threads', fontsize=14)
+    plt.xlabel('Número de Threads', fontsize=12)
+    plt.ylabel('Primos encontrados', fontsize=12)
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.legend(fontsize=12)
+
+    plt.xticks(df['threads'])
+
+    if physical_cores > 0 and physical_cores < max(df['threads']):
+        plt.axvline(x=physical_cores, color='grey', linestyle=':')
+
+    contagem_path = os.path.join(base_dir, 'contagem_primos_plot.png')
+    plt.savefig(contagem_path, dpi=300, bbox_inches='tight')
+    print(f"Gráfico salvo em {contagem_path}")
 
 if __name__ == '__main__':
     main()

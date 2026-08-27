@@ -30,10 +30,8 @@
 
 \begin{center}
     {\LARGE\bfseries Contagem de Primos com OpenMP}\\[0.4em]
-    {\large Paralelismo de Laços e Observação de Race Conditions}\\[1em]
     {\normalsize Eugênio Vitor Lopes dos Santos}\\[0.3em]
     {\small DCA3703 -- Programação Paralela, Universidade Federal do Rio Grande do Norte}\\[0.3em]
-    {\small \today}
 \end{center}
 
 
@@ -48,114 +46,37 @@ O OpenMP distribui iterações de um laço \texttt{for} entre threads. A diretiv
 \subsection{Race condition}
 Uma race condition ocorre quando threads escrevem na mesma variável sem sincronização. A CPU executa \texttt{total\_primos\_paralelo++} em três passos: LOAD (lê da memória), ADD (soma 1 no registrador) e STORE (grava na memória). Se duas threads executam o LOAD ao mesmo tempo, ambas leem o mesmo valor. Ambas somam 1 e gravam o mesmo resultado. O programa perde um incremento.
 
-\section{Experimento}
+\section{Implementação}
 
-O código usa $N=5.000.000$. A função \texttt{eh\_primo} verifica divisores ímpares até $\sqrt{n}$.
+O código usa $N=5.000.000$. A função \texttt{eh\_primo} verifica divisores ímpares até $\sqrt{n}$. O programa executa duas versões: uma sequencial, que percorre o laço em uma thread, e uma paralela, que adiciona \texttt{\#pragma omp parallel for} ao mesmo laço sem alterar a lógica. Um script varia o número de threads de 1 até o máximo disponível na máquina.
 
-O programa executa duas versões:
-\begin{enumerate}
-    \item \textbf{Sequencial}: Percorre o laço em uma thread.
-    \item \textbf{Paralela}: Adiciona \texttt{\#pragma omp parallel for} ao mesmo laço, sem alterar a lógica.
-\end{enumerate}
+\newpage
+\lstinputlisting[caption={tarefa05.c}]{tarefa05.c}
 
-O script varia o número de threads de 1 até o máximo disponível na máquina.
+\section{Resultados e Discussão}
 
-\section{Código-fonte}
-
-\begin{lstlisting}[caption={tarefa05.c}]
-#define _POSIX_C_SOURCE 199309L
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-#include <omp.h>
-
-#define LIMITE_MAXIMO_PADRAO 5000000L
-
-static double obter_tempo_segundos(void) {
-    struct timespec tempo_atual;
-    clock_gettime(CLOCK_MONOTONIC, &tempo_atual);
-    return (double)tempo_atual.tv_sec + (double)tempo_atual.tv_nsec / 1e9;
-}
-
-int eh_primo(long numero) {
-    if (numero <= 1) return 0;
-    if (numero == 2) return 1;
-    if (numero % 2 == 0) return 0;
-    for (long divisor = 3; divisor * divisor <= numero; divisor += 2) {
-        if (numero % divisor == 0) return 0;
-    }
-    return 1;
-}
-
-int main(int argc, char **argv) {
-    long limite_superior = argc > 1 ? atol(argv[1]) : LIMITE_MAXIMO_PADRAO;
-    if (limite_superior <= 0) {
-        fprintf(stderr, "Uso: %s [limite_superior]\n", argv[0]);
-        return 1;
-    }
-
-    int total_threads = omp_get_max_threads();
-
-    // VERSAO SEQUENCIAL
-    double tempo_inicio_sequencial = obter_tempo_segundos();
-    long total_primos_sequencial = 0;
-
-    for (long numero_atual = 2; numero_atual <= limite_superior; ++numero_atual) {
-        if (eh_primo(numero_atual)) {
-            total_primos_sequencial++;
-        }
-    }
-    double tempo_execucao_sequencial = obter_tempo_segundos() - tempo_inicio_sequencial;
-
-    // VERSAO PARALELA (sem alterar a logica original)
-    double tempo_inicio_paralelo = obter_tempo_segundos();
-    long total_primos_paralelo = 0;
-
-    #pragma omp parallel for
-    for (long numero_atual = 2; numero_atual <= limite_superior; ++numero_atual) {
-        if (eh_primo(numero_atual)) {
-            total_primos_paralelo++;
-        }
-    }
-    double tempo_execucao_paralelo = obter_tempo_segundos() - tempo_inicio_paralelo;
-
-    printf("N=%ld threads=%d seq_time=%.9f par_time=%.9f seq_count=%ld par_count=%ld\n",
-           limite_superior, total_threads,
-           tempo_execucao_sequencial, tempo_execucao_paralelo,
-           total_primos_sequencial, total_primos_paralelo);
-
-    return 0;
-}
-\end{lstlisting}
-
-\section{Resultados}
-
-\subsection{Contagem}
-A versão sequencial contou 348.513 primos. A versão paralela retornou valores diferentes a cada execução. Com 2 threads, reportou cerca de 165.000. Com 8 threads, caiu para cerca de 40.000. Os incrementos se sobrescreveram na memória.
-
-\subsection{Tempo de execução}
+A versão sequencial contou 348.513 primos em todas as execuções. A versão paralela conta errado: com 2 threads perdeu 245 incrementos, com 28 threads perdeu mais de 25.000. Cada thread escreve no mesmo endereço de memória ao mesmo tempo. O processador aceita os writes e o programa termina sem erro, mas o resultado final está errado.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.9\textwidth]{speedup_plot.png}
-\caption{Speedup da versão paralela. A curva fica abaixo do ideal. O resultado está incorreto devido à race condition.}
-\label{fig:speedup}
+\includegraphics[width=0.9\textwidth]{contagem_primos_plot.png}
+\caption{Contagem de primos retornada pela versão paralela. A linha tracejada é o valor correto (348.513). Quanto mais threads, mais incrementos se perdem.}
+\label{fig:contagem}
 \end{figure}
 
-\section{Discussão}
+A Figura \ref{fig:contagem} mostra: com 1 thread a contagem bate. A partir de 2 threads começa a cair. Com 28 threads o programa reporta 323.893 primos, 7\% a menos. O programa compila e roda sem warnings. Imprime um número. O número está errado, mas o compilador e o runtime não avisam. Só descobre o bug quem compara com a versão sequencial.
 
-\subsection{A race condition é silenciosa}
-O programa compila e executa sem erros visíveis. Ele imprime um número no terminal. O número está errado, mas o programa não avisa. O programador detecta o problema comparando com a versão sequencial.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{tempo_execucao_plot.png}
+\caption{Tempo de execução sequencial vs paralelo. A versão paralela fica mais rápida, mas retorna contagens incorretas.}
+\label{fig:tempo}
+\end{figure}
 
-\subsection{Desbalanceamento de carga}
-A Figura \ref{fig:speedup} mostra o speedup abaixo da reta ideal. O escalonamento estático divide os índices em blocos contíguos. A thread que recebe os números maiores gasta mais ciclos na ALU. As threads com números menores terminam antes e ficam ociosas.
-
-\subsection{Correção}
-A cláusula \texttt{reduction(+:total\_primos\_paralelo)} resolve a race condition. O compilador cria uma cópia privada da variável para cada thread. No fim do laço, o OpenMP soma os subtotais. O escalonamento dinâmico (\texttt{schedule(dynamic)}) equilibra a carga.
+A Figura \ref{fig:tempo} mostra o tempo caindo. A versão sequencial mantém \(\approx 0{,}8\)s. A paralela cai de 0,57s (2 threads) para 0,086s (28 threads). O escalonamento estático do OpenMP divide os índices em blocos contíguos. Números primos maiores demandam mais divisões. A thread que recebe o bloco final gasta mais tempo. As primeiras terminam e ficam ociosas esperando a última. O ganho de velocidade é real: 28 threads rodam 6,5x mais rápido que 1 thread. O problema não é velocidade, é correção.
 
 \section{Conclusão}
 
-O \texttt{\#pragma omp parallel for} distribui as iterações entre threads sem alterar a lógica do laço. O resultado ficou incorreto porque as threads escrevem na mesma variável sem sincronização. A race condition não gera erro visível. A correção exige mecanismos como \texttt{reduction}. O desbalanceamento de carga reduz o speedup abaixo do ideal.
+O \texttt{\#pragma omp parallel for} distribui iterações entre threads sem mudar a lógica do laço. O resultado ficou errado porque múltiplas threads escrevem na mesma variável sem sincronização. A race condition não gera erro visível. O programa compila, roda e imprime um número errado. O tempo de execução cai com mais threads, mas sem sincronização a contagem cai junto.
 
 \end{document}
