@@ -21,19 +21,19 @@
 Implemente dois programas paralelos em C com OpenMP: um limitado por memória, com somas simples em vetores, e outro limitado por CPU, com cálculos matemáticos intensivos. Paralelize com \texttt{\#pragma omp parallel for} e meça o tempo de execução variando o número de threads. Analise quando o desempenho melhora, estabiliza ou piora. Reflita sobre como o multithreading de hardware pode ajudar programas memory-bound e atrapalhar programas compute-bound pela competição por recursos.
 
 \section{Fundamentação}
-Uma aplicação memory-bound transfere muitos dados e realiza poucas operações por byte. Neste caso, cada iteração lê dois valores e escreve um valor. O limite principal é a largura de banda da memória. A soma realiza uma operação de ponto flutuante para cerca de 24 bytes transferidos, sem considerar efeitos de cache.
+Uma aplicação memory-bound transfere muitos dados e realiza poucas operações por byte. Cada iteração lê dois valores e escreve um valor. O gargalo é a largura de banda da memória. A soma faz uma operação de ponto flutuante para cada 24 bytes transferidos, sem contar efeitos de cache.
 
-Uma aplicação compute-bound realiza muitas operações antes de acessar novos dados. Neste trabalho, cada elemento executa 50 repetições de \texttt{sqrt} e \texttt{sin}. Essas funções exigem mais tempo de cálculo do que a leitura e a escrita de um único elemento. Não é correto atribuir um número exato de FLOPs a essas funções sem conhecer a implementação da biblioteca matemática. Por isso, a classificação é feita pelo comportamento do laço, e não por uma estimativa exata de FLOPs.
+Uma aplicação compute-bound realiza muitas operações antes de acessar novos dados. Aqui, cada elemento roda 50 repetições de \texttt{sqrt} e \texttt{sin}. O cálculo dessas funções leva mais tempo que ler e escrever um único elemento. Sem conhecer a implementação da biblioteca matemática, não dá para atribuir um número exato de FLOPs. A classificação depende do comportamento do laço, não de uma estimativa precisa de FLOPs.
 
-O multithreading de hardware pode ajudar uma aplicação memory-bound porque outra thread pode executar enquanto a primeira espera dados da memória. Esse ganho depende da latência e da largura de banda disponíveis. Quando a largura de banda está saturada, novas threads passam a competir pelo mesmo recurso. Em uma aplicação compute-bound, threads lógicas compartilham unidades de execução, caches e outros recursos do núcleo físico. Por isso, elas podem não produzir ganho e podem aumentar o tempo por causa da competição.
+O multithreading de hardware ajuda uma aplicação memory-bound porque, enquanto uma thread espera dados da memória, outra pode executar. O ganho depende da latência e da largura de banda disponíveis. Quando a largura de banda satura, threads adicionais competem pelo mesmo recurso. Em uma aplicação compute-bound, threads lógicas do mesmo núcleo físico compartilham unidades de execução, caches e outros recursos. O paralelismo pode não reduzir o tempo ou até aumentá-lo por causa dessa competição.
 
 \section{Implementação}
-Embora o enunciado use a expressão ``dois programas'', esta implementação usa um único arquivo e um único executável. Ele contém dois testes independentes, executados e medidos separadamente. Essa escolha evita repetir o código de alocação, inicialização, medição e configuração de threads. Ela não altera os dois casos exigidos: o primeiro laço é memory-bound e o segundo é compute-bound.
+O enunciado pede ``dois programas'', mas esta implementação usa um único arquivo e um único executável com dois testes independentes, medidos separadamente. Isso evita repetir código de alocação, inicialização, medição e configuração de threads. Os dois casos exigidos ficam preservados: o primeiro laço é memory-bound e o segundo é compute-bound.
 
-O teste memory-bound aloca os vetores \texttt{A}, \texttt{B} e \texttt{C} e calcula \texttt{C[i] = A[i] + B[i]}. Cada thread escreve em uma posição diferente de \texttt{C}. O teste compute-bound aplica 50 repetições de \texttt{sqrt} e \texttt{sin} a cada elemento de \texttt{V}. O valor temporário \texttt{val} é privado de cada iteração. A alocação e o preenchimento dos vetores ocorrem antes dos cronômetros. Cada tempo cobre somente o seu laço paralelo.
+O teste memory-bound aloca os vetores \texttt{A}, \texttt{B} e \texttt{C} e calcula \texttt{C[i] = A[i] + B[i]}. Cada thread escreve em uma posição diferente de \texttt{C}. O teste compute-bound aplica 50 repetições de \texttt{sqrt} e \texttt{sin} a cada elemento de \texttt{V}. A variável temporária \texttt{val} é privada de cada iteração. Alocação e preenchimento dos vetores acontecem antes dos cronômetros. Cada medição cobre somente o seu laço paralelo.
 \lstinputlisting[caption={Testes limitado pela memória e limitado pela CPU}]{tarefa04.c}
 
-O arquivo é compilado com GCC, \texttt{-fopenmp} e \texttt{-lm}. O programa recebe o número de elementos como argumento e usa $N=50.000.000$ como valor padrão. Os testes deste relatório usam $N=5.000.000$. A medição usa \texttt{CLOCK\_MONOTONIC}, que não é afetado por alterações no relógio do sistema.
+O arquivo é compilado com GCC, \texttt{-fopenmp} e \texttt{-lm}. O programa recebe o número de elementos como argumento e usa $N=50.000.000$ como padrão. Os testes deste relatório usam $N=5.000.000$. A medição usa \texttt{CLOCK\_MONOTONIC}, que não é afetado por alterações no relógio do sistema.
 
 \begin{lstlisting}[caption={Compilação e execução dos testes}]
 gcc -std=c11 -Wall -Wextra -fopenmp tarefa04.c -o tarefa04 -lm
@@ -50,9 +50,9 @@ OMP_NUM_THREADS=28 ./tarefa04 5000000
 \label{fig:tempos}
 \end{figure}
 
-O programa memory-bound melhora quando o número de threads aumenta no início do experimento. Depois, o tempo apresenta pouca redução e oscila. Em alguns pontos, o tempo aumenta. Esse comportamento indica saturação ou disputa pela largura de banda da memória.
+O programa memory-bound melhora quando o número de threads aumenta no início. Depois, o tempo apresenta pouca redução e oscila. Em alguns pontos, o tempo sobe. Esse comportamento aponta saturação ou disputa pela largura de banda da memória.
 
-O programa compute-bound também melhora com o aumento de threads enquanto existem recursos de CPU disponíveis. Após esse ponto, o ganho diminui e pode desaparecer. Se threads lógicas compartilham o mesmo núcleo físico, a competição por unidades de cálculo pode causar estabilidade ou piora.
+O programa compute-bound também melhora com mais threads enquanto existem recursos de CPU disponíveis. Depois disso, o ganho diminui e pode desaparecer. Se threads lógicas compartilham o mesmo núcleo físico, a competição por unidades de cálculo pode causar estabilidade ou piora.
 
 \begin{figure}[H]
 \centering
@@ -61,7 +61,7 @@ O programa compute-bound também melhora com o aumento de threads enquanto exist
 \label{fig:roofline}
 \end{figure}
 
-O Roofline mostra onde o hardware travou o desempenho. O eixo X mede intensidade aritmética, quantas operações de ponto flutuante cada byte da memória rende. O eixo Y mostra GFLOP/s. A linha preta é o teto do sistema. À esquerda do ponto de crista, a memória é o gargalo. À direita, a CPU.
+O Roofline mostra onde o hardware trava o desempenho. O eixo X mede intensidade aritmética: quantas operações de ponto flutuante cada byte da memória rende. O eixo Y mostra GFLOP/s. A linha preta é o teto do sistema. À esquerda do ponto de crista, a memória é o gargalo. À direita, a CPU.
 
 O kernel \texttt{memory\_bound} faz uma adição por elemento.
 
@@ -86,9 +86,9 @@ for (j = 0; j < 50; ++j)
 
 \noindent Intensidade: $\sim$1050/16 $\approx$ 65,6 FLOP/byte. Bem à direita do ponto de crista ($\sim$6,4), onde a CPU define o limite. Com 20 threads sobe a \(\sim\)120 GFLOP/s. Fica longe dos 350 GFLOP/s teóricos porque não usa vetorização AVX2/FMA e \texttt{sqrt}/\texttt{sin} rodam em software escalar.
 
-\texttt{sqrt} e \texttt{sin} não são 1 FLOP cada. São funções de biblioteca com dezenas de operações internas, Newton-Raphson, polinômios minimax. A contagem de $\sim$1050 FLOPs é uma estimativa razoável do custo real em software.
+\texttt{sqrt} e \texttt{sin} não são 1 FLOP cada. São funções de biblioteca com dezenas de operações internas: Newton-Raphson, polinômios minimax. A estimativa de $\sim$1050 FLOPs é razoável para o custo real em software.
 
 \section{Conclusão}
-Os dois testes paralelos usam OpenMP e permitem comparar dois tipos de gargalo. Em uma aplicação memory-bound, o multithreading de hardware ajuda porque, enquanto uma thread aguarda dados da memória, outra thread pode executar. O ganho existe enquanto a largura de banda da memória não está saturada. Quando múltiplos núcleos lógicos compartilham o mesmo barramento de memória, threads adicionais competem pelo mesmo recurso e os ganhos se estabilizam ou diminuem. Em uma aplicação compute-bound, threads lógicas do mesmo núcleo físico compartilham unidades de execução, caches e etc. Por isso, o paralelismo pode não reduzir o tempo e até aumentá-lo: mais threads significam mais competição pelos mesmos recursos de cálculo, sem o benefício de esconder latência de memória.
+Os dois testes paralelos usam OpenMP e permitem comparar dois tipos de gargalo. Em uma aplicação memory-bound, o multithreading de hardware ajuda porque, enquanto uma thread aguarda dados da memória, outra pode executar. O ganho existe enquanto a largura de banda da memória não está saturada. Quando múltiplos núcleos lógicos compartilham o mesmo barramento de memória, threads adicionais competem pelo mesmo recurso e os ganhos se estabilizam ou diminuem. Em uma aplicação compute-bound, threads lógicas do mesmo núcleo físico compartilham unidades de execução e caches. O paralelismo pode não reduzir o tempo e até aumentá-lo: mais threads significam mais competição pelos mesmos recursos de cálculo, sem o benefício de esconder latência de memória.
 
 \end{document}

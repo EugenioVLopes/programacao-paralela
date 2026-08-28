@@ -48,7 +48,7 @@ Uma race condition ocorre quando threads escrevem na mesma variável sem sincron
 
 \section{Implementação}
 
-O código usa $N=5.000.000$. A função \texttt{eh\_primo} verifica divisores ímpares até $\sqrt{n}$. O programa executa duas versões: uma sequencial, que percorre o laço em uma thread, e uma paralela, que adiciona \texttt{\#pragma omp parallel for} ao mesmo laço sem alterar a lógica. Um script varia o número de threads de 1 até o máximo disponível na máquina.
+O código usa $N=5.000.000$. A função \texttt{eh\_primo} verifica divisores ímpares até $\sqrt{n}$. O programa executa duas versões: uma sequencial, que percorre o laço em uma thread, e uma paralela, que adiciona \texttt{\#pragma omp parallel for} ao mesmo laço. Um script varia o número de threads de 1 até o máximo disponível na máquina.
 
 \newpage
 \lstinputlisting[caption={tarefa05.c}]{tarefa05.c}
@@ -73,7 +73,7 @@ A versão sequencial contou 348.513 primos em todas as execuções. A versão pa
 \label{fig:contagem}
 \end{figure}
 
-A Figura \ref{fig:contagem} mostra: com 1 thread a contagem bate. A partir de 2 threads começa a cair. Com 28 threads o programa reporta 323.893 primos, 7\% a menos. O programa compila e roda sem warnings. Imprime um número. O número está errado, mas o compilador e o runtime não avisam. Só descobre o bug quem compara com a versão sequencial.
+A Figura \ref{fig:contagem} mostra: com 1 thread a contagem bate. A partir de 2 threads começa a cair. Com 28 threads o programa reporta 323.893 primos, 7\% a menos. O programa compila e roda sem warnings e imprime um número errado. O compilador e o runtime não avisam. Só descobre o bug quem compara com a versão sequencial.
 
 \begin{figure}[H]
 \centering
@@ -82,10 +82,10 @@ A Figura \ref{fig:contagem} mostra: com 1 thread a contagem bate. A partir de 2 
 \label{fig:tempo}
 \end{figure}
 
-A Figura \ref{fig:tempo} mostra o tempo caindo. A versão sequencial mantém \(\approx 0{,}8\)s. A paralela cai de 0,57s (2 threads) para 0,086s (28 threads). O escalonamento estático do OpenMP divide os índices em blocos contíguos. Números primos maiores demandam mais divisões. A thread que recebe o bloco final gasta mais tempo. As primeiras terminam e ficam ociosas esperando a última. O ganho de velocidade é real: 28 threads rodam 6,5x mais rápido que 1 thread. O problema não é velocidade, é correção.
+A Figura \ref{fig:tempo} mostra o tempo caindo. A versão sequencial mantém \(\approx 0{,}8\)s. A paralela cai de 0,57s (2 threads) para 0,086s (28 threads). O escalonamento estático do OpenMP divide os índices em blocos contíguos, mas primos maiores demandam mais divisões. A thread que recebe o bloco final gasta mais tempo, e as primeiras terminam e ficam ociosas esperando a última. O ganho de velocidade é real: 28 threads rodam 6,5x mais rápido que 1 thread. O problema não é velocidade, é correção.
 
 \section{Conclusão}
 
-O \texttt{\#pragma omp parallel for} distribui iterações entre threads sem mudar a lógica do laço. O resultado ficou errado porque múltiplas threads escrevem na mesma variável sem sincronização. A race condition não gera erro visível. O programa compila, roda e imprime um número errado. O tempo de execução cai com mais threads, mas sem sincronização a contagem cai junto.
+O \texttt{\#pragma omp parallel for} distribui iterações entre threads sem mudar a lógica do laço. Múltiplas threads escrevem na mesma variável sem sincronização, o que causa perda de incrementos. A race condition não gera erro visível: o programa compila, roda e imprime um número errado. O tempo de execução cai com mais threads, mas sem sincronização a contagem cai junto.
 
 \end{document}
