@@ -28,8 +28,7 @@
 \pagestyle{plain}
 
 \begin{center}
-    {\LARGE\bfseries Paralelismo ao Nível de Instrução (ILP)}\\[0.4em]
-    {\large Dependências de dados e níveis de otimização em C}\\[1em]
+    {\LARGE\bfseries Pipeline e vetorização}\\[0.4em]
     {\normalsize Eugênio Vitor Lopes dos Santos}\\[0.3em]
     {\small DCA3703 -- Programação Paralela, Universidade Federal do Rio Grande do Norte}\\[0.3em]
     {\small 2026}
@@ -71,29 +70,29 @@ iteração. Não há dependência entre escritas consecutivas, então o compilad
 pode vetorizar o laço com instruções SIMD e o processador pode executar várias
 escrituras em paralelo.
 
-\section{Experimento}
+\newpage
+\section{Implementação}
 
-\subsection{Configuração}
 O vetor contém $N=100.000.000$ inteiros (\texttt{int}, 4~bytes cada), totalizando
 aproximadamente 381,5~MiB (400~MB). Esse valor foi dimensionado com base na
 arquitetura de teste (processador Intel Core i7-14700HX):
 (1)~supera em mais de 11$\times$ o cache L3 compartilhado de 33~MiB (e os caches
-L1D de 48~KiB e L2 de 2~MiB por núcleo), garantindo que o experimento
-atravesse toda a hierarquia de memória até a DRAM;
-(2)~mantém os tempos de execução na faixa de 26 a 300~ms, minimizando o peso
+L1D de 48~KiB e L2 de 2~MiB por núcleo), de modo que o experimento percorre
+toda a hierarquia de memória até a DRAM;
+(2)~mantém os tempos de execução na faixa de 26 a 300~ms, o que reduz o peso
 relativo do ruído de medição e do escalonador do sistema operacional; e
 (3)~consome apenas uma fração da memória RAM principal, sem risco de
 paginação em disco (\textit{swap}).
 
 A função \texttt{v[i] = 3*i + 1} preenche o vetor. Depois, dois laços
 somam todos os elementos: o primeiro com um acumulador, o segundo com quatro.
-
 Cada laço é cronometrado isoladamente com
 \texttt{clock\_gettime(CLOCK\_MONOTONIC)}, que tem resolução de nanossegundos e
 não conta tempo de outros processos. O programa compara os dois resultados para
-garantir que a soma com múltiplos acumuladores produz o mesmo valor.
+confirmar que a soma com múltiplos acumuladores produz o mesmo valor.
 
-\subsection{Compilação}
+\lstinputlisting[caption={tarefa03.c}]{tarefa03.c}
+
 O código foi compilado três vezes, variando apenas o nível de otimização:
 \begin{lstlisting}[language=bash]
 gcc -std=c11 -Wall -Wextra -O0 tarefa03.c -o tarefa03_O0
@@ -106,70 +105,8 @@ estrutura original do código. \texttt{-O2} aplica desenrolamento de laços e
 alocação de registradores. \texttt{-O3} adiciona vetorização automática com
 instruções SIMD.
 
-\section{Código-fonte}
-\begin{lstlisting}[caption={tarefa03.c}]
-#define _POSIX_C_SOURCE 199309L
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-
-#define DEFAULT_N 100000000L
-
-static double agora(void) {
-    struct timespec t;
-    clock_gettime(CLOCK_MONOTONIC, &t);
-    return t.tv_sec + t.tv_nsec / 1e9;
-}
-
-int main(int argc, char **argv) {
-    long n = argc > 1 ? atol(argv[1]) : DEFAULT_N;
-    if (n <= 0) {
-        fprintf(stderr, "Uso: %s [numero_de_elementos]\n", argv[0]);
-        return 1;
-    }
-
-    int *v = malloc((size_t)n * sizeof(*v));
-    if (!v) {
-        perror("malloc");
-        return 1;
-    }
-
-    double inicio = agora();
-    for (long i = 0; i < n; ++i)
-        v[i] = (int)(3 * i + 1);
-    double tempo_inicializacao = agora() - inicio;
-
-    inicio = agora();
-    long long soma_dependente = 0;
-    for (long i = 0; i < n; ++i)
-        soma_dependente += v[i];
-    double tempo_dependente = agora() - inicio;
-
-    inicio = agora();
-    long long s0 = 0, s1 = 0, s2 = 0, s3 = 0;
-    long i = 0;
-    for (; i + 3 < n; i += 4) {
-        s0 += v[i];
-        s1 += v[i + 1];
-        s2 += v[i + 2];
-        s3 += v[i + 3];
-    }
-    for (; i < n; ++i)
-        s0 += v[i];
-    long long soma_multiplos = s0 + s1 + s2 + s3;
-    double tempo_multiplos = agora() - inicio;
-
-    printf("N=%ld inicializacao=%.9f dependente=%.9f multiplos=%.9f "
-           "somas=%lld,%lld\n", n, tempo_inicializacao,
-           tempo_dependente, tempo_multiplos, soma_dependente,
-           soma_multiplos);
-    free(v);
-    return soma_dependente != soma_multiplos;
-}
-\end{lstlisting}
-
-\section{Resultados}
+\newpage
+\section{Resultados e Discussões}
 
 \subsection{Tempos medidos}
 \begin{table}[H]
@@ -208,8 +145,6 @@ O3 & 0,86$\times$\\
 \label{fig:ilp_results}
 \end{figure}
 
-\subsection{Leitura dos resultados}
-
 Com \texttt{-O0}, a soma com quatro acumuladores rodou em 0,058~s contra
 0,151~s do acumulador único: ganho de 2,58$\times$ de desempenho. O limite
 teórico de aceleração seria de 4$\times$ (quatro cadeias independentes de cálculo).
@@ -225,16 +160,13 @@ automaticamente.
 Com \texttt{-O3}, os tempos de soma dependente (0,026~s) e de múltiplos acumuladores
 (0,030~s) tornam-se equivalentes, com variação residual na ordem de 4~ms.
 Nesse nível de otimização, a vetorização automática SIMD e a reordenação profunda
-atuam em ambas as abordagens, fazendo com que o gargalo de execução seja dominado
-pela taxa de transferência de dados da memória e não pela dependência aritmética
-original.
+atuam em ambas as abordagens, e o gargalo passa a ser a largura de banda da
+memória, não mais a dependência aritmética original.
 
 A inicialização reduziu de 0,301~s em \texttt{-O0} para cerca de 0,102~s em
 \texttt{-O2}. Como o laço de inicialização grava elementos contíguos em posições
-independentes de memória, o compilador consegue aplicar vetorização SIMD com
-amplo aproveitamento de largura de banda.
-
-\section{Discussão}
+independentes de memória, o compilador consegue aplicar vetorização SIMD. O compilador vetoriza o laço, gravando vários elementos por
+instrução e aproveitando a largura de banda da memória.
 
 \subsection{Caminho crítico e dependências de dados}
 Os laços de soma executam o mesmo número de operações aritméticas, $O(N)$, porém
@@ -249,10 +181,10 @@ final dos acumuladores parciais (\texttt{s0 + s1 + s2 + s3}) requer apenas
 três adições adicionais, custo irrelevante para $N = 10^8$.
 
 \subsection{Atuação das otimizações do compilador}
-Nos níveis \texttt{-O2} e \texttt{-O3}, o compilador aplica técnicas avançadas
-de reordenação, desenrolamento de laços e vetorização vetorial SIMD. Esse processo
-elimina a desvantagem do código sequencial direto, equiparando o desempenho da
-versão ingênua ao da versão manualmente desenrolada.
+Nos níveis \texttt{-O2} e \texttt{-O3}, o compilador reordena as somas e
+desenrola o laço, chegando à mesma estrutura de quatro acumuladores do código
+manual. Por isso, a versão sequencial tem desempenho semelhante à desenrolada
+manualmente.
 
 \subsection{Escopo do paralelismo investigado}
 O paralelismo analisado ocorre exclusivamente em nível de instrução (ILP) dentro
@@ -261,15 +193,15 @@ e pipelines superescalares. Esse mecanismo opera internamente no hardware e não
 deve ser confundido com paralelismo entre threads ou múltiplos núcleos físicos.
 
 \section{Conclusão}
-O experimento comprovou que dependências de dados entre iterações consecutivas
+O experimento mostrou que dependências de dados entre iterações consecutivas
 restringem diretamente a capacidade de execução paralela do pipeline. Sem
 otimização do compilador (\texttt{-O0}), a divisão em quatro acumuladores
 independentes proporcionou um ganho de $2,58\times$ na soma do vetor.
 
 Com níveis de otimização elevados (\texttt{-O2} e \texttt{-O3}), o compilador
-foi capaz de identificar e explorar automaticamente esse paralelismo, tornando
-equivalente o desempenho de ambas as implementações. Assim, comprova-se que a
-exposição de instruções independentes é essencial para o desempenho quando o
-código depende da estrutura direta dada pelo programador.
+identifica e explora esse paralelismo automaticamente, e as duas implementações
+têm desempenho semelhante. Portanto, expor instruções independentes é essencial
+para o desempenho naqueles casos em que o código impõe a ordem original das
+operações ao compilador.
 
 \end{document}
