@@ -80,7 +80,7 @@ for (j = 0; j < 50; ++j)
 
 // sqrt: ~8 FLOPs (libm, Newton-Raphson)
 // sin:  ~10 FLOPs (redução de argumento + polinômio minimax)
-// Total: (1 MUL + 1 ADD + 8 + 10 + 1 ADD) × 50 ≈ 1050 FLOPs
+// Total: (1 MUL + 1 ADD + 8 + 10 + 1 ADD) × 50 ~ 1050 FLOPs
 // Bytes: 2 acessos × 8 = 16 bytes/elemento
 \end{verbatim}
 
