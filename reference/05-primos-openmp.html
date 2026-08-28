@@ -44,7 +44,29 @@
 
   <main>
     <section>
-      <h2>1. Sintaxe básica</h2>
+      <h2>1. Compilação e execução</h2>
+      <pre><code><span class="hl-com"># Compilação com OpenMP</span>
+$ gcc -std=c11 -Wall -Wextra -fopenmp tarefa05.c -o tarefa05 -lm
+
+<span class="hl-com"># Executa com o padrão de threads do sistema</span>
+$ ./tarefa05 5000000
+
+<span class="hl-com"># Define 4 threads e executa</span>
+$ <span class="hl-kw">export</span> OMP_NUM_THREADS=4
+$ ./tarefa05 5000000
+
+<span class="hl-com"># Executa definindo a variável inline</span>
+$ OMP_NUM_THREADS=2 ./tarefa05 5000000
+</code></pre>
+      <ul>
+        <li>O argumento é o limite superior $N$ para contagem de primos.</li>
+        <li>A saída mostra <code>seq_time</code>, <code>par_time</code>, <code>seq_count</code> e <code>par_count</code>.</li>
+        <li>Use <code>./execute.sh</code> para rodar o experimento completo com todas as thread counts e gerar os gráficos.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>2. Sintaxe básica</h2>
       <pre><code><span class="hl-prep">#pragma</span> omp parallel for
 <span class="hl-kw">for</span> (<span class="hl-type">long</span> numero_atual = <span class="hl-num">0</span>; numero_atual &lt; limite_superior; numero_atual++) {
     <span class="hl-comment">// Operações independentes sobre o número atual</span>
@@ -56,7 +78,7 @@
     </section>
 
     <section>
-      <h2>2. Escalonamento (schedule)</h2>
+      <h2>3. Escalonamento (schedule)</h2>
       <p>A cláusula <code>schedule(tipo, tamanho_bloco)</code> controla a divisão das iterações.</p>
       <ul>
         <li><code>schedule(static)</code> — Divide as iterações em blocos iguais no início. Custo mínimo. Ideal para carga uniforme.</li>
@@ -65,7 +87,7 @@
     </section>
 
     <section>
-      <h2>3. Race condition com variável compartilhada</h2>
+      <h2>4. Race condition com variável compartilhada</h2>
       <pre><code><span class="hl-type">long</span> total_primos = <span class="hl-num">0</span>;
 <span class="hl-prep">#pragma</span> omp parallel for
 <span class="hl-kw">for</span> (<span class="hl-type">long</span> numero_atual = <span class="hl-num">0</span>; numero_atual &lt; limite_superior; numero_atual++) {
