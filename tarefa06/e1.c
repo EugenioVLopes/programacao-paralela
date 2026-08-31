@@ -1,0 +1,38 @@
+#define _DEFAULT_SOURCE
+
+/*
+ * dentro_circulo++ envolve ler, somar 1 e escrever de volta.
+ * Sao pelo menos 3 instrucoes de maquina que podem se entrelacar
+ * entre threads, perdendo incrementos.
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <omp.h>
+
+#define TOTAL_ELEMENTOS_PADRAO 5000000L
+
+int main(int argc, char *argv[]) {
+    long long total_elementos = argc > 1 ? atoll(argv[1]) : TOTAL_ELEMENTOS_PADRAO;
+
+    long long dentro_circulo = 0;
+
+    #pragma omp parallel for
+    for (long long i = 0; i < total_elementos; i++) {
+        unsigned int seed = (unsigned int)(i + 1);
+        double x = 2.0 * (double)rand_r(&seed) / (double)RAND_MAX - 1.0;
+        double y = 2.0 * (double)rand_r(&seed) / (double)RAND_MAX - 1.0;
+
+        if ((x * x + y * y) <= 1.0) {
+            dentro_circulo++;
+        }
+    }
+
+    double pi = 4.0 * dentro_circulo / total_elementos;
+    double erro = fabs(pi - M_PI);
+
+    printf("Dentro do circulo = %lld\nPI = %.10f\nErro = %.10e\n", dentro_circulo, pi, erro);
+
+    return 0;
+}

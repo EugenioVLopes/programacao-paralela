@@ -26,6 +26,7 @@ Cada tarefa tem lição prática, teoria dedicada, guia de consulta rápida, có
 | 03 | Paralelismo em nível de instrução (ILP) | [Lição 03](https://eugeniovlopes.github.io/programacao-paralela/lessons/0003-tarefa03-ilp-acumuladores.html) | [Teoria 03](https://eugeniovlopes.github.io/programacao-paralela/reference/03-teoria-ilp-pipeline-superscalar.html) | [Referência 03](https://eugeniovlopes.github.io/programacao-paralela/reference/03-ilp-acumuladores-otimizacao.html) | [`tarefa03/`](tarefa03/) e [PDF](tarefa03/relatorio.pdf) |
 | 04 | Limitações por Memória e CPU | [Lição 04](https://eugeniovlopes.github.io/programacao-paralela/lessons/0004-tarefa04-memory-cpu-bound.html) | [Teoria 04](https://eugeniovlopes.github.io/programacao-paralela/reference/04-teoria-memory-bound-cpu-bound.html) | [Referência 04](https://eugeniovlopes.github.io/programacao-paralela/reference/04-memory-bound-cpu-bound.html) | [`tarefa04/`](tarefa04/) e [PDF](tarefa04/relatorio.pdf) |
 | 05 | Contagem de Primos e Race Conditions | [Lição 05](https://eugeniovlopes.github.io/programacao-paralela/lessons/0005-tarefa05-primos-openmp.html) | [Teoria 05](https://eugeniovlopes.github.io/programacao-paralela/reference/05-teoria-primos-openmp.html) | [Referência 05](https://eugeniovlopes.github.io/programacao-paralela/reference/05-primos-openmp.html) | [`tarefa05/`](tarefa05/) e [PDF](tarefa05/relatorio.pdf) |
+| 06 | Estimativa de $\pi$ (Monte Carlo) e Cláusulas OpenMP | — | — | — | [`tarefa06/`](tarefa06/) e [PDF](tarefa06/relatorio.pdf) |
 
 ---
 
@@ -76,8 +77,13 @@ Cada tarefa tem lição prática, teoria dedicada, guia de consulta rápida, có
 │   ├── execute.sh
 │   ├── plot_results.py
 │   └── relatorio.tex
-└── tarefa05/                    # Código C, teste de contagem de primos e Race Condition
-    ├── tarefa05.c
+├── tarefa05/                    # Código C, teste de contagem de primos e Race Condition
+│   ├── tarefa05.c
+│   ├── execute.sh
+│   ├── plot_results.py
+│   └── relatorio.tex
+└── tarefa06/                    # Monte Carlo Pi com OpenMP, race condition e escopos
+    ├── e0.c ... e4_*.c
     ├── execute.sh
     ├── plot_results.py
     └── relatorio.tex

@@ -1,6 +1,7 @@
 # Agent & Environment configurations
 .agents/
 .codebase-memory/
+.pi/
 skills-lock.json
 
 # Binaries and Object files
@@ -23,10 +24,19 @@ skills-lock.json
 /tarefa03/tarefa03_*
 /tarefa04/tarefa04
 /tarefa05/tarefa05
+/tarefa06/e0
+/tarefa06/e1
+/tarefa06/e2
+/tarefa06/e3
+/tarefa06/e4_private
+/tarefa06/e4_firstprivate
+/tarefa06/e4_lastprivate
+/tarefa06/e4_default_none
 
 # Presentation scripts & podcasts (untracked)
 *roteiro*.md
 *podcast*.md
+*apresentacao*.md
 
 # LaTeX build artifacts
 *.aux
