@@ -14,15 +14,17 @@ def main():
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    ax.plot(df['threads'], df['cpu_bound'], 'r-s', markersize=5,
-            label='Limitado por CPU (sqrt+sin ×50)')
-    ax.plot(df['threads'], df['memory_bound'], 'b-o', markersize=5,
-            label='Limitado por memória (C=A+B)')
+    ax.errorbar(df['threads'], df['cpu_bound_mean'], yerr=df['cpu_bound_std'],
+                fmt='r-s', markersize=5, capsize=3, capthick=1,
+                label='Limitado por CPU (sqrt+sin ×50)')
+    ax.errorbar(df['threads'], df['memory_bound_mean'], yerr=df['memory_bound_std'],
+                fmt='b-o', markersize=5, capsize=3, capthick=1,
+                label='Limitado por memória (C=A+B)')
 
     ax.set_yscale('log')
     ax.set_xlabel('Número de threads', fontsize=12)
     ax.set_ylabel('Tempo de execução (s)', fontsize=12)
-    ax.set_title('Tempo de execução vs. número de threads', fontsize=14,
+    ax.set_title('Tempo de execução vs. número de threads (média de 10 execuções)', fontsize=14,
                  fontweight='bold')
 
     ax.grid(True, which='both', linestyle='--', alpha=0.3)

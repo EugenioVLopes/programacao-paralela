@@ -78,8 +78,8 @@ def main():
         row = df[df['threads'] == t]
         if row.empty:
             continue
-        t_mem = row['memory_bound'].values[0]
-        t_cpu = row['cpu_bound'].values[0]
+        t_mem = row['memory_bound_mean'].values[0]
+        t_cpu = row['cpu_bound_mean'].values[0]
 
         gf_mem = compute_gflops(t_mem, 1, N)         # 1 FLOP/elem
         gf_cpu = compute_gflops(t_cpu, FLOPS_CPU_PER_ELEM, N)

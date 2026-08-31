@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tarefa 04 — Visualização Paralela</title>
+<style>
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8;
+    --mem: #3b82f6; --cpu: #ef4444; --green: #22c55e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'SF Mono', 'Fira Code', monospace; }
+  h1 { text-align: center; padding: 24px 0 8px; font-size: 1.4rem; color: var(--accent); }
+  .subtitle { text-align: center; color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 1200px; margin: 0 auto; padding: 0 16px 24px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .card h2 { font-size: 0.95rem; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .card h2 .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .full { grid-column: 1 / -1; }
+
+  canvas { width: 100%; border-radius: 6px; background: #0c1322; display: block; }
+
+  .controls { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  button { background: var(--accent); color: #000; border: none; padding: 6px 16px; border-radius: 6px;
+           font-family: inherit; font-weight: 600; cursor: pointer; font-size: 0.8rem; }
+  button:hover { opacity: 0.85; }
+  button.secondary { background: var(--border); color: var(--text); }
+  button:focus-visible, input[type=range]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  select, input[type=range] { background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 4px; padding: 4px 8px; font-family: inherit; font-size: 0.8rem; }
+  label { color: var(--muted); font-size: 0.78rem; }
+
+  .legend { display: flex; gap: 16px; font-size: 0.75rem; color: var(--muted); margin-top: 8px; }
+  .legend span { display: flex; align-items: center; gap: 4px; }
+  .legend .swatch { width: 12px; height: 12px; border-radius: 2px; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+  .stat { background: var(--bg); border-radius: 6px; padding: 8px; text-align: center; }
+  .stat .val { font-size: 1.1rem; font-weight: 700; color: var(--accent); }
+  .stat .lbl { font-size: 0.65rem; color: var(--muted); margin-top: 2px; }
+
+  .code-block { background: #0c1322; border-radius: 6px; padding: 12px; font-size: 0.72rem;
+    line-height: 1.5; overflow-x: auto; white-space: pre; color: var(--muted); }
+  .code-block .kw { color: #c084fc; }
+  .code-block .fn { color: #38bdf8; }
+  .code-block .cm { color: #475569; }
+  .code-block .num { color: #fbbf24; }
+  .code-block .hl-mem { background: rgba(59,130,246,0.15); display: inline; }
+  .code-block .hl-cpu { background: rgba(239,68,68,0.15); display: inline; }
+
+  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2,1fr); } }
+</style>
+</head>
+<body>
+
+<h1>Tarefa 04 — Dois Kernels, Dois Mundos</h1>
+<p class="subtitle">Memory-bound vs CPU-bound com OpenMP — 5M elementos, até 28 threads (média de 10 execuções)</p>
+
+<div class="grid">
+
+  <!-- CODE VIEW -->
+  <div class="card">
+    <h2><span class="dot" style="background:#c084fc"></span> Código C</h2>
+    <div class="code-block" id="codeBlock"></div>
+  </div>
+
+  <!-- MEMORY LAYOUT -->
+  <div class="card">
+    <h2><span class="dot" style="background:var(--mem)"></span> Layout de Memória</h2>
+    <canvas id="memCanvas" height="220" role="img" aria-label="Diagrama do layout de memória mostrando os arrays A[], B[], C[] e V[]"></canvas>
+    <div class="legend">
+      <span><span class="swatch" style="background:#3b82f6"></span> A[]</span>
+      <span><span class="swatch" style="background:#8b5cf6"></span> B[]</span>
+      <span><span class="swatch" style="background:#22c55e"></span> C[] = A+B</span>
+      <span><span class="swatch" style="background:#ef4444"></span> V[] (sqrt+sin)</span>
+    </div>
+  </div>
+
+  <!-- PHASE ANIMATION -->
+  <div class="card full">
+    <h2><span class="dot" style="background:var(--green)"></span> Execução Paralela</h2>
+    <div class="controls">
+      <button id="btnMem" onclick="startPhase('mem')">▶ Fase Memory-Bound</button>
+      <button id="btnCpu" onclick="startPhase('cpu')">▶ Fase CPU-Bound</button>
+      <button class="secondary" onclick="resetAll()">↺ Reset</button>
+      <label for="threadSlider">Threads: <input type="range" id="threadSlider" min="1" max="28" value="4" aria-label="Número de threads"> <span id="threadVal">4</span></label>
+    </div>
+    <canvas id="phaseCanvas" height="300" role="img" aria-label="Animação da execução paralela mostrando threads processando blocos de memória"></canvas>
+    <div class="stats" id="statsBar">
+      <div class="stat"><div class="val" id="statThreads">4</div><div class="lbl">THREADS</div></div>
+      <div class="stat"><div class="val" id="statProgress">0%</div><div class="lbl">PROGRESSO</div></div>
+      <div class="stat"><div class="val" id="statTime">—</div><div class="lbl">TEMPO (s)</div></div>
+      <div class="stat"><div class="val" id="statType">—</div><div class="lbl">TIPO</div></div>
+    </div>
+  </div>
+
+  <!-- CHART: Time vs Threads -->
+  <div class="card">
+    <h2><span class="dot" style="background:var(--accent)"></span> Tempo vs Threads (log)</h2>
+    <canvas id="chartCanvas" height="240" role="img" aria-label="Gráfico de tempo de execução versus número de threads em escala logarítmica"></canvas>
+  </div>
+
+  <!-- CHART: Speedup -->
+  <div class="card">
+    <h2><span class="dot" style="background:var(--green)"></span> Speedup vs Threads</h2>
+    <canvas id="speedCanvas" height="240" role="img" aria-label="Gráfico de speedup versus número de threads com linha de referência ideal"></canvas>
+  </div>
+
+</div>
+
+<script>
+// ─── DATA ──────────────────────────────────────────────
+const DATA = [
+  {t:1,  mem:0.0326, cpu:4.4788},
+  {t:2,  mem:0.0160, cpu:2.3539},
+  {t:3,  mem:0.0104, cpu:1.6746},
+  {t:4,  mem:0.0077, cpu:1.2679},
+  {t:5,  mem:0.0064, cpu:1.0518},
+  {t:6,  mem:0.0064, cpu:0.9266},
+  {t:7,  mem:0.0068, cpu:0.8337},
+  {t:8,  mem:0.0070, cpu:0.7417},
+  {t:9,  mem:0.0063, cpu:0.6925},
+  {t:10, mem:0.0068, cpu:0.6600},
+  {t:11, mem:0.0060, cpu:0.6129},
+  {t:12, mem:0.0061, cpu:0.5781},
+  {t:13, mem:0.0060, cpu:0.5469},
+  {t:14, mem:0.0062, cpu:0.5192},
+  {t:15, mem:0.0066, cpu:0.5010},
+  {t:16, mem:0.0053, cpu:0.4752},
+  {t:17, mem:0.0063, cpu:0.4591},
+  {t:18, mem:0.0064, cpu:0.4445},
+  {t:19, mem:0.0067, cpu:0.4315},
+  {t:20, mem:0.0065, cpu:0.4287},
+  {t:21, mem:0.0067, cpu:0.4266},
+  {t:22, mem:0.0065, cpu:0.4190},
+  {t:23, mem:0.0066, cpu:0.4233},
+  {t:24, mem:0.0065, cpu:0.4144},
+  {t:25, mem:0.0070, cpu:0.4196},
+  {t:26, mem:0.0073, cpu:0.4236},
+  {t:27, mem:0.0071, cpu:0.4140},
+  {t:28, mem:0.0076, cpu:0.4375},
+];
+
+// ─── CODE DISPLAY ──────────────────────────────────────
+const codeLines = [
+  ['<span class="cm">// Aloca 4 vetores de 50M doubles (~1.6 GB)</span>'],
+  ['<span class="kw">double</span> *A = <span class="fn">malloc</span>(N * <span class="kw">sizeof</span>(<span class="kw">double</span>));'],
+  ['<span class="kw">double</span> *B = <span class="fn">malloc</span>(N * <span class="kw">sizeof</span>(<span class="kw">double</span>));'],
+  ['<span class="kw">double</span> *C = <span class="fn">malloc</span>(N * <span class="kw">sizeof</span>(<span class="kw">double</span>));'],
+  ['<span class="kw">double</span> *V = <span class="fn">malloc</span>(N * <span class="kw">sizeof</span>(<span class="kw">double</span>));'],
+  [''],
+  ['<span class="cm">// Inicialização sequencial</span>'],
+  ['<span class="kw">for</span> (<span class="kw">long</span> i = <span class="num">0</span>; i &lt; N; ++i) {'],
+  ['    A[i] = i * <span class="num">0.5</span>;  B[i] = i * <span class="num">0.25</span>;  V[i] = i * <span class="num">0.1</span>;'],
+  ['}'],
+  [''],
+  ['<span class="cm">// ═══ FASE 1: MEMORY-BOUND ═══</span>'],
+  ['<span class="hl-mem"><span class="kw">#pragma omp parallel for</span></span>'],
+  ['<span class="hl-mem"><span class="kw">for</span> (<span class="kw">long</span> i = <span class="num">0</span>; i &lt; N; ++i) {</span>'],
+  ['<span class="hl-mem">    C[i] = A[i] + B[i];  <span class="cm">// 1 FLOP, 24 bytes</span></span>'],
+  ['<span class="hl-mem">}</span>'],
+  [''],
+  ['<span class="cm">// ═══ FASE 2: CPU-BOUND ═══</span>'],
+  ['<span class="hl-cpu"><span class="kw">#pragma omp parallel for</span></span>'],
+  ['<span class="hl-cpu"><span class="kw">for</span> (<span class="kw">long</span> i = <span class="num">0</span>; i &lt; N; ++i) {</span>'],
+  ['<span class="hl-cpu">    <span class="kw">double</span> val = V[i];</span>'],
+  ['<span class="hl-cpu">    <span class="kw">for</span> (<span class="kw">int</span> j = <span class="num">0</span>; j &lt; <span class="num">50</span>; ++j) {</span>'],
+  ['<span class="hl-cpu">        val = <span class="fn">sqrt</span>(val + j*<span class="num">0.01</span>) + <span class="fn">sin</span>(val);</span>'],
+  ['<span class="hl-cpu">    }</span>'],
+  ['<span class="hl-cpu">    V[i] = val;  <span class="cm">// ~1050 FLOPs, 16 bytes</span></span>'],
+  ['<span class="hl-cpu">}</span>'],
+];
+document.getElementById('codeBlock').innerHTML = codeLines.map(l => l[0]).join('\n');
+
+// ─── CANVAS UTILS ──────────────────────────────────────
+const _canvasCache = {};
+
+function initCanvas(id) {
+  const c = document.getElementById(id);
+  const dpr = window.devicePixelRatio || 1;
+  const rect = c.getBoundingClientRect();
+  c.width = rect.width * dpr;
+  c.height = rect.height * dpr;
+  const ctx = c.getContext('2d');
+  ctx.scale(dpr, dpr);
+  _canvasCache[id] = { c, ctx, w: rect.width, h: rect.height };
+  return _canvasCache[id];
+}
+
+function getCachedCanvas(id) {
+  return _canvasCache[id] || initCanvas(id);
+}
+
+// ─── MEMORY LAYOUT ANIMATION ───────────────────────────
+let memAnim;
+function drawMemoryLayout() {
+  const { ctx, w, h } = initCanvas('memCanvas');
+  const N = 50_000_000;
+  const arrW = (w - 80) / 4;
+  const arrH = 40;
+  const y0 = 40;
+  const colors = ['#3b82f6', '#8b5cf6', '#22c55e', '#ef4444'];
+  const labels = ['A[]', 'B[]', 'C[] = A+B', 'V[] (sqrt+sin)'];
+  const descs = [
+    `${(N*8/1e9).toFixed(1)} GB — i * 0.5`,
+    `${(N*8/1e9).toFixed(1)} GB — i * 0.25`,
+    `${(N*8/1e9).toFixed(1)} GB — saída`,
+    `${(N*8/1e9).toFixed(1)} GB — saída`
+  ];
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Draw arrays as segmented bars
+  for (let a = 0; a < 4; a++) {
+    const x = 20 + a * (arrW + 10);
+    // Segments to show it's chunked across threads
+    const segs = 16;
+    const segW = (arrW - 2) / segs;
+    for (let s = 0; s < segs; s++) {
+      const brightness = 0.4 + 0.6 * (s / segs);
+      ctx.fillStyle = colors[a];
+      ctx.globalAlpha = brightness;
+      ctx.fillRect(x + s * segW, y0, segW - 1, arrH);
+    }
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = '#475569';
+    ctx.strokeRect(x, y0, arrW, arrH);
+    ctx.fillStyle = '#e2e8f0';
+    ctx.font = 'bold 11px SF Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(labels[a], x + arrW/2, y0 + arrH/2 + 4);
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '9px SF Mono, monospace';
+    ctx.fillText(descs[a], x + arrW/2, y0 + arrH + 16);
+  }
+
+  // Arrows showing data flow
+  ctx.globalAlpha = 0.5;
+  // A+B -> C
+  const arrowY = y0 + arrH + 35;
+  ctx.strokeStyle = '#22c55e';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(20 + arrW/2, arrowY);
+  ctx.lineTo(20 + 2*(arrW+10) + arrW/2, arrowY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#22c55e';
+  ctx.font = '10px SF Mono';
+  ctx.fillText('C[i] = A[i] + B[i]', w/2, arrowY - 6);
+
+  // V processing
+  ctx.strokeStyle = '#ef4444';
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  const vx = 20 + 3*(arrW+10) + arrW/2;
+  ctx.moveTo(vx, y0 + arrH + 30);
+  ctx.lineTo(vx, y0 + arrH + 55);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#ef4444';
+  ctx.fillText('sqrt+sin ×50', vx, y0 + arrH + 68);
+
+  ctx.globalAlpha = 1;
+
+  // Bandwidth info
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '9px SF Mono';
+  ctx.textAlign = 'left';
+  ctx.fillText('DDR5-5600 dual-channel ≈ 55 GB/s (prático)', 20, h - 25);
+  ctx.fillText('Ridge point: AI = 6.36 FLOP/byte', 20, h - 12);
+}
+
+// ─── THREAD TIMELINE ANIMATION ─────────────────────────
+let phaseState = { running: false, type: null, progress: 0, threads: 4, startTime: 0 };
+let phaseRAF;
+
+function startPhase(type) {
+  cancelAnimationFrame(phaseRAF);
+  phaseState = { running: true, type, progress: 0, threads: +document.getElementById('threadSlider').value, startTime: performance.now() };
+  document.getElementById('statType').textContent = type === 'mem' ? 'MEMORY' : 'CPU';
+  document.getElementById('statType').style.color = type === 'mem' ? '#3b82f6' : '#ef4444';
+  animatePhase();
+}
+
+function resetAll() {
+  cancelAnimationFrame(phaseRAF);
+  phaseState = { running: false, type: null, progress: 0, threads: 4, startTime: 0 };
+  const { ctx, w, h } = getCachedCanvas('phaseCanvas');
+  ctx.clearRect(0, 0, w, h);
+  document.getElementById('statProgress').textContent = '0%';
+  document.getElementById('statTime').textContent = '—';
+  document.getElementById('statType').textContent = '—';
+  document.getElementById('statType').style.color = 'var(--accent)';
+}
+
+function animatePhase() {
+  if (!phaseState.running) return;
+  const { ctx, w, h } = getCachedCanvas('phaseCanvas');
+  const { type, threads } = phaseState;
+
+  // Speed: memory-bound is ~0.007s real, cpu-bound ~1.2s for 4 threads
+  // We animate over ~3 seconds
+  const elapsed = (performance.now() - phaseState.startTime) / 1000;
+  const animDuration = type === 'mem' ? 2.5 : 3.5;
+  phaseState.progress = Math.min(elapsed / animDuration, 1);
+
+  const progress = phaseState.progress;
+  document.getElementById('statProgress').textContent = (progress * 100).toFixed(0) + '%';
+
+  // Real time estimate
+  const t1 = type === 'mem' ? DATA[0].mem : DATA[0].cpu;
+  const tN = interpolateTime(threads, type);
+  document.getElementById('statTime').textContent = tN.toFixed(4);
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Draw thread lanes
+  const laneH = Math.min(30, (h - 60) / threads);
+  const laneGap = 4;
+  const laneW = w - 80;
+  const x0 = 60;
+
+  // Title
+  ctx.fillStyle = type === 'mem' ? '#3b82f6' : '#ef4444';
+  ctx.font = 'bold 12px SF Mono';
+  ctx.textAlign = 'left';
+  ctx.fillText(type === 'mem' ? 'C[i] = A[i] + B[i]  (Memory-Bound)' : 'sqrt+sin ×50  (CPU-Bound)', 10, 18);
+
+  // Y-axis label
+  ctx.save();
+  ctx.translate(12, h/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '10px SF Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText('THREADS', 0, 0);
+  ctx.restore();
+
+  // X-axis label
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '10px SF Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText('ELEMENTOS (N = 50M)', w/2, h - 6);
+
+  for (let th = 0; th < threads; th++) {
+    const y = 30 + th * (laneH + laneGap);
+
+    // Thread label
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '9px SF Mono';
+    ctx.textAlign = 'right';
+    ctx.fillText(`T${th}`, x0 - 8, y + laneH/2 + 3);
+
+    // Background lane
+    ctx.fillStyle = '#1a2332';
+    ctx.fillRect(x0, y, laneW, laneH);
+
+    // Work chunk: each thread processes N/threads elements
+    // Visualize as processing from left to right
+    const chunkW = laneW / threads;
+    const thX = x0 + th * chunkW;
+    const processed = chunkW * progress;
+
+    // Unprocessed portion
+    ctx.fillStyle = type === 'mem' ? 'rgba(59,130,246,0.1)' : 'rgba(239,68,68,0.1)';
+    ctx.fillRect(thX, y, chunkW, laneH);
+
+    // Processed portion with gradient
+    const grad = ctx.createLinearGradient(thX, 0, thX + processed, 0);
+    if (type === 'mem') {
+      grad.addColorStop(0, 'rgba(59,130,246,0.3)');
+      grad.addColorStop(1, 'rgba(34,197,94,0.6)');
+    } else {
+      grad.addColorStop(0, 'rgba(239,68,68,0.3)');
+      grad.addColorStop(1, 'rgba(251,191,36,0.6)');
+    }
+    ctx.fillStyle = grad;
+    ctx.fillRect(thX, y, processed, laneH);
+
+    // Processing head (glow effect)
+    if (progress > 0 && progress < 1) {
+      const headX = thX + processed;
+      const glow = ctx.createRadialGradient(headX, y + laneH/2, 0, headX, y + laneH/2, 12);
+      glow.addColorStop(0, type === 'mem' ? 'rgba(34,197,94,0.8)' : 'rgba(251,191,36,0.8)');
+      glow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(headX - 12, y - 4, 24, laneH + 8);
+    }
+
+    // Memory access pattern indicator
+    if (type === 'mem') {
+      // Show 3 memory accesses per element (read A, read B, write C)
+      ctx.fillStyle = 'rgba(59,130,246,0.4)';
+      const dots = Math.floor(processed / 8);
+      for (let d = 0; d < Math.min(dots, 60); d++) {
+        ctx.fillRect(thX + d * 8, y + 2, 5, laneH - 4);
+      }
+    } else {
+      // Show compute density (thicker bars)
+      ctx.fillStyle = 'rgba(239,68,68,0.3)';
+      const blocks = Math.floor(processed / 12);
+      for (let b = 0; b < Math.min(blocks, 40); b++) {
+        ctx.fillRect(thX + b * 12, y + 1, 9, laneH - 2);
+      }
+    }
+
+    // Border
+    ctx.strokeStyle = '#334155';
+    ctx.strokeRect(thX, y, chunkW, laneH);
+  }
+
+  // Access pattern info box
+  const infoY = 30 + threads * (laneH + laneGap) + 15;
+  if (infoY < h - 40) {
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(x0, infoY, laneW, 36);
+    ctx.strokeStyle = '#334155';
+    ctx.strokeRect(x0, infoY, laneW, 36);
+    ctx.font = '10px SF Mono';
+    ctx.textAlign = 'left';
+    if (type === 'mem') {
+      ctx.fillStyle = '#3b82f6';
+      ctx.fillText('Padrão de acesso: leitura sequencial (A, B) + escrita sequencial (C)', x0 + 8, infoY + 14);
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText('Intensidade aritmética: 0.042 FLOP/byte → LIMITADO POR LARGURA DE BANDA', x0 + 8, infoY + 28);
+    } else {
+      ctx.fillStyle = '#ef4444';
+      ctx.fillText('Padrão de acesso: leitura/escrita sequencial (V) + 50 iterações de sqrt+sin', x0 + 8, infoY + 14);
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText('Intensidade aritmética: 65.6 FLOP/byte → LIMITADO POR CPU', x0 + 8, infoY + 28);
+    }
+  }
+
+  if (progress < 1) {
+    phaseRAF = requestAnimationFrame(animatePhase);
+  } else {
+    document.getElementById('statProgress').textContent = '100% ✓';
+  }
+}
+
+function interpolateTime(threads, type) {
+  const d = DATA.find(r => r.t === threads);
+  if (d) return type === 'mem' ? d.mem : d.cpu;
+  // Linear interpolation
+  for (let i = 0; i < DATA.length - 1; i++) {
+    if (threads >= DATA[i].t && threads <= DATA[i+1].t) {
+      const frac = (threads - DATA[i].t) / (DATA[i+1].t - DATA[i].t);
+      const v0 = type === 'mem' ? DATA[i].mem : DATA[i].cpu;
+      const v1 = type === 'mem' ? DATA[i+1].mem : DATA[i+1].cpu;
+      return v0 + frac * (v1 - v0);
+    }
+  }
+  return type === 'mem' ? DATA[DATA.length-1].mem : DATA[DATA.length-1].cpu;
+}
+
+document.getElementById('threadSlider').addEventListener('input', e => {
+  document.getElementById('threadVal').textContent = e.target.value;
+  document.getElementById('statThreads').textContent = e.target.value;
+});
+
+// ─── CHARTS ────────────────────────────────────────────
+function drawTimeChart() {
+  const { ctx, w, h } = initCanvas('chartCanvas');
+  const pad = { l: 55, r: 15, t: 15, b: 35 };
+  const pw = w - pad.l - pad.r;
+  const ph = h - pad.t - pad.b;
+
+  // Log scale for Y
+  const allY = DATA.flatMap(d => [d.mem, d.cpu]);
+  const minY = Math.log10(Math.min(...allY) * 0.8);
+  const maxY = Math.log10(Math.max(...allY) * 1.2);
+
+  const xScale = t => pad.l + ((t - 1) / 27) * pw;
+  const yScale = v => pad.t + ph - ((Math.log10(v) - minY) / (maxY - minY)) * ph;
+
+  // Grid
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 1;
+  for (let p = Math.ceil(minY); p <= Math.floor(maxY); p++) {
+    const y = yScale(Math.pow(10, p));
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '9px SF Mono';
+    ctx.textAlign = 'right';
+    ctx.fillText(`10^${p}`, pad.l - 4, y + 3);
+  }
+
+  // X labels
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '9px SF Mono';
+  ctx.textAlign = 'center';
+  [1, 4, 8, 14, 20, 28].forEach(t => {
+    const x = xScale(t);
+    ctx.fillText(t, x, h - pad.b + 14);
+    ctx.strokeStyle = '#1e293b';
+    ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, h - pad.b); ctx.stroke();
+  });
+
+  // Memory-bound line
+  ctx.strokeStyle = '#3b82f6';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  DATA.forEach((d, i) => {
+    const fn = i === 0 ? 'moveTo' : 'lineTo';
+    ctx[fn](xScale(d.t), yScale(d.mem));
+  });
+  ctx.stroke();
+  DATA.forEach(d => {
+    ctx.beginPath();
+    ctx.arc(xScale(d.t), yScale(d.mem), 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#3b82f6';
+    ctx.fill();
+  });
+
+  // CPU-bound line
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  DATA.forEach((d, i) => {
+    const fn = i === 0 ? 'moveTo' : 'lineTo';
+    ctx[fn](xScale(d.t), yScale(d.cpu));
+  });
+  ctx.stroke();
+  DATA.forEach(d => {
+    ctx.beginPath();
+    ctx.arc(xScale(d.t), yScale(d.cpu), 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#ef4444';
+    ctx.fill();
+  });
+
+  // Labels
+  ctx.font = '9px SF Mono';
+  ctx.fillStyle = '#3b82f6';
+  ctx.textAlign = 'left';
+  ctx.fillText('Memory-bound', pad.l + 4, yScale(DATA[0].mem) - 8);
+  ctx.fillStyle = '#ef4444';
+  ctx.fillText('CPU-bound', pad.l + 4, yScale(DATA[0].cpu) - 8);
+}
+
+function drawSpeedupChart() {
+  const { ctx, w, h } = initCanvas('speedCanvas');
+  const pad = { l: 55, r: 15, t: 15, b: 35 };
+  const pw = w - pad.l - pad.r;
+  const ph = h - pad.t - pad.b;
+
+  const t1_mem = DATA[0].mem;
+  const t1_cpu = DATA[0].cpu;
+  const maxSpeedup = Math.max(...DATA.map(d => t1_cpu / d.cpu)) * 1.1;
+
+  const xScale = t => pad.l + ((t - 1) / 27) * pw;
+  const yScale = s => pad.t + ph - (s / maxSpeedup) * ph;
+
+  // Ideal speedup line
+  ctx.strokeStyle = '#475569';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(xScale(1), yScale(1));
+  ctx.lineTo(xScale(28), yScale(28));
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#475569';
+  ctx.font = '8px SF Mono';
+  ctx.textAlign = 'left';
+  ctx.fillText('Ideal (linear)', xScale(20), yScale(20) - 6);
+
+  // Grid
+  ctx.strokeStyle = '#1e293b';
+  for (let s = 0; s <= maxSpeedup; s += 5) {
+    const y = yScale(s);
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '9px SF Mono';
+    ctx.textAlign = 'right';
+    ctx.fillText(s.toFixed(0) + 'x', pad.l - 4, y + 3);
+  }
+
+  // X labels
+  ctx.fillStyle = '#94a3b8';
+  ctx.textAlign = 'center';
+  [1, 4, 8, 14, 20, 28].forEach(t => {
+    ctx.fillText(t, xScale(t), h - pad.b + 14);
+  });
+
+  // Memory speedup
+  ctx.strokeStyle = '#3b82f6';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  DATA.forEach((d, i) => {
+    const s = t1_mem / d.mem;
+    ctx[i === 0 ? 'moveTo' : 'lineTo'](xScale(d.t), yScale(s));
+  });
+  ctx.stroke();
+
+  // CPU speedup
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  DATA.forEach((d, i) => {
+    const s = t1_cpu / d.cpu;
+    ctx[i === 0 ? 'moveTo' : 'lineTo'](xScale(d.t), yScale(s));
+  });
+  ctx.stroke();
+
+  // Points
+  DATA.forEach(d => {
+    ctx.beginPath();
+    ctx.arc(xScale(d.t), yScale(t1_mem / d.mem), 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#3b82f6';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(xScale(d.t), yScale(t1_cpu / d.cpu), 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#ef4444';
+    ctx.fill();
+  });
+
+  // Annotate peak
+  const peakCpu = DATA.reduce((best, d) => d.cpu < best.cpu ? d : best);
+  const peakSpeedup = t1_cpu / peakCpu.cpu;
+  ctx.fillStyle = '#ef4444';
+  ctx.font = 'bold 9px SF Mono';
+  ctx.textAlign = 'left';
+  ctx.fillText(`${peakSpeedup.toFixed(1)}x @ ${peakCpu.t}T`, xScale(peakCpu.t) + 6, yScale(peakSpeedup) - 6);
+}
+
+// ─── INIT ──────────────────────────────────────────────
+window.addEventListener('load', () => {
+  drawMemoryLayout();
+  drawTimeChart();
+  drawSpeedupChart();
+});
+window.addEventListener('resize', () => {
+  Object.keys(_canvasCache).forEach(k => delete _canvasCache[k]);
+  drawMemoryLayout();
+  drawTimeChart();
+  drawSpeedupChart();
+});
+</script>
+</body>
+</html>
