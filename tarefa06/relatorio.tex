@@ -29,7 +29,7 @@
 \pagestyle{plain}
 
 \begin{center}
-    {\LARGE\bfseries Estimativa estocástica de $\pi$ com OpenMP}\\[0.4em]
+    {\LARGE\bfseries Escopo de variáveis e regiões críticas com OpenMP}\\[0.4em]
     {\normalsize Eugênio Vitor Lopes dos Santos}\\[0.3em]
     {\small DCA3703 -- Programação Paralela, Universidade Federal do Rio Grande do Norte}\\[0.3em]
 \end{center}
@@ -40,7 +40,7 @@ Implementar em C uma estimativa de $\pi$ pelo método de Monte Carlo. O programa
 \section{Fundamentação teórica}
 
 \subsection{Método de Monte Carlo}
-O quadrado tem área 4 e o círculo unitário tem área $\pi$. Se os pontos forem uniformes no quadrado, a fração de pontos dentro do círculo se aproxima da razão entre as áreas:
+O quadrado de lado 2 tem área 4 e o círculo unitário inscrito tem área $\pi$. Se os pontos forem uniformes no quadrado, a fração de pontos dentro do círculo converge para a razão entre as áreas:
 \[
 \frac{n_{\text{dentro}}}{N} \approx \frac{\pi}{4}.
 \]
@@ -48,15 +48,23 @@ A estimativa calculada pelo programa é, portanto,
 \[
 \hat{\pi} = 4 \cdot \frac{n_{\text{dentro}}}{N}.
 \]
-Cada ponto $(x,y)$ pertence ao círculo quando $x^2 + y^2 \leq 1$. Como o método usa amostras aleatórias, o resultado é uma aproximação. Aumentar $N$ reduz a variação, mas não elimina o caráter estocástico da estimativa.
+Cada ponto $(x,y)$ com $x,y \in [-1,1]$ pertence ao círculo quando $x^2 + y^2 \leq 1$. Como o método usa amostras aleatórias, o resultado é uma aproximação. Aumentar $N$ reduz a variação, mas não elimina o caráter estocástico da estimativa.
 
 \subsection{Condição de corrida}
-A expressão \texttt{dentro\_circulo++} lê o contador, soma 1 e grava o novo valor. Essas operações não formam uma única instrução atômica. Duas threads podem ler o mesmo valor antes que qualquer uma grave o resultado. Nesse caso, uma escrita substitui a outra e um incremento desaparece. O programa termina normalmente, mas a contagem fica menor do que deveria.
+A operação \texttt{dentro\_circulo++} não é atômica no nível da máquina. O processador executa três passos separados: ler o valor da memória para um registrador (LOAD), incrementar o registrador (ADD) e escrever o resultado de volta (STORE). Se duas threads executam o LOAD antes que qualquer uma complete o STORE, ambas leem o mesmo valor, ambas incrementam para o mesmo resultado e uma das escritas sobrescreve a outra. Perde-se um incremento. O programa termina normalmente, mas o resultado final é menor que o correto.
 
-\subsection{Escopo das variáveis em OpenMP}
-Dentro de uma região paralela, \texttt{shared} mantém uma única variável para todo o time de threads. \texttt{private} cria uma cópia sem valor inicial definido para cada thread. \texttt{firstprivate} também cria cópias, mas inicia cada uma com o valor que a variável tinha antes da região paralela. Em um laço, \texttt{lastprivate} copia para a variável externa o valor produzido na última iteração lógica, e não o valor da thread que terminou por último.
+A gravidade do problema depende do número de threads e da frequência dos acessos concorrentes. Não há como prever exatamente quantos incrementos serão perdidos em cada execução, pois o escalonamento das threads e a ordem das operações mudam a cada execução.
 
-A cláusula \texttt{default(none)} obriga a declarar o escopo das variáveis referenciadas na região paralela. O compilador passa a rejeitar uma variável que tenha sido esquecida, em vez de assumir um escopo implícito.
+\subsection{Escopo de variáveis em OpenMP}
+Em uma região paralela, o OpenMP define regras de visibilidade para cada variável:
+
+\begin{itemize}
+    \item \texttt{shared(var)}: todas as threads compartilham o mesmo endereço de memória. Alterações são visíveis a todas as threads, mas sem sincronização podem causar condições de corrida.
+    \item \texttt{private(var)}: cada thread recebe uma cópia local da variável, sem valor inicial definido (conteúdo indeterminado). A variável externa não é modificada pela região paralela.
+    \item \texttt{firstprivate(var)}: como \texttt{private}, mas a cópia local é inicializada com o valor que a variável tinha antes da região paralela.
+    \item \texttt{lastprivate(var)}: aplicável a laços. Ao final do laço, a variável externa recebe o valor produzido na última iteração lógica, e não o valor da thread que terminou por último.
+    \item \texttt{default(none)}: proíbe escopos implícitos. O compilador exige que toda variável referenciada dentro da região paralela seja explicitamente declarada com alguma cláusula de escopo. Variáveis esquecidas geram erro de compilação.
+\end{itemize}
 
 \section{Implementação}
 
@@ -66,12 +74,12 @@ Em e2.c, a diretiva \texttt{critical} protege somente o incremento de \texttt{de
 
 A versão e3.c separa as diretivas \texttt{parallel} e \texttt{for}. Cada thread declara \texttt{local\_dentro} e uma semente própria antes do laço. Durante o \texttt{for}, ela atualiza apenas o contador local. Depois do laço, cada thread entra uma vez em \texttt{critical} para somar seu resultado no contador global. A diretiva também usa \texttt{default(none)} e declara \texttt{total\_elementos} e \texttt{dentro\_circulo} como \texttt{shared}.
 
-Para validar isoladamente as cláusulas de compartilhamento e escopo de dados em OpenMP, foram desenvolvidos quatro programas complementares:
+Para validar isoladamente as cláusulas de compartilhamento e escopo de dados em OpenMP, desenvolvemos quatro programas complementares:
 \begin{itemize}
-    \item \texttt{e4\_private.c}: demonstra a criação de cópias locais sem inicialização;
-    \item \texttt{e4\_firstprivate.c}: demonstra a inicialização da cópia local com o valor prévio;
-    \item \texttt{e4\_lastprivate.c}: demonstra a propagação do valor da última iteração lógica;
-    \item \texttt{e4\_default\_none.c}: demonstra a obrigatoriedade de classificação explícita.
+    \item \textbf{e4\_private.c} -- demonstra a criação de cópias locais sem inicialização;
+    \item \textbf{e4\_firstprivate.c} -- demonstra a inicialização da cópia local com o valor prévio;
+    \item \textbf{e4\_lastprivate.c} -- demonstra a propagação do valor da última iteração lógica;
+    \item \textbf{e4\_default\_none.c} -- demonstra a obrigatoriedade de classificação explícita.
 \end{itemize}
 
 \lstinputlisting[caption={e0.c, versão sequencial}]{e0.c}
@@ -90,28 +98,32 @@ Para validar isoladamente as cláusulas de compartilhamento e escopo de dados em
 
 \lstinputlisting[caption={e4\_default\_none.c, demonstração de default(none)}]{e4_default_none.c}
 
-Os códigos-fonte são compilados com o GCC utilizando o padrão C11, nível de otimização \texttt{-O2}, avisos ativados (\texttt{-Wall -Wextra}) e suporte a OpenMP (\texttt{-fopenmp}). Para as medições de desempenho, a afinidade das threads é controlada por variáveis de ambiente (\texttt{OMP\_PROC\_BIND=close} e \texttt{OMP\_PLACES=cores}), variando a contagem de threads de 1 até o limite da máquina com dez repetições por configuração.
+Compilamos os códigos-fonte com GCC 13.3, padrão C11, nível de otimização \texttt{-O2}, avisos ativados (\texttt{-Wall -Wextra}) e suporte a OpenMP (\texttt{-fopenmp}). Para as medições de desempenho, a afinidade das threads é controlada por variáveis de ambiente (\texttt{OMP\_PROC\_BIND=close} e \texttt{OMP\_PLACES=cores}), variando a contagem de threads de 1 até o limite da máquina com dez repetições por configuração.
+
+As flags de compilação têm as seguintes funções: \texttt{-std=c11} fixa o padrão C11 da linguagem; \texttt{-O2} aplica otimizações do compilador; \texttt{-Wall -Wextra} ativam diagnósticos adicionais; \texttt{-fopenmp} habilita a interpretação de diretivas OpenMP e a vinculação com a \texttt{libgomp}; e \texttt{-lm} vincula a biblioteca matemática padrão.
 
 \begin{lstlisting}[language=bash, caption={Exemplo de compilação e execução}]
 gcc -std=c11 -O2 -Wall -Wextra -fopenmp e0.c -o e0 -lm
+gcc -std=c11 -O2 -Wall -Wextra -fopenmp e1.c -o e1 -lm
+gcc -std=c11 -O2 -Wall -Wextra -fopenmp e2.c -o e2 -lm
+gcc -std=c11 -O2 -Wall -Wextra -fopenmp e3.c -o e3 -lm
 
-OMP_NUM_THREADS=1 ./e0 5000000
+OMP_NUM_THREADS=28 ./e1 5000000
+OMP_NUM_THREADS=28 ./e2 5000000
 OMP_NUM_THREADS=28 ./e3 5000000
 \end{lstlisting}
-
-As flags de compilação têm as seguintes funções: \texttt{-std=c11} fixa o padrão C11 da linguagem; \texttt{-O2} aplica otimizações do compilador; \texttt{-Wall -Wextra} ativam diagnósticos adicionais; \texttt{-fopenmp} habilita a interpretação de diretivas OpenMP e a vinculação com a \texttt{libgomp}; e \texttt{-lm} vincula a biblioteca matemática padrão.
 
 \newpage
 \section{Resultados e discussão}
 
-Os testes usaram $N=5.000.000$, dez repetições por configuração e um Intel Core i7-14700HX exposto ao WSL2 com 14 núcleos físicos e 28 threads lógicas. A afinidade foi configurada com \texttt{OMP\_PROC\_BIND} close e \texttt{OMP\_PLACES} cores, e \texttt{OMP\_DYNAMIC} ficou desativado. A máquina é um laptop sob um hipervisor; o sistema operacional interfere nas medições e o desvio padrão é alto em várias configurações. As tabelas usam a mediana dos tempos; as barras de erro dos gráficos mostram o desvio padrão das dez repetições.
+Realizamos os testes com $N=5.000.000$, dez repetições por configuração, em um Intel Core i7-14700HX exposto ao WSL2 com 14 núcleos físicos e 28 threads lógicas. A afinidade foi configurada com \texttt{OMP\_PROC\_BIND=close} e \texttt{OMP\_PLACES=cores}, e \texttt{OMP\_DYNAMIC} ficou desativado. A máquina é um laptop sob um hipervisor -- o sistema operacional interfere nas medições e o desvio padrão é alto em várias configurações. As tabelas usam a mediana dos tempos; as barras de erro dos gráficos mostram o desvio padrão das dez repetições.
 
 \subsection{Versão sem sincronização}
-Com uma thread, e1.c retornou $\hat{\pi}=3{,}1415096$, igual ao resultado de e2.c. Os dois programas usam a mesma sequência de pontos, portanto a diferença a partir de duas threads só pode vir do acesso concorrente ao contador. A Tabela \ref{tab:race} resume as dez execuções de e1.c. A média com 28 threads foi 0,4478194, com valores entre 0,3476832 e 0,5515736.
+Com uma thread, e1.c retornou $\hat{\pi}=3{,}1415096$, igual ao resultado de e2.c. Os dois programas usam a mesma sequência de pontos, portanto a diferença a partir de duas threads só pode vir do acesso concorrente ao contador. A Tabela \ref{tab:race} resume as dez execuções de e1.c. Com 2 threads, a média já cai para 2,06 (erro de 34\%). Com 4 threads, cai para 0,91 (erro de 71\%). Com 8 threads ou mais, a média oscila entre 0,38 e 0,62, sempre muito abaixo do valor correto.
 
 \begin{table}[H]
 \centering
-\caption{Estimativa de e1.c em dez repetições por configuração.}
+\caption{Estimativa de $\pi$ em e1.c com race condition (10 execuções por configuração).}
 \label{tab:race}
 \begin{tabular}{crrr}
 \hline
@@ -136,7 +148,7 @@ Threads & Média de $\hat{\pi}$ & Desvio padrão & Intervalo observado \\ \hline
 A Figura \ref{fig:race} mostra que o efeito não segue uma curva regular. A ordem das leituras e escritas muda em cada execução, portanto não há como prever quantos incrementos serão perdidos. O programa compila e termina sem falha. A comparação com uma versão sincronizada é o que revela o defeito.
 
 \subsection{Custo da seção crítica}
-A Tabela \ref{tab:tempos} compara os tempos de e2.c e e3.c. Em e2.c, o tempo mediano subiu de 0,096032 s com uma thread para 1,221722 s com 28. O trabalho geométrico é paralelo, mas aproximadamente $\pi N/4$, ou 3,93 milhões, de pontos entram no círculo e disputam a seção \texttt{critical}. Com mais threads, a disputa cresce e o tempo não cai; ele flutua entre 0,9 e 1,5 s desde a oitava thread, com desvios padrão altos.
+A Tabela \ref{tab:tempos} compara os tempos de e2.c e e3.c. Em e2.c, o tempo mediano subiu de 0,096032 s com uma thread para 1,221722 s com 28. O trabalho geométrico é paralelo, mas aproximadamente $\pi N/4$, ou 3,93 milhões de pontos, entram no círculo e disputam a seção \texttt{critical}. Com mais threads, a disputa cresce e o tempo flutua entre 0,9 e 1,5 s desde a oitava thread, com desvios padrão altos. O speedup fica abaixo de 1 em todas as configurações com mais de uma thread: a paralelização \emph{piora} o desempenho.
 
 \begin{table}[H]
 \centering
@@ -164,17 +176,17 @@ Threads & e2, critical por ponto & e3, contador local & Razão e2/e3 \\ \hline
 
 Em e3.c, cada thread entra em \texttt{critical} uma vez, depois de processar o seu bloco de iterações. O tempo caiu de 0,055613 s com uma thread para 0,003498 s com 14 threads, um ganho de 15,9$\times$. Com 16 threads, o tempo foi 0,003321 s, o menor valor medido. Nas duas configurações o ganho é próximo de 16, a quantidade de threads lógicas. Com 28 threads, o tempo voltou para 0,009430 s. Nesta máquina, o melhor resultado ocorreu com os 14 núcleos físicos ou logo acima deles.
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.9\textwidth]{speedup_plot.png}
-\caption{Speedup de e2.c e e3.c em relação a uma thread. A linha verde marca 14 núcleos físicos.}
-\label{fig:speedup}
-\end{figure}
-
-A Figura \ref{fig:speedup} separa os dois efeitos. O speedup de e2.c fica abaixo de 1 a partir de duas threads, pois a sincronização custa mais do que o trabalho dividido economiza. Em e3.c, o speedup acompanha o número de threads até o entorno de 14 e o excesso de threads lógicas passa a competir pelos mesmos recursos de execução, aumentando o tempo e a variação.
+%\begin{figure}[H]
+%\centering
+%\includegraphics[width=0.9\textwidth]{speedup_plot.png}
+%\caption{Speedup de e2.c e e3.c em relação a uma thread. A linha verde marca 14 núcleos físicos.}
+%\label{fig:speedup}
+%\end{figure}
+%
+%A Figura \ref{fig:speedup} separa os dois efeitos. O speedup de e2.c fica abaixo de 1 a partir de duas threads, pois a sincronização custa mais do que o trabalho dividido economiza. Em e3.c, o speedup acompanha o número de threads até o entorno de 14 e o excesso de threads lógicas passa a competir pelos mesmos recursos de execução, aumentando o tempo e a variação.
 
 \subsection{Comportamento das cláusulas de escopo de dados}
-Quatro programas complementares foram executados para avaliar o comportamento isolado de cada cláusula de escopo:
+Executamos quatro programas complementares para avaliar o comportamento isolado de cada cláusula de escopo:
 
 \begin{itemize}
     \item \textbf{\texttt{private(x)}} (\texttt{e4\_private.c}): cada thread recebe uma instância não inicializada de \texttt{x} em sua pilha privada. A leitura de \texttt{x} antes de qualquer atribuição resulta em valor indefinido (lixo de memória). Ao final da região paralela, a variável externa preserva o valor original (100).
@@ -191,6 +203,8 @@ error: 'y' not specified in enclosing 'parallel'
 \end{itemize}
 
 \section{Conclusão}
-A versão e1.c mostra que um contador compartilhado não pode receber incrementos concorrentes sem sincronização. e2.c preserva a contagem, mas serializa milhões de atualizações e perde desempenho conforme o número de threads aumenta. e3.c acumula localmente e sincroniza apenas no final. Com 14 threads, a versão levou 0,003498 s, contra 0,746605 s de e2.c na mesma configuração. O teste também mostra o limite prático do hardware: depois dos 14 núcleos físicos, as threads lógicas não melhoraram o tempo de e3.c e ainda aumentaram a variância das medições.
+A versão e1.c mostra que um contador compartilhado não pode receber incrementos concorrentes sem sincronização: o programa compila, executa e imprime um valor, mas a estimativa de $\pi$ com 8 threads cai para 0,46 contra o valor correto de 3,14. e2.c preserva a contagem, mas serializa milhões de atualizações e perde desempenho conforme o número de threads aumenta. e3.c acumula localmente e sincroniza apenas no final. Com 14 threads, a versão levou 0,003498 s, contra 0,746605 s de e2.c na mesma configuração -- o speedup atinge 16$\times$, contra 0,13$\times$ de e2.c. O teste também mostra o limite prático do hardware: depois dos 14 núcleos físicos, as threads lógicas não melhoraram o tempo de e3.c e ainda aumentaram a variância das medições.
+
+As cláusulas \texttt{private}, \texttt{firstprivate}, \texttt{lastprivate} e \texttt{default(none)} controlam o escopo e a visibilidade das variáveis. A cláusula \texttt{default(none)} se torna útil em programas complexos porque obriga a declaração explícita de todas as variáveis, prevenindo erros sutis de compartilhamento acidental.
 
 \end{document}
