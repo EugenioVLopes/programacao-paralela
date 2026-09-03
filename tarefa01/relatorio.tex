@@ -1,5 +1,5 @@
 \documentclass[11pt,letterpaper]{article}
-\usepackage{scientific_report}
+\usepackage{../assets/scientific_report}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
 \usepackage{float}
@@ -33,7 +33,7 @@
     {\LARGE\bfseries Aproximação de $\pi$ usando Série Matemática}\\[0.5em]
     {\large Análise de Precisão e Desempenho Computacional}\\[1em]
     {\normalsize Eugênio Vitor Lopes dos Santos}\\[0.3em]
-    {\small DCA3703 - Programação Paralela --- Universidade Federal do Rio Grande do Norte}\\[0.3em]
+    {\small DCA3703 -- Programação Paralela, Universidade Federal do Rio Grande do Norte}\\[0.3em]
     {\small 2026}
 \end{center}
 
@@ -41,7 +41,7 @@
 
 \section{Enunciado}
 
-Implemente um programa em C que calcule uma aproximação de $\pi$ usando uma série matemática, variando o número de iterações e medindo o tempo de execução. Compare os valores obtidos com o valor real de $\pi$ e analise como a acurácia melhora com mais processamento. Reflita sobre como esse comportamento se repete em aplicações reais que demandam resultados cada vez mais precisos, como simulações físicas e inteligência artificial.
+Implementar em C um programa para calcular a aproximação de $\pi$ por meio de uma série matemática, variando o número de iterações e mensurando o tempo de execução. O objetivo envolve comparar os valores obtidos com a constante de referência $\pi$, analisar a evolução da acurácia com o aumento do processamento e avaliar como esse comportamento se manifesta em aplicações reais de alto desempenho, tais como simulações físicas e inteligência artificial.
 
 % 2. Fundamentação Teórica
 \section{Fundamentação Teórica}
@@ -55,15 +55,15 @@ A série de Leibniz para $\pi$ é dada por:
 
 \subsection{Algoritmo}
 \begin{enumerate}
-    \item Inicializar \texttt{pi} = 0.0
+    \item Inicializar \texttt{pi} com 0.0;
     \item Para cada iteração $k$ de 0 até $N-1$:
     \begin{itemize}
-        \item Calcular termo: $\frac{1}{2k+1}$
-        \item Aplicar sinal alternado: positivo para $k$ par, negativo para $k$ ímpar
-        \item Acumular o termo
+        \item Calcular o termo: $\frac{1}{2k+1}$;
+        \item Aplicar sinal alternado: positivo para $k$ par, negativo para $k$ ímpar;
+        \item Acumular o termo no somatório;
     \end{itemize}
-    \item Multiplicar o resultado por 4
-    \item Calcular o erro absoluto: $|\pi_{aprox} - \pi_{real}|$
+    \item Multiplicar o resultado por 4;
+    \item Calcular o erro absoluto: $|\pi_{\text{aprox}} - \pi_{\text{real}}|$.
 \end{enumerate}
 
 % 3. Experimento
@@ -71,9 +71,9 @@ A série de Leibniz para $\pi$ é dada por:
 \section{Experimento}
 
 \subsection{Código-Fonte}
-O programa recebe o número de iterações como argumento de linha de comandos e calcula a aproximação de $\pi$ pela série de Leibniz.
+O programa recebe o número de iterações como argumento de linha de comando e calcula a aproximação de $\pi$ pela série de Leibniz.
 
-\begin{lstlisting}[caption={Código-fonte em C para Aproximação de $\pi$}, label={lst:codigo}]
+\begin{lstlisting}[caption={Código-fonte em C para aproximação de $\pi$}, label={lst:codigo}]
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
 }
 \end{lstlisting}
 
-O tempo de execução é medido externamente com o comando \texttt{time} do shell Linux, variando o argumento de iterações a cada execução:
+O tempo de execução é medido externamente por meio do utilitário \texttt{time} do shell Linux, variando-se o argumento de iterações a cada execução:
 \begin{lstlisting}[caption={Exemplo de execução com medição de tempo}, label={lst:execucao}]
 gcc tarefa01.c -o tarefa01 -lm
 time ./tarefa01 1000000000
@@ -117,7 +117,7 @@ time ./tarefa01 1000000000
 
 \begin{table}[H]
 \centering
-\caption{Resultados da Aproximação de $\pi$}
+\caption{Resultados da aproximação de $\pi$ em função do número de iterações.}
 \label{tab:results}
 \small
 \begin{tabular}{@{}lccc@{}}
@@ -145,23 +145,25 @@ time ./tarefa01 1000000000
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.9\textwidth]{pi_approximation_analysis.png}
-\caption{Análise da Aproximação de $\pi$: (a) Tempo de Execução vs Iterações; (b) Erro Absoluto vs Iterações. Ambos os eixos em escala logarítmica.}
+\caption{Análise da aproximação de $\pi$: (a) Tempo de execução vs iterações; (b) Erro absoluto vs iterações. Ambos os eixos em escala logarítmica.}
 \label{fig:analysis}
 \end{figure}
 
 \subsection{Observações Principais}
 \begin{itemize}
-    \item O erro absoluto diminui uma ordem de magnitude a cada 10x mais iterações.
-    \item O tempo de execução cresce linearmente com o número de iterações.
-    \item A precisão de $10^{-9}$ foi alcançada com 1 bilhão de iterações.
+    \item O erro absoluto decresce em uma ordem de magnitude a cada aumento de 10 vezes no número de iterações;
+    \item O tempo de execução cresce linearmente em relação ao número de iterações processadas;
+    \item Atinge-se precisão da ordem de $10^{-9}$ com $10^9$ iterações.
 \end{itemize}
 
 % 5. Discussão
 \section{Discussão}
 
-Esse trade-off entre precisão e custo computacional é justamente o que motiva o uso de técnicas de paralelização e séries de convergência mais rápida. Séries alternativas a Leibniz, como a série de Machin ou algoritmos como o de Chudnovsky, convergem muito mais rapidamente, exigindo menos iterações para o mesmo nível de precisão. Da mesma forma, distribuir o cálculo entre múltiplos núcleos ou GPUs permite reduzir o tempo de execução sem abrir mão da precisão desejada, abordagem central em simulações físicas de larga escala e no treinamento de modelos de IA modernos, que dependem intensamente de paralelismo (múltiplas CPUs/GPUs) para tornar viável o processamento de dados em escala.
+A relação de compromisso (\textit{trade-off}) entre precisão numérica e custo computacional motiva o emprego de técnicas de paralelização e de séries com taxas de convergência superiores. Métodos alternativos à série de Leibniz, tais como a fórmula de Machin ou os algoritmos baseados em Ramanujan e Chudnovsky, convergem com maior rapidez, exigindo menor quantidade de iterações para atingir a mesma tolerância de erro.
+
+De modo análogo, a distribuição das etapas de cálculo entre múltiplos núcleos de processamento (CPUs) ou aceleradores gráficos (GPUs) viabiliza a redução substancial do tempo de execução sem prejuízo da exatidão requerida. Trata-se de uma abordagem indispensável em simulações físicas de larga escala e no treinamento de modelos modernos de inteligência artificial, cenários em que o processamento intensivo em paralelo viabiliza o tratamento de grandes volumes de dados em tempo hábil.
 
 \section{Conclusão}
-O experimento demonstra, em escala reduzida, um princípio fundamental da computação científica: precisão tem custo computacional, e esse custo cresce de forma desproporcional ao ganho de precisão obtido. Esse mesmo princípio orienta decisões de engenharia em áreas muito mais complexas, como simulações físicas e inteligência artificial, onde a escolha entre algoritmos mais eficientes, paralelização e trade-offs de precisão é frequentemente o que determina a viabilidade prática de um projeto.
+O experimento demonstra, em escala controlada, um princípio fundamental da computação científica: a obtenção de maior precisão numérica acarreta custo computacional progressivo, o qual cresce de forma desproporcional ao ganho incremental de exatidão na série de Leibniz. Esse princípio orienta decisões de projeto em sistemas de alto desempenho, nos quais a escolha criteriosa de algoritmos eficientes, a aplicação de técnicas de paralelismo e a definição de tolerâncias de erro determinam a viabilidade prática das soluções computacionais.
 
 \end{document}
