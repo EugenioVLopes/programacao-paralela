@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Teoria aprofundada: diretivas task do OpenMP, agendamento de tarefas, taskwait e single para processamento de lista encadeada.">
+  <title>Teoria 06: Task OpenMP — Processamento de Lista com Tarefas</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function applyMath(el = document.body) {
+      if (window.renderMathInElement) {
+        renderMathInElement(el, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+    document.addEventListener("DOMContentLoaded", () => applyMath());
+    window.addEventListener("load", () => applyMath());
+  </script>
+</head>
+<body>
+  <nav class="top-nav">
+    <div style="display: flex; gap: 16px;">
+      <a href="00-fundamentos-programacao-paralela.html">Índice geral</a>
+      <a href="05-primos-openmp.html">Lição 05</a>
+    </div>
+    <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+  </nav>
+
+  <header>
+    <div class="lesson-badge">Teoria 06 &bull; DCA3703</div>
+    <h1>Teoria 06: Task OpenMP — Processamento de Lista com Tarefas</h1>
+    <div class="metadata">
+      Processamento de lista encadeada com <code>#pragma omp task</code> &bull; Agendamento de tarefas &bull; Garantia de execuções únicas
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ===================== SEÇÃO 1: MOTIVAÇÃO ===================== -->
+    <section id="motivacao">
+      <h2>1. Motivação: Por que <code>task</code> para listas?</h2>
+
+      <p>
+        As diretivas <code>parallel for</code> e <code>parallel sections</code> exigem que o paralelismo seja <em>conhecido em tempo de compilação</em>. O OpenMP divide os índices do laço entre as threads antes da execução começar. Isso funciona bem para iterações de laço, mas <strong>listas encadeadas não são arranjos contíguos</strong>: o compilador não sabe quantos nós existem até o programa percorrer a lista em tempo de execução.
+      </p>
+
+      <p>
+        A diretiva <code>#pragma omp task</code> resolve esse problema ao <em>criar tarefas explícitas</em> em tempo de execução. Cada nó da lista gera uma tarefa; o sistema de tarefas do OpenMP — não o programador — decide <strong>qual thread executa qual tarefa</strong>.
+      </p>
+
+      <div class="callout callout-info">
+        <strong>Ideia central:</strong> O <code>task</code> separa a <em>criação</em> da <em>execução</em>. Você gera todas as tarefas primeiro; o <em>task runtime</em> as distribui entre as threads disponíveis.
+      </div>
+    </section>
+
+    <!-- ===================== SEÇÃO 2: ANATOMIA DO TASK ===================== -->
+    <section id="anatomia-task">
+      <h2>2. Anatomia de uma <code>#pragma omp task</code></h2>
+
+      <pre><code><span class="hl-prep">#pragma omp task</span> [<span class="hl-kw">clause</span> [, <span class="hl-kw">clause</span>]...]
+<span class="hl-comment">// código da tarefa — pode ser um bloco ou uma única instrução</span>
+{
+    <span class="hl-comment">// região paralela: só uma thread cria a tarefa; outra thread pode executá-la</span>
+    printf(<span class="hl-str">"Arquivo: %s | Thread: %d\n"</span>, node-&gt;filename, <span class="hl-fn">omp_get_thread_num</span>());
+}</code></pre>
+
+      <h3>Cláusulas disponíveis</h3>
+      <table>
+        <thead>
+          <tr><th>Cláusula</th><th>Efeito</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>shared(list)</code></td>
+            <td>Variáveis na <code>list</code> são compartilhadas entre todas as tarefas e a thread que as criou.</td>
+          </tr>
+          <tr>
+            <td><code>private(list)</code></td>
+            <td>Cada tarefa obtém uma cópia não inicializada da variável. O valor original não é visível dentro da tarefa.</td>
+          </tr>
+          <tr>
+            <td><code>firstprivate(list)</code></td>
+            <td>Como <code>private</code>, mas cada cópia é inicializada com o valor da variável no momento da criação da tarefa.</td>
+          </tr>
+          <tr>
+            <td><code>final(expression)</code></td>
+            <td>Se <code>expression</code> for verdadeira, todas as tarefas internas são geradas como <code>included</code> (executadas inline pela thread atual).</td>
+          </tr>
+          <tr>
+            <td><code>depend(dependence-type: list)</code></td>
+            <td>Especifica dependências entre tarefas (tipo <code>in</code>, <code>out</code>, <code>inout</code>) para ordenação.</td>
+          </tr>
+          <tr>
+            <td><code>priority(value)</code></td>
+            <td>Define a prioridade de agendamento da tarefa. Valores maiores têm preferência.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Ciclo de vida de uma tarefa</h3>
+      <ol>
+        <li><strong>Criação (encoding):</strong> A thread que encontra o <code>task</code> empacota o contexto (valores das variáveis no momento) em um <em>descriptor</em> e o entrega ao <em>task runtime</em>.</li>
+        <li><strong>Agendamento (scheduling):</strong> O runtime atribui a tarefa a uma thread do time. Uma thread pode criar tarefas e outra executá-las.</li>
+        <li><strong>Execução (execution):</strong> A thread designada executa o corpo da tarefa.</li>
+        <li><strong>Junção (join):</strong> O <code>taskwait</code> aguarda a conclusão de todas as tarefas pendentes geradas pela região atual.</li>
+      </ol>
+
+      <div class="callout callout-warning">
+        <strong>Ponto crucial:</strong> A thread que <em>cria</em> a tarefa (<code>task</code>) pode ser diferente da thread que a <em>executa</em>. Isso é o inverso do <code>parallel for</code>, onde a thread que itera é a que executa.
+      </div>
+    </section>
+
+    <!-- ===================== SEÇÃO 3: PROBLEMA FUNDAMENTAL ===================== -->
+    <section id="problema-fundamental">
+      <h2>3. O problema central: cada nó é processado quantas vezes?</h2>
+
+      <p>O comportamento do processamento de lista com tarefas depende de <strong>como</strong> o laço de travessia é escrito. Existem três padrões principais:</p>
+
+      <h3>Padrão A — Laço <em>dentro</em> da região paralela (INCORRETO)</h3>
+      <pre><code><span class="hl-prep">#pragma omp parallel</span>
+{
+    <span class="hl-comment">// PROBLEMA: todas as threads executam o laço completo</span>
+    Node *current = head;
+    <span class="hl-kw">while</span> (current != NULL) {
+        <span class="hl-prep">#pragma omp task</span>
+        {
+            printf(<span class="hl-str">"%s\n"</span>, current-&gt;filename);
+        }
+        current = current-&gt;next;
+    }
+}</code></pre>
+      <ul>
+        <li>Todas as threads entram na região paralela.</li>
+        <li>Cada thread percorre a lista <strong>inteira</strong>.</li>
+        <li>Cada nó é processado por <strong>tantas vezes quantas forem as threads</strong> do time.</li>
+        <li>Resultado: $N$ nós × $T$ threads execuções.</li>
+      </ul>
+
+      <h3>Padrão B — Laço <em>fora</em> da região paralela, <code>single</code> no laço (CORRETO)</h3>
+      <pre><code><span class="hl-prep">#pragma omp parallel</span>
+{
+    <span class="hl-prep">#pragma omp single</span>
+    {
+        Node *current = head;
+        <span class="hl-kw">while</span> (current != NULL) {
+            <span class="hl-prep">#pragma omp task</span>
+            {
+                printf(<span class="hl-str">"%s | thread %d\n"</span>,
+                       current-&gt;filename, <span class="hl-fn">omp_get_thread_num</span>());
+            }
+            current = current-&gt;next;
+        }
+    }
+    <span class="hl-prep">#pragma omp taskwait</span>
+}
+</code></pre>
+      <ul>
+        <li>Apenas <strong>uma thread</strong> executa o laço de travessia.</li>
+        <li>Essa thread cria <strong>uma tarefa por nó</strong>.</li>
+        <li>O runtime distribui as tarefas entre as threads do time.</li>
+        <li>O <code>taskwait</code> garante que todas as tarefas terminem antes das threads saírem da região.</li>
+      </ul>
+
+      <h3>Padrão C — Travessia sequencial <em>antes</em> da região paralela (alternativa)</h3>
+      <pre><code"><span class="hl-comment">// Primeira percorrida: contar nós (sequencial)</span>
+<span class="hl-type">int</span> node_count = <span class="hl-num">0</span>;
+Node *count = head;
+<span class="hl-kw">while</span> (count) { node_count++; count = count-&gt;next; }
+
+<span class="hl-comment">// Alocar vetor de ponteiros (paralelo, task-based)</span>
+Node **nodes = (Node **)<span class="hl-fn">malloc</span>(node_count * <span class="hl-kw">sizeof</span>(Node *));
+Node *fill = head;
+<span class="hl-kw">for</span> (<span class="hl-type">int</span> i = <span class="hl-num">0</span>; i &lt; node_count; i++) {
+    nodes[i] = fill;
+    fill = fill-&gt;next;
+}
+
+<span class="hl-prep">#pragma omp parallel for</span>
+<span class="hl-kw">for</span> (<span class="hl-type">int</span> i = <span class="hl-num">0</span>; i &lt; node_count; i++) {
+    <span class="hl-fn">process_node</span>(nodes[i]);
+}</code></pre>
+      <ul>
+        <li>Converte a lista em vetor primeiro; depois usa <code>parallel for</code> — evita o problema inteiramente.</li>
+        <li>Custo: $O(N)$ adicional sequencial para contar e copiar ponteiros.</li>
+      </ul>
+    </section>
+
+    <!-- ===================== SEÇÃO 4: VARIÂNCIA ENTRE EXECUÇÕES ===================== -->
+    <section id="variancia">
+      <h2>4. Por que o comportamento varia entre execuções?</h2>
+
+      <p>
+        O <em>task runtime</em> do OpenMP é <strong>não-determinístico por design</em>. O agendador pode escolher qualquer thread disponível para cada tarefa. Isso significa:
+      </p>
+
+      <ul>
+        <li>A ordem em que as tarefas são executadas <strong>varia</strong> entre execuções.</li>
+        <li>Se cada tarefa escrever em um <em>acumulador compartilhado</em> (por exemplo, <code>count++</code>), o valor final depende da ordem de interleaving — <em>race condition</em>.</li>
+        <li>Se cada tarefa escrever em uma posição <strong>distinta</strong> do vetor (por exemplo, <code>results[i] = ...</code>), não há race condition, mas a ordem de preenchimento é arbitrária.</li>
+      </ul>
+
+      <div class="callout callout-warning">
+        <strong>Race condition vs. resultado variável:</strong> Quando cada nó é processado exatamente uma vez, mas a ordem varia, o resultado final pode ser diferente entre execuções se as tarefas escreverem na mesma variável compartilhada. Esse é o padrão da Tarefa 06 (Monte Carlo).
+      </div>
+    </section>
+
+    <!-- ===================== SEÇÃO 5: TASKWAIT ===================== -->
+    <section id="taskwait">
+      <h2>5. <code>taskwait</code>: aguardando todas as tarefas</h2>
+
+      <p>
+        O <code>taskwait</code> é uma <em>barreira implícita</em> para todas as tarefas geradas no bloco de código que o contém. Sem ele, as threads podem sair da região paralela antes que as tarefas terminem.
+      </p>
+
+      <pre><code"><span class="hl-prep">#pragma omp parallel</span>
+{
+    <span class="hl-prep">#pragma omp single</span>
+    {
+        <span class="hl-kw">while</span> (current != NULL) {
+            <span class="hl-prep">#pragma omp task</span> <span class="hl-kw">shared</span>(current)
+            {
+                <span class="hl-fn">process_node</span>(current);
+            }
+            current = current-&gt;next;
+        }
+    }
+    <span class="hl-comment">// taskwait aqui: aguarda todas as tarefas criadas no single acima</span>
+    <span class="hl-prep">#pragma omp taskwait</span>
+
+    <span class="hl-comment">// Aqui, todas as tarefas já terminaram</span>
+    printf(<span class="hl-str">"Fim do processamento.\n"</span>);
+}</code></pre>
+
+      <h3>Variantes de sincronização</h3>
+      <table>
+        <thead>
+          <tr><th>Diretiva</th><th>Efeito</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>taskwait</code></td>
+            <td>Aguarda todas as tarefas filhas diretas do contexto atual.</td>
+          </tr>
+          <tr>
+            <td><code>taskgroup</code> + <code>taskwait</code></td>
+            <td>Aguarda todas as tarefas de um grupo inteiro, incluindo tarefas aninhadas.</td>
+          </tr>
+          <tr>
+            <td><code>taskyield</code></td>
+            <td> cede a thread corrente para que o scheduler possa executar outra tarefa pronta.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ===================== SEÇÃO 6: SINGLE ===================== -->
+    <section id="single">
+      <h2>6. <code>single</code>: uma única thread no bloco</h2>
+
+      <p>
+        A diretiva <code>#pragma omp single</code> faz com que <strong>exatamente uma thread</strong> execute o bloco. As outras threads do time esperam no fim do bloco (barreira implícita), a menos que a cláusula <code>nowait</code> seja usada.
+      </p>
+
+      <pre><code"><span class="hl-prep">#pragma omp single</span> <span class="hl-kw">nowait</span>
+{
+    <span class="hl-comment">// Apenas uma thread entra aqui; as outras passam direto</span>
+    Node *current = head;
+    <span class="hl-kw">while</span> (current != NULL) {
+        <span class="hl-prep">#pragma omp task</span> <span class="hl-kw">firstprivate</span>(current)
+        {
+            printf(<span class="hl-str">"%s\n"</span>, current-&gt;filename);
+        }
+        current = current-&gt;next;
+    }
+}
+<span class="hl-comment">// Se usasse nowait, as outras threads não esperariam o single terminar</span>
+<span class="hl-comment">// — perigoso se o código abaixo dependesse dos nós já estarem processados</span></code></pre>
+
+      <div class="callout callout-info">
+        <strong><code>firstprivate(current)</code>:</strong> Cada tarefa recebe sua própria cópia de <code>current</code> com o valor que <code>current</code> tinha quando a tarefa foi <em>criada</em>. Sem isso, todas as tarefas veriam o valor final de <code>current</code> após o laço terminar (provavelmente <code>NULL</code>).
+      </div>
+    </section>
+
+    <!-- ===================== SEÇÃO 7: THREAD NUM ===================== -->
+    <section id="thread-num">
+      <h2>7. <code>omp_get_thread_num()</code>: qual thread executa?</h2>
+
+      <p>
+        A função <code>omp_get_thread_num()</code> retorna o ID da thread que a chama, no intervalo <code>[0, omp_get_num_threads() - 1]</code>.
+      </p>
+
+      <pre><code"><span class="hl-type">int</span> tid = <span class="hl-fn">omp_get_thread_num</span>();    <span class="hl-comment">// ID da thread [0, T-1]</span>
+<span class="hl-type">int</span> nt  = <span class="hl-fn">omp_get_num_threads</span>();   <span class="hl-comment">// total de threads no time</span></code></pre>
+
+      <p>
+        No Padrão B (correto), cada nó gera uma tarefa. Quando a thread 0 (ou qualquer thread designada pelo <code>single</code>) cria as tarefas, ela passa por cada nó e gera uma tarefa. As tarefas são então <em>agendadas</em> para as threads disponíveis — tipicamente de forma <em>work-stealing</em>: threads ociosas "roubam" tarefas de threads ocupadas.
+      </p>
+
+      <p>
+        Em uma execução típica com 4 threads, ao criar 10 tarefas, a thread 0 pode criar todas, mas as threads 1, 2 e 3 roubam tarefas para executar. A distribuição exata depende do scheduler e da carga de cada thread — e <strong>varia entre execuções</strong>.
+      </p>
+    </section>
+
+    <!-- ===================== SEÇÃO 8: TABELA DE CONCEITOS ===================== -->
+    <section id="tabela-conceitos">
+      <h2>8. Tabela de conceitos-chave</h2>
+      <table>
+        <thead>
+          <tr><th>Conceito</th><th>Definição</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>task</code></td>
+            <td>Unidade de trabalho criada em tempo de execução por uma thread e potencialmente executada por outra.</td>
+          </tr>
+          <tr>
+            <td><code>taskwait</code></td>
+            <td>Barreira que aguarda a conclusão de todas as tarefas filhas geradas no bloco atual.</td>
+          </tr>
+          <tr>
+            <td><code>single</code></td>
+            <td>Diretiva que faz apenas uma thread do time executar o bloco; as demais esperam ao final (barreira implícita).</td>
+          </tr>
+          <tr>
+            <td><code>taskyield</code></td>
+            <td>Diretiva que cede a thread atual ao scheduler para que outra tarefa pronta possa ser executada.</td>
+          </tr>
+          <tr>
+            <td><code>firstprivate</code></td>
+            <td>Cada tarefa recebe uma cópia privada da variável, inicializada com o valor no momento da criação.</td>
+          </tr>
+          <tr>
+            <td><code>depend</code></td>
+            <td>Cláusula que estabelece dependências (in/out/inout) entre tarefas para ordenação pelo scheduler.</td>
+          </tr>
+          <tr>
+            <td>Work-stealing</td>
+            <td>Estratégia de agendamento onde threads ociosas roubam tarefas de threads ocupadas.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+  </main>
+
+  <footer class="footer-nav">
+    <a href="05-teoria-primos-openmp.html">&larr; Teoria 05</a>
+    <a href="06-task-openmp.html">Referência rápida 06 &rarr;</a>
+  </footer>
+
+  <script>
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('theme', target);
+    }
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+  </script>
+</body>
+</html>

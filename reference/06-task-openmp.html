@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Referência rápida: diretivas task, single, taskwait do OpenMP para processamento de lista encadeada.">
+  <title>Referência 06: Task OpenMP — DCA3703</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function applyMath(el = document.body) {
+      if (window.renderMathInElement) {
+        renderMathInElement(el, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+    document.addEventListener("DOMContentLoaded", () => applyMath());
+    window.addEventListener("load", () => applyMath());
+  </script>
+</head>
+<body>
+  <nav class="top-nav">
+    <a href="00-fundamentos-programacao-paralela.html">Índice geral</a>
+    <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+  </nav>
+
+  <header>
+    <div class="lesson-badge">Referência 06 &bull; DCA3703</div>
+    <h1>Referência 06: Task OpenMP</h1>
+    <div class="metadata">Folha de consulta rápida para diretivas task, single e taskwait</div>
+  </header>
+
+  <main>
+
+    <!-- ===================== SINTAXE ===================== -->
+    <section id="sintaxe">
+      <h2>1. Sintaxe das diretivas</h2>
+
+      <h3><code>task</code></h3>
+      <pre><code><span class="hl-prep">#pragma omp task</span> [<span class="hl-kw">clause</span>...]
+<span class="hl-comment">// bloco da tarefa — pode ser único ou composto</span>
+{
+    <span class="hl-comment">// cada tarefa executa este bloco</span>
+}</code></pre>
+
+      <h3><code>taskwait</code></h3>
+      <pre><code"><span class="hl-prep">#pragma omp taskwait</span> [<span class="hl-kw">clause</span>...]</code></pre>
+
+      <h3><code>single</code></h3>
+      <pre><code"><span class="hl-prep">#pragma omp single</span> [<span class="hl-kw">clause</span>...]
+{
+    <span class="hl-comment">// apenas uma thread executa este bloco</span>
+}</code></pre>
+    </section>
+
+    <!-- ===================== CLÁUSULAS ===================== -->
+    <section id="clausulas">
+      <h2>2. Cláusulas das diretivas</h2>
+
+      <table>
+        <thead>
+          <tr><th>Cláusula</th><th>Uso em</th><th>Descrição</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>shared(list)</code></td>
+            <td><code>task</code></td>
+            <td>Variáveis compartilhadas entre tarefas e threads.</td>
+          </tr>
+          <tr>
+            <td><code>private(list)</code></td>
+            <td><code>task</code></td>
+            <td>Cópia privada não inicializada por tarefa.</td>
+          </tr>
+          <tr>
+            <td><code>firstprivate(list)</code></td>
+            <td><code>task</code></td>
+            <td>Cópia privada inicializada com valor no momento da criação.</td>
+          </tr>
+          <tr>
+            <td><code>depend(type: list)</code></td>
+            <td><code>task</code></td>
+            <td>Dependência entre tarefas (<code>in</code>, <code>out</code>, <code>inout</code>).</td>
+          </tr>
+          <tr>
+            <td><code>priority(value)</code></td>
+            <td><code>task</code></td>
+            <td>Prioridade da tarefa (maior = executada primeiro).</td>
+          </tr>
+          <tr>
+            <td><code>final(expr)</code></td>
+            <td><code>task</code></td>
+            <td>Se <code>expr</code> ≠ 0, tarefas internas executam inline.</td>
+          </tr>
+          <tr>
+            <td><code>nowait</code></td>
+            <td><code>single</code></td>
+            <td>Remove a barreira implícita ao final do bloco.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ===================== PADRÃO CORRETO ===================== -->
+    <section id="padrao-correto">
+      <h2>3. Padrão correto: <code>single</code> + <code>task</code> + <code>taskwait</code></h2>
+
+      <pre><code"><span class="hl-comment">// Estrutura do nó</span>
+<span class="hl-kw">typedef struct</span> Node {
+    <span class="hl-type">char</span> filename[<span class="hl-num">256</span>];
+    <span class="hl-kw">struct</span> Node *next;
+} Node;
+
+<span class="hl-comment">// Travessia: apenas uma thread cria as tarefas</span>
+<span class="hl-prep">#pragma omp parallel</span>
+{
+    <span class="hl-prep">#pragma omp single</span>
+    {
+        Node *current = head;
+        <span class="hl-kw">while</span> (current != NULL) {
+            <span class="hl-prep">#pragma omp task</span> <span class="hl-kw">firstprivate</span>(current)
+            {
+                printf(<span class="hl-str">"Arquivo: %s | Thread: %d\n"</span>,
+                       current-&gt;filename, <span class="hl-fn">omp_get_thread_num</span>());
+            }
+            current = current-&gt;next;
+        }
+    }
+    <span class="hl-prep">#pragma omp taskwait</span>
+}</code></pre>
+
+      <ul>
+        <li><code>single</code>: apenas uma thread percorre a lista e cria as tarefas.</li>
+        <li><code>task</code>: cada nó gera uma tarefa.</li>
+        <li><code>firstprivate(current)</code>: cada tarefa recebe o ponteiro do nó com o valor correto no momento da criação.</li>
+        <li><code>taskwait</code>: aguarda todas as tarefas antes de continuar.</li>
+      </ul>
+    </section>
+
+    <!-- ===================== PADRÃO INCORRETO ===================== -->
+    <section id="padrao-incorreto">
+      <h2>4. Padrão incorreto: laço dentro da região paralela</h2>
+
+      <pre><code"><span class="hl-comment">// ERRADO: todas as threads executam o laço</span>
+<span class="hl-prep">#pragma omp parallel</span>
+{
+    Node *current = head;
+    <span class="hl-kw">while</span> (current != NULL) {
+        <span class="hl-prep">#pragma omp task</span>
+        {
+            printf(<span class="hl-str">"%s\n"</span>, current-&gt;filename);
+        }
+        current = current-&gt;next;
+    }
+}
+<span class="hl-comment">// Resultado: cada nó processado T vezes (T = número de threads)</span></code></pre>
+    </section>
+
+    <!-- ===================== FUNÇÕES ===================== -->
+    <section id="funcoes">
+      <h2>5. Funções OpenMP para tasks</h2>
+
+      <table>
+        <thead>
+          <tr><th>Função</th><th>Retorno</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>omp_get_thread_num()</code></td>
+            <td>ID da thread chamadora (0 a <code>omp_get_num_threads()-1</code>)</td>
+          </tr>
+          <tr>
+            <td><code>omp_get_num_threads()</code></td>
+            <td>Número de threads no time atual</td>
+          </tr>
+          <tr>
+            <td><code>omp_in_parallel()</code></td>
+            <td>Retorna 1 se dentro de região paralela</td>
+          </tr>
+          <tr>
+            <td><code>omp_get_task_num()</code></td>
+            <td>ID da tarefa em execução</td>
+          </tr>
+          <tr>
+            <td><code>omp_get_num_tasks()</code></td>
+            <td>Número de tarefas no team atual</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ===================== FLAGS DE COMPILAÇÃO ===================== -->
+    <section id="flags">
+      <h2>6. Flags de compilação</h2>
+
+      <table>
+        <thead>
+          <tr><th>Flag</th><th>Descrição</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>-fopenmp</code></td>
+            <td>Habilita suporte a OpenMP (GCC/Clang)</td>
+          </tr>
+          <tr>
+            <td><code>-O2</code>, <code>-O3</code></td>
+            <td>Otimização para melhor desempenho</td>
+          </tr>
+          <tr>
+            <td><code>-g</code></td>
+            <td>Símbolos de debug</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <pre><code">$ gcc -O2 -fopenmp -o tarefa07 tarefa07.c -lm
+$ ./tarefa07
+Arquivo: documento1.txt | Thread: 2
+Arquivo: documento2.txt | Thread: 0
+Arquivo: documento3.txt | Thread: 1
+...</code></pre>
+    </section>
+
+    <!-- ===================== MAPEAMENTO DE TAREFAS ===================== -->
+    <section id="mapeamento">
+      <h2>7. Mapeamento: tarefa por nó da lista</h2>
+
+      <p>Cada nó da lista gera exatamente <strong>uma tarefa</strong>. O runtime distribui entre as threads disponíveis.</p>
+
+      <table>
+        <thead>
+          <tr><th>Nó</th><th>Tarefa criada</th><th>Thread que executa</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>node 1</td><td>task_1</td><td>variável (work-stealing)</td></tr>
+          <tr><td>node 2</td><td>task_2</td><td>variável (work-stealing)</td></tr>
+          <tr><td>node 3</td><td>task_3</td><td>variável (work-stealing)</td></tr>
+          <tr><td colspan="3">...</td></tr>
+        </tbody>
+      </table>
+
+      <p>A thread que executa cada tarefa é determinada pelo <em>scheduler</em> em tempo de execução — não é determinística.</p>
+    </section>
+
+    <!-- ===================== QUIZ ===================== -->
+    <section id="quiz">
+      <h2>8. Quiz rápido</h2>
+
+      <div class="quiz">
+        <div class="quiz-question">
+          <p><strong>1.</strong> Por que o <code>single</code> é necessário no padrão correto?</p>
+          <ol type="a">
+            <li>Para dividir o laço entre as threads</li>
+            <li>Para garantir que apenas uma thread percorra a lista e crie as tarefas</li>
+            <li>Para acelerar o acesso à lista encadeada</li>
+          </ol>
+        </div>
+        <div class="quiz-question">
+          <p><strong>2.</strong> O que acontece se o laço de travessia estiver dentro da região paralela, sem <code>single</code>?</p>
+          <ol type="a">
+            <li>Cada nó é processado exatamente uma vez</li>
+            <li>Cada nó é processado múltiplas vezes (T vezes)</li>
+            <li>O programa para de executar</li>
+          </ol>
+        </div>
+        <div class="quiz-question">
+          <p><strong>3.</strong> Para que serve o <code>taskwait</code>?</p>
+          <ol type="a">
+            <li>Para criar mais tarefas</li>
+            <li>Para aguardar que todas as tarefas criadas no bloco atual terminem</li>
+            <li>Para definir a prioridade das tarefas</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer-nav">
+    <a href="00-fundamentos-programacao-paralela.html">&larr; Índice geral</a>
+    <a href="06-teoria-task-openmp.html">Teoria 06 &rarr;</a>
+  </footer>
+
+  <script>
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('theme', target);
+    }
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+  </script>
+</body>
+</html>

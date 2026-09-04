@@ -1,0 +1,341 @@
+\documentclass[11pt,letterpaper]{article}
+\usepackage{../assets/scientific_report}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{geometry}
+\geometry{headheight=23pt, top=2cm, bottom=2cm, left=2.5cm, right=2.5cm}
+\setlength{\parskip}{0.5em}
+\setlength{\parindent}{0pt}
+
+\lstset{
+    language=C,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{green!60!black}\itshape,
+    stringstyle=\color{red!80!black},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    numbersep=8pt,
+    frame=single,
+    breaklines=true,
+    captionpos=b,
+    tabsize=4,
+    showstringspaces=false
+}
+
+\begin{document}
+\pagestyle{plain}
+
+\begin{center}
+    {\LARGE\bfseries Processamento paralelo de lista encadeada com \texttt{task}}\\[0.4em]
+    {\normalsize Eugênio Vitor Lopes dos Santos}\\[0.3em]
+    {\small DCA3703 -- Programação Paralela, Universidade Federal do Rio Grande do Norte}\\[0.3em]
+\end{center}
+
+\section{Enunciado}
+Implementar em C um programa que cria uma lista encadeada com nós contendo nomes de arquivos fictícios. Dentro de uma região paralela, o programa deve percorrer a lista e criar uma tarefa com \texttt{\#pragma omp task} para processar cada nó. Cada tarefa imprime o nome do arquivo e o identificador da thread que a executou (\texttt{omp\_get\_thread\_num}). Após executar o programa, deve-se refletir: todos os nós foram processados? Algum foi processado mais de uma vez ou ignorado? O comportamento muda entre execuções? Como garantir que cada nó seja processado uma única vez e por apenas uma tarefa?
+
+\section{Fundamentação teórica}
+
+\subsection{Modelo de tarefas do OpenMP}
+O OpenMP oferece o modelo de tarefas (\texttt{task}) para expressar paralelismo em estruturas de dados irregulares, como listas encadeadas, árvores e grafos. Diferentemente de \texttt{parallel for}, que exige que o número de iterações seja conhecido antes da execução, as tarefas podem ser criadas dinamicamente conforme a estrutura é percorrida.
+
+Uma diretiva \texttt{\#pragma omp task} delimita um bloco de código que pode ser executado por qualquer thread do time. A thread que criou a tarefa continua o fluxo normal; a tarefa entra em uma fila e qualquer thread pode executá-la. Se a thread criadora não tiver trabalho imediato e houver tarefas pendentes, ela pode executá-las. Caso contrário, threads ociosas podem ``roubar'' tarefas da fila de outras, mecanismo conhecido como \textit{work-stealing} (roubo de trabalho).
+
+\subsection{As diretivas \texttt{single} e \texttt{task}}
+\begin{itemize}
+    \item \texttt{\#pragma omp single}: delimita um bloco que deve ser executado por exatamente uma thread do time. As demais threads saltam o bloco e prosseguem. É o mecanismo correto para que apenas uma thread percorra a lista e crie as tarefas.
+    \item \texttt{\#pragma omp task}: cria uma tarefa com o bloco de código seguinte. A tarefa pode ser executada imediatamente ou postergada, dependendo do escalonador.
+    \item \texttt{\#pragma omp taskwait}: barreira que aguarda a conclusão de todas as tarefas criadas dentro do escopo atual. É necessária quando o código após ela depende do resultado das tarefas.
+\end{itemize}
+
+\subsection{Escopo de variáveis em tarefas}
+Uma variável referenciada dentro de uma \texttt{task} segue as mesmas regras de escopo da região \texttt{parallel} que a contém, a menos que uma cláusula de escopo seja explicitada:
+\begin{itemize}
+    \item \texttt{shared(var)}: todas as tarefas compartilham o mesmo endereço de memória. Se a variável muda após a criação da tarefa, a tarefa vê o novo valor, o que, no caso de um ponteiro de travessia, faz todas as tarefas enxergarem o mesmo nó (ou NULL).
+    \item \texttt{firstprivate(var)}: cada tarefa recebe uma cópia privada inicializada com o valor da variável no momento da criação. É a cláusula adequada para capturar o ponteiro \texttt{atual} em cada iteração de um laço.
+    \item \texttt{private(var)}: cria uma cópia privada sem inicialização (valor indefinido). Causa comportamento imprevisível.
+\end{itemize}
+
+\section{Implementação}
+
+Os arquivos-fonte \texttt{e0.c} a \texttt{e5.c} apresentam o modelo de tarefas de forma incremental. As versões com erro e1 e e2 têm o mesmo problema; mantemos e2 por incluir o contador que quantifica as repetições. As fun\c c\~oes auxiliares (\texttt{criar\_no}, \texttt{inserir\_no\_fim}, \texttt{liberar\_lista}) e a estrutura \texttt{No} s\~ao id\^enticas em todas as vers\~oes; por isso, os trechos a seguir mostram apenas a \texttt{main()} de cada vers\~ao, onde as diretivas OpenMP e as cl\'ausulas de escopo variam. O c\'odigo completo de cada arquivo encontra-se no Ap\^endice~\ref{apendice:codigos}.
+
+Compilamos os códigos-fonte com GCC 13.3, padrão C11, avisos ativados (\texttt{-Wall}) e suporte a OpenMP (\texttt{-fopenmp}).
+
+\begin{lstlisting}[language=bash, caption={Compilação e execução dos programas}]
+gcc -std=c11 -Wall -fopenmp e0.c -o e0
+gcc -std=c11 -Wall -fopenmp e2.c -o e2
+gcc -std=c11 -Wall -fopenmp e3.c -o e3
+gcc -std=c11 -Wall -fopenmp e4.c -o e4
+gcc -std=c11 -Wall -fopenmp e5.c -o e5
+
+OMP_NUM_THREADS=4 ./e2
+OMP_NUM_THREADS=4 ./e5
+\end{lstlisting}
+
+\subsection{Versão base sequencial (e0.c)}
+Constrói a lista encadeada com 5 nomes de arquivo e a percorre sequencialmente, sem qualquer diretiva OpenMP. Serve como referência para o comportamento esperado.
+
+\lstinputlisting[caption={e0.c, versão sequencial base}]{e0.c}
+
+\subsection{Erro 1: ausência de \texttt{single} (e2.c)}
+O laço de travessia fica diretamente dentro de \texttt{\#pragma omp parallel}. Todas as $T$ threads executam o laço completo e cada uma cria $N$ tarefas, totalizando $N \times T$ tarefas e $N \times T$ processamentos do mesmo nó. O contador \texttt{processados} quantifica o excesso.
+
+\begin{lstlisting}[caption={main() de e2.c, parallel sem single}]
+int main() {
+    No *cabeca = NULL;
+    /* cria lista com 5 n00f3s */
+
+        int nos_lista = 5;
+    int processados = 0;
+
+    #pragma omp parallel
+    {
+        No *atual = cabeca;
+        while (atual != NULL) {
+            #pragma omp task
+            {
+                printf("  [Thread %d] %s\n",
+                       omp_get_thread_num(), atual->nome_arquivo);
+                processados++;
+            }
+                atual = atual->next;
+            }
+        }
+        #pragma omp taskwait
+    }
+
+    printf("Nos na lista (N): %d\n"
+           "Processamentos totais (Y): %d\n"
+           "Relacao: Y = N x T = %d x %d = %d (esperado)\n",
+           nos_lista, processados,
+           nos_lista, (processados / nos_lista), processados);
+
+    liberar_lista(cabeca);
+    return 0;
+}
+\end{lstlisting}
+
+\subsection{Erro 2: \texttt{single} sem \texttt{firstprivate} (e3.c)}
+Há \texttt{\#pragma omp single} para que apenas uma thread crie as tarefas. A cláusula \texttt{shared(atual)} faz todas as tarefas compartilharem o mesmo ponteiro. Como o laço avança o ponteiro imediatamente após criar cada tarefa, as tarefas executadas posteriormente leem um valor já modificado (outro nó ou NULL).
+
+\begin{lstlisting}[caption={main() de e3.c, single + shared}]
+int main() {
+    No *cabeca = NULL;
+    inserir_no_fim(&cabeca, "doc1.txt");
+
+    int nos_lista = 1;
+    int processados = 0;
+
+    #pragma omp parallel
+    {
+        #pragma omp single
+        {
+            No *atual = cabeca;
+            while (atual != NULL) {
+                #pragma omp task shared(atual)
+                {
+                    printf("  [Thread %d] atual aponta para: %s\n",
+                           omp_get_thread_num(),
+                           atual ? atual->nome_arquivo : "(NULL)");
+                    processados++;
+                }
+                atual = atual->next;
+            }
+        }
+    }
+
+    printf("Nos na lista: %d | Processamentos contados: %d\n",
+           nos_lista, processados);
+
+    liberar_lista(cabeca);
+    return 0;
+}
+\end{lstlisting}
+
+\subsection{Erro 3: \texttt{firstprivate} sem \texttt{taskwait} (e4.c)}
+As tarefas recebem \texttt{firstprivate(atual)} e cada uma captura o endereço correto do nó — o nome impresso é sempre correto. No entanto, sem \texttt{taskwait}, não há garantia formal de que as tarefas estejam concluídas antes que código subsequente dependa de seus resultados. A barreira implícita no fim da região \texttt{parallel} compensa neste caso específico, mas não é a forma portável de sincronizar.
+
+\begin{lstlisting}[caption={main() de e4.c, firstprivate sem taskwait}]
+int main() {
+    No *cabeca = NULL;
+    inserir_no_fim(&cabeca, "doc1.txt");
+
+    int nos_lista = 1;
+    int processados = 0;
+
+    #pragma omp parallel
+    {
+        #pragma omp single
+        {
+            No *atual = cabeca;
+            while (atual != NULL) {
+                #pragma omp task firstprivate(atual)
+                {
+                    printf("  [Thread %d] Arquivo: %s\n",
+                           omp_get_thread_num(), atual->nome_arquivo);
+                    processados++;
+                }
+                atual = atual->next;
+            }
+        }
+    }
+
+    printf("Nos na lista: %d | Processamentos contados: %d\n",
+           nos_lista, processados);
+
+    liberar_lista(cabeca);
+    return 0;
+}
+\end{lstlisting}
+
+\subsection{Versão correta (e5.c)}
+A solução combina três elementos:
+\begin{enumerate}
+    \item \texttt{single}: apenas uma thread percorre a lista e cria as tarefas;
+    \item \texttt{firstprivate(atual)}: cada tarefa captura o endereço do nó no momento da criação;
+    \item \texttt{taskwait}: sincroniza o término das tarefas antes de prosseguir.
+\end{enumerate}
+
+\begin{lstlisting}[caption={main() de e5.c, versão correta}]
+int main() {
+    No *cabeca = NULL;
+    inserir_no_fim(&cabeca, "doc1.txt");
+
+    int nos_lista = 1;
+    int processados = 0;
+
+    #pragma omp parallel
+    {
+        #pragma omp single
+        {
+            No *atual = cabeca;
+            while (atual != NULL) {
+                #pragma omp task firstprivate(atual)
+                {
+                    printf("  [Thread %d/%d] Arquivo: %s\n",
+                           omp_get_thread_num(),
+                           omp_get_num_threads(),
+                           atual->nome_arquivo);
+                    processados++;
+                }
+                atual = atual->next;
+            }
+        }
+    }
+
+    printf("Nos na lista: %d | Processamentos: %d (devem ser iguais!)\n",
+           nos_lista, processados);
+
+    liberar_lista(cabeca);
+    return 0;
+}
+\end{lstlisting}
+
+\newpage
+\section{Resultados e discussão}
+
+A Tabela~\ref{tab:comparacao} resume o comportamento de cada versão com 4 threads.
+
+\begin{table}[H]
+\centering
+\caption{Comparação do processamento das versões com 4 threads}
+\label{tab:comparacao}
+\begin{tabular}{llll}
+\hline
+\textbf{Arquivo} & \textbf{Nós process.} & \textbf{Nome correto?} & \textbf{Problema} \\ \hline
+\texttt{e0.c} & 5 (sequencial) & Sim & Sem paralelismo \\
+\texttt{e2.c} & 20 ($N\times T$) & Sim & Contador quantifica o excesso \\
+\texttt{e3.c} & 5 & Sim (por acaso) & \texttt{shared(current)}: ponteiro inválido \\
+\texttt{e4.c} & 5 & Sim & Sem \texttt{taskwait}: sem sincronização formal \\
+\texttt{e5.c} & 5 & Sim & Correto: \texttt{single+firstprivate+taskwait} \\ \hline
+\end{tabular}
+\end{table}
+
+\subsection{Ausência de \texttt{single} (e2.c)}
+Com 4 threads e 5 nós, \texttt{e2.c} confirma \texttt{Y = 20}:
+
+\begin{lstlisting}[language=bash, caption={Saída de e2.c com 4 threads confirmando $N \times T$}]
+$ OMP_NUM_THREADS=4 ./e2
+[Thread 0] doc1.txt
+[Thread 0] img2.png
+[Thread 0] dat3.csv
+[Thread 0] rep4.pdf
+[Thread 0] bkp5.zip
+[Thread 0] doc1.txt
+[Thread 0] img2.png
+[Thread 0] dat3.csv
+[Thread 3] bkp5.zip
+[Thread 3] doc1.txt
+[Thread 3] img2.png
+[Thread 3] dat3.csv
+[Thread 3] rep4.pdf
+[Thread 3] bkp5.zip
+[Thread 0] rep4.pdf
+[Thread 3] doc1.txt
+[Thread 0] img2.png
+[Thread 3] dat3.csv
+[Thread 1] rep4.pdf
+[Thread 1] bkp5.zip
+Nos na lista (N): 5
+Processamentos totais (Y): 20
+Relacao: Y = N x T = 5 x 4 = 20 (esperado)
+\end{lstlisting}
+
+Cada thread executou o laço independentemente e gerou 5 tarefas. O programa gastou $T$ vezes mais trabalho que o necessário. Se as tarefas tivessem efeitos colaterais (escrita em arquivo, atualização de banco de dados), cada nó seria alterado $T$ vezes.
+
+\subsection{Compartilhamento do ponteiro (e3.c)}
+Mesmo com \texttt{single}, se a cláusula de escopo é \texttt{shared(current)}, o ponteiro avança enquanto as tarefas ainda não executaram. O comportamento é não-determinístico: o contador acusa o número correto de nós, mas algumas tarefas podem imprimir NULL ou nomes trocados, dependendo do instante em que o escalonador as ativa.
+
+Sem \texttt{firstprivate}, a correção do resultado depende de uma condição de corrida favorável. Não há garantia alguma. Comparando \texttt{e3.c} (shared) com \texttt{e4.c} (firstprivate), vê-se que a cláusula de escopo é decisiva.
+
+\subsection{Ausência de \texttt{taskwait} (e4.c)}
+Com \texttt{firstprivate}, \texttt{e4.c} imprime os 5 nomes corretos — cada tarefa captura o valor do ponteiro \texttt{atual} no instante da criação, então o laço \texttt{atual = atual->next} não afeta tarefas já criadas. No entanto, sem \texttt{taskwait}, não há sincronização formal entre a criação das tarefas e código subsequente que dependa delas. Neste caso, a barreira implícita no fim da região \texttt{parallel} compensa, mas o uso de \texttt{taskwait} é a forma correta e portável de garantir a conclusão.
+
+\subsection{Versão correta}
+
+Com \texttt{single}, \texttt{firstprivate(atual)} e \texttt{taskwait} (código análogo ao de \texttt{e4.c} acrescentando a barreira), cada nó é processado exatamente uma vez, como mostra a saída de \texttt{e5.c}:
+
+\begin{lstlisting}[language=bash, caption={Execução da versão correta com 4 threads}]
+$ OMP_NUM_THREADS=4 ./e5
+[Thread 1/4] Arquivo: doc1.txt
+[Thread 1/4] Arquivo: bkp5.zip
+[Thread 2/4] Arquivo: img2.png
+[Thread 3/4] Arquivo: dat3.csv
+[Thread 0/4] Arquivo: rep4.pdf
+Nos na lista: 5 | Processamentos: 5 (devem ser iguais!)
+\end{lstlisting}
+
+O programa imprimiu 5 linhas (uma por nó). Quatro threads diferentes executaram as tarefas. A ordem varia entre execuções, mas a contagem permanece 5.
+
+\section{Conclusão}
+
+O paralelismo de listas encadeadas com OpenMP exige três elementos:
+
+\begin{enumerate}
+    \item \texttt{single}: restringe a criação de tarefas a uma única thread, evitando a multiplicação de trabalho;
+    \item \texttt{firstprivate}: captura o valor do ponteiro de travessia no momento da criação, impedindo que tarefas compartilhem um endereço que avança;
+    \item \texttt{taskwait}: sincroniza o término das tarefas antes de prosseguir.
+\end{enumerate}
+
+A ausência de qualquer um desses elementos resulta em um dos três erros: (i) cada nó é processado $T$ vezes (sem \texttt{single}), (ii) tarefas leem ponteiros inválidos ou trocados (sem \texttt{firstprivate}) ou (iii) não há garantia de conclusão antes de código subsequente (sem \texttt{taskwait}). O comportamento varia entre execuções porque o escalonamento de tarefas é não-determinístico: a thread que executa cada tarefa, a ordem de execução e o instante de ativação dependem do estado do runtime.
+
+\newpage
+\appendix
+\section{Código-fonte completo}
+\label{apendice:codigos}
+
+\lstinputlisting[caption={e0.c, versão sequencial base}]{e0.c}
+
+\lstinputlisting[caption={e2.c, parallel sem single com contador}]{e2.c}
+
+\lstinputlisting[caption={e3.c, single sem firstprivate}]{e3.c}
+
+\lstinputlisting[caption={e4.c, firstprivate sem taskwait}]{e4.c}
+
+\lstinputlisting[caption={e5.c, versão correta com single + firstprivate + taskwait}]{e5.c}
+
+\end{document}

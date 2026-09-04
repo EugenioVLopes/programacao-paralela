@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Lição 07: Modelo de execução de tasks, work-stealing e experimentos práticos com OpenMP.">
+  <title>Lição 07: Execução de Tasks, Work-Stealing e Experimentos</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function applyMath(el = document.body) {
+      if (window.renderMathInElement) {
+        renderMathInElement(el, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+    document.addEventListener("DOMContentLoaded", () => applyMath());
+    window.addEventListener("load", () => applyMath());
+  </script>
+</head>
+<body>
+  <nav class="top-nav">
+    <div style="display: flex; gap: 16px;">
+      <a href="../reference/06-teoria-task-openmp.html">Teoria 06</a>
+      <a href="0006-tarefa07-lista-task.html">Lição 06</a>
+      <a href="../reference/00-fundamentos-programacao-paralela.html">Índice geral</a>
+    </div>
+    <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+  </nav>
+
+  <header>
+    <div class="lesson-badge">Lição 07 &bull; DCA3703 &bull; Aprofundamento</div>
+    <h1>Lição 07: Execução de Tasks, Work-Stealing e Experimentos Práticos</h1>
+    <div class="metadata">
+      Modelo de execução do OpenMP task runtime &bull; Experimentos isolados &bull; Observação de comportamento não-determinístico
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ===================== SEÇÃO 1: COMO AS TASKS FUNCIONAM POR DENTRO ===================== -->
+    <section id="modelo-execucao">
+      <h2>1. Como as tasks funcionam por dentro</h2>
+
+      <p>
+        Quando você escreve <code>#pragma omp task</code>, não está apenas "criando uma thread extra". Você está inserindo uma unidade de trabalho em uma <strong>fila de tarefas</strong> mantida pelo runtime do OpenMP. Essa fila é global ao time de threads.
+      </p>
+
+      <p>
+        O modelo operacional é o <strong>work-stealing</strong> (roubo de trabalho):
+      </p>
+
+      <ol>
+        <li><strong>Fila local:</strong> cada thread possui uma fila privada de tarefas prontas para executar.</li>
+        <li><strong>Criação:</strong> quando uma thread encontra um <code>task</code>, ela empilha essa tarefa em sua própria fila.</li>
+        <li><strong>Execução:</strong> a thread executa suas próprias tarefas da pilha.</li>
+        <li><strong>Roubo:</strong> se uma thread fica ociosa (sua pilha vazia), ela "rouba" tarefas do fundo da pilha de outra thread que está ocupada.</li>
+      </ol>
+
+      <div class="callout callout-info">
+        <strong>Por que isso importa:</strong> a thread que <em>cria</em> a tarefa não é necessariamente a que a <em>executa</em>. A atribuição depende do estado das pilhas no momento exato — e esse estado varia a cada execução.
+      </div>
+
+      <p>
+        Em uma execução, a thread 0 pode criar 10 tarefas e executar 7 delas. Na próxima execução, com as mesmas entradas, a thread 0 pode executar apenas 3, porque as threads 1 e 2 roubaram mais cedo. Isso é <strong>correto</strong> e <strong>esperado</strong>.
+      </p>
+    </section>
+
+    <!-- ===================== SEÇÃO 2: EXPERIMENTO A — QUAIS THREADS EXISTEM? ===================== -->
+    <section id="exp-a">
+      <h2>2. Experimento A: "Quem são as threads deste time?"</h2>
+
+      <p>
+        Antes de trabalhar com tasks, confirme que você consegue identificar as threads do time.
+      </p>
+
+      <h3>Código descartável</h3>
+      <p>Crie um arquivo <code>exp_a_threads.c</code> separado do projeto principal:</p>
+
+      <pre><code><span class="hl-prep">#include &lt;stdio.h&gt;</span>
+<span class="hl-prep">#include &lt;omp.h&gt;</span>
+
+<span class="hl-type">int</span> <span class="hl-fn">main</span>() {
+    <span class="hl-prep">#pragma omp parallel</span>
+    {
+        <span class="hl-type">int</span> tid = <span class="hl-fn">omp_get_thread_num</span>();
+        <span class="hl-type">int</span> nt  = <span class="hl-fn">omp_get_num_threads</span>();
+        <span class="hl-fn">printf</span>(<span class="hl-str">"Sou a thread %d de %d\n"</span>, tid, nt);
+    }
+    <span class="hl-kw">return</span> <span class="hl-num">0</span>;
+}</code></pre>
+
+      <h3>O que fazer</h3>
+      <ol>
+        <li>Compile: <code>gcc -Wall -fopenmp -o exp_a_threads exp_a_threads.c</code></li>
+        <li>Execute várias vezes com <code>OMP_NUM_THREADS=4 ./exp_a_threads</code></li>
+        <li>Observe: as mensagens aparecem sempre? A ordem muda?</li>
+      </ol>
+
+      <div class="callout callout-warning">
+        <strong>O que observar:</strong> o número total de mensagens é sempre igual ao número de threads? Existe thread 0? Existe thread 3? Alguma thread nunca aparece? Isso confirma que o time está completo.
+      </div>
+    </section>
+
+    <!-- ===================== SEÇÃO 3: EXPERIMENTO B — SINGLE SEM TASK ===================== -->
+    <section id="exp-b">
+      <h2>3. Experimento B: O que <code>single</code> faz sozinho?</h2>
+
+      <p>
+        Antes de combinar <code>single</code> com <code>task</code>, observe o comportamento do <code>single</code> isolado.
+      </p>
+
+      <pre><code><span class="hl-type">int</span> <span class="hl-fn">main</span>() {
+    <span class="hl-prep">#pragma omp parallel</span>
+    {
+        <span class="hl-prep">#pragma omp single</span>
+        {
+            <span class="hl-fn">printf</span>(<span class="hl-str">" single executado pela thread %d\n"</span>,
+                   <span class="hl-fn">omp_get_thread_num</span>());
+        }
+        <span class="hl-fn">printf</span>(<span class="hl-str">"  fora do single, thread %d\n"</span>,
+               <span class="hl-fn">omp_get_thread_num</span>());
+    }
+    <span class="hl-kw">return</span> <span class="hl-num">0</span>;
+}</code></pre>
+
+      <h3>Pergunta orientadora</h3>
+      <p>
+        Quantas vezes a mensagem do <code>single</code> aparece? E quantas vezes aparece a mensagem "fora do single"? Se você adicionar <code>nowait</code> ao <code>single</code>, o que muda na ordem das mensagens?
+      </p>
+
+      <div class="callout callout-info">
+        <strong>Insight:</strong> sem <code>nowait</code>, as outras threads esperam no fim do bloco <code>single</code> antes de continuar. Isso significa que, enquanto uma thread percorre a lista criando tasks, as outras ficam paradas aguardando — mas o runtime pode reaproveitá-las para executar tarefas roubadas.
+      </div>
+    </section>
+
+    <!-- ===================== SEÇÃO 4: EXPERIMENTO C — O ERRO DO SHARED ===================== -->
+    <section id="exp-c">
+      <h2>4. Experimento C: O erro catastrófico de <code>shared(current)</code></h2>
+
+      <p>
+        Este é o experimento mais importante da lição. Ele demonstra por que <code>firstprivate(current)</code> é obrigatório.
+      </p>
+
+      <pre><code><span class="hl-type">int</span> <span class="hl-fn">main</span>() {
+    <span class="hl-type">int</span> i = <span class="hl-num">0</span>;
+    <span class="hl-prep">#pragma omp parallel</span>
+    {
+        <span class="hl-prep">#pragma omp single</span>
+        {
+            <span class="hl-kw">for</span> (i = <span class="hl-num">0</span>; i &lt; <span class="hl-num">5</span>; i++) {
+                <span class="hl-comment">// ERRADO DE PROPOSITO: shared captura o valor FINAL após o laço</span>
+                <span class="hl-prep">#pragma omp task</span> <span class="hl-kw">shared</span>(i)
+                {
+                    <span class="hl-type">int</span> tid = <span class="hl-fn">omp_get_thread_num</span>();
+                    <span class="hl-fn">printf</span>(<span class="hl-str">"Task: i=%d | Thread: %d\n"</span>, i, tid);
+                }
+            }
+        }
+        <span class="hl-prep">#pragma omp taskwait</span>
+    }
+    <span class="hl-kw">return</span> <span class="hl-num">0</span>;
+}</code></pre>
+
+      <h3>O que fazer</h3>
+      <ol>
+        <li>Compile e execute várias vezes.</li>
+        <li>Anote o valor de <code>i</code> impresso em cada tarefa.</li>
+        <li>Todas as tarefas imprimem o mesmo valor? Qual valor?</li>
+      </ol>
+
+      <div class="callout callout-warning">
+        <strong>Por que acontece:</strong> com <code>shared(i)</code>, todas as tarefas apontam para a mesma variável <code>i</code>. O laço <code>for</code> incrementa <code>i</code> rapidamente até 5. Quando as tarefas finalmente começam a executar (roubadas por outras threads), <code>i</code> já vale 5. Resultado: todas as tarefas imprimem <code>i=5</code> (ou um valor inconsistente, dependendo do timing).
+      </div>
+
+      <h3>Correção</h3>
+      <p>
+        Substitua <code>shared(i)</code> por <code>firstprivate(i)</code>. Recompile e execute novamente. Agora cada tarefa imprime o valor que <code>i</code> tinha no momento da criação.
+      </p>
+    </section>
+
+    <!-- ===================== SEÇÃO 5: EXPERIMENTO D — SEM SINGLE, TUDO REPETE ===================== -->
+    <section id="exp-d">
+      <h2>5. Experimento D: Sem <code>single</code>, cada tarefa é criada T vezes</h2>
+
+      <p>
+        Este experimento replica o erro da Tarefa 07 quando o laço de travessia fica diretamente dentro de <code>parallel</code>.
+      </p>
+
+      <pre><code><span class="hl-type">int</span> <span class="hl-fn">main</span>() {
+    <span class="hl-type">int</span> count = <span class="hl-num">0</span>;  <span class="hl-comment">// contador compartilhado (SERA USADO PARA OBSERVAR)</span>
+    <span class="hl-prep">#pragma omp parallel</span>
+    {
+        <span class="hl-type">int</span> tid = <span class="hl-fn">omp_get_thread_num</span>();
+        <span class="hl-kw">for</span> (<span class="hl-type">int</span> i = <span class="hl-num">0</span>; i &lt; <span class="hl-num">3</span>; i++) {
+            <span class="hl-prep">#pragma omp task</span> <span class="hl-kw">firstprivate</span>(i) <span class="hl-kw">shared</span>(count)
+            {
+                <span class="hl-prep">#pragma omp atomic</span>
+                count++;
+                <span class="hl-fn">printf</span>(<span class="hl-str">"T%d criou task i=%d | Total count=%d\n"</span>,
+                       tid, i, count);
+            }
+        }
+    }
+    <span class="hl-fn">printf</span>(<span class="hl-str">"Valor final de count: %d\n"</span>, count);
+    <span class="hl-kw">return</span> <span class="hl-num">0</span>;
+}</code></pre>
+
+      <h3>Pergunta orientadora</h3>
+      <p>
+        Se executar com <code>OMP_NUM_THREADS=4</code>, qual o valor esperado de <code>count</code> se cada thread cria 3 tasks? E qual valor você vê? A relação é <code>count = 3 iteracoes x T threads</code>?
+      </p>
+
+      <div class="callout callout-info">
+        <strong>Como corrigir:</strong> envolva o <code>for</code> dentro de um <code>#pragma omp single</code>. Agora apenas uma thread (qualquer uma) cria as 3 tasks. O <code>count</code> final será exatamente 3.
+      </div>
+    </section>
+
+    <!-- ===================== SEÇÃO 6: EXPERIMENTO E — TASKWAIT VS NADA ===================== -->
+    <section id="exp-e">
+      <h2>6. Experimento E: <code>taskwait</code> vs. término prematuro</h2>
+
+      <p>
+        Este experimento demonstra o que acontece quando você remove o <code>taskwait</code> e a região paralela termina antes das tarefas.
+      </p>
+
+      <pre><code><span class="hl-type">int</span> <span class="hl-fn">main</span>() {
+    <span class="hl-fn">printf</span>(<span class="hl-str">"Inicio da regiao paralela\n"</span>);
+    <span class="hl-prep">#pragma omp parallel</span>
+    {
+        <span class="hl-prep">#pragma omp single</span>
+        {
+            <span class="hl-kw">for</span> (<span class="hl-type">int</span> i = <span class="hl-num">0</span>; i &lt; <span class="hl-num">8</span>; i++) {
+                <span class="hl-prep">#pragma omp task</span> <span class="hl-kw">firstprivate</span>(i)
+                {
+                    <span class="hl-fn">printf</span>(<span class="hl-str">"  [Task i=%d] Iniciando na thread %d\n"</span>,
+                           i, <span class="hl-fn">omp_get_thread_num</span>());
+                    <span class="hl-comment">// Simula trabalho demorado</span>
+                    <span class="hl-kw">for</span> (<span class="hl-type">volatile</span> <span class="hl-type">int</span> j = <span class="hl-num">0</span>; j &lt; <span class="hl-num">100000000</span>; j++);
+                    <span class="hl-fn">printf</span>(<span class="hl-str">"  [Task i=%d] Terminou na thread %d\n"</span>,
+                           i, <span class="hl-fn">omp_get_thread_num</span>());
+                }
+            }
+        }
+        <span class="hl-comment">// REMOVA O TASKWAIT PARA VER O EFEITO</span>
+        <span class="hl-comment">// #pragma omp taskwait</span>
+    }
+    <span class="hl-fn">printf</span>(<span class="hl-str">"Fim da regiao paralela\n"</span>);
+    <span class="hl-kw">return</span> <span class="hl-num">0</span>;
+}</code></pre>
+
+      <h3>O que observar</h3>
+      <ol>
+        <li>Execute <strong>sem</strong> <code>taskwait</code>. Note se a mensagem "Fim da regiao paralela" aparece <strong>antes</strong> de todas as tasks terminarem.</li>
+        <li>Adicione <code>#pragma omp taskwait</code> depois do <code>single</code>. A mensagem "Fim" agora só aparece após todas as tasks.</li>
+      </ol>
+
+      <div class="callout callout-warning">
+        <strong>Cuidado:</strong> sem <code>taskwait</code>, se a <code>main</code> termina logo após a região paralela, as threads do time são destruídas e tarefas pendentes podem ser canceladas ou deixadas inacabadas. O comportamento é indefinido pela especificação.
+      </div>
+    </section>
+
+    <!-- ===================== SEÇÃO 7: EXPERIMENTO F — OBSERVAR WORK-STEALING ===================== -->
+    <section id="exp-f">
+      <h2>7. Experimento F: Observando o work-stealing na prática</h2>
+
+      <p>
+        Crie um experimento onde uma única thread gera muitas tarefas que "dormem" um pouco. Isso força as outras threads a roubarem trabalho.
+      </p>
+
+      <pre><code"><span class="hl-prep">#include &lt;unistd.h&gt;</span>  <span class="hl-comment">// para sleep()</span>
+
+<span class="hl-type">int</span> <span class="hl-fn">main</span>() {
+    <span class="hl-prep">#pragma omp parallel</span>
+    {
+        <span class="hl-prep">#pragma omp single</span>
+        {
+            <span class="hl-kw">for</span> (<span class="hl-type">int</span> i = <span class="hl-num">0</span>; i &lt; <span class="hl-num">12</span>; i++) {
+                <span class="hl-prep">#pragma omp task</span> <span class="hl-kw">firstprivate</span>(i)
+                {
+                    <span class="hl-type">int</span> tid = <span class="hl-fn">omp_get_thread_num</span>();
+                    <span class="hl-fn">printf</span>(<span class="hl-str">"[Task %2d] Executada pela thread %d\n"</span>, i, tid);
+                    <span class="hl-fn">sleep</span>(<span class="hl-num">1</span>);  <span class="hl-comment">// 1 segundo de "trabalho"</span>
+                }
+            }
+        }
+        <span class="hl-prep">#pragma omp taskwait</span>
+    }
+    <span class="hl-kw">return</span> <span class="hl-num">0</span>;
+}</code></pre>
+
+      <h3>O que observar</h3>
+      <ol>
+        <li>Execute com <code>OMP_NUM_THREADS=4 ./exp_f_workstealing</code></li>
+        <li>A thread 0 cria todas as 12 tasks, mas imprime a thread que <em>executa</em> cada uma.</li>
+        <li>Na primeira execução, talvez thread 0 execute tasks 0, 1, 2... e as outras "roubem" tardiamente.</li>
+        <li>Na segunda execução, a distribuição pode ser completamente diferente.</li>
+      </ol>
+
+      <div class="callout callout-info">
+        <strong>Contagem de tarefas por thread:</strong> adicione um array <code>tasks_per_thread[NT]</code> (onde NT é o número de threads) e incremente atomicamente dentro de cada task. No fim, imprima quantas tasks cada thread executou. Varia entre execuções?
+      </div>
+    </section>
+
+    <!-- ===================== SEÇÃO 8: MAPA MENTAL ===================== -->
+    <section id="mapa">
+      <h2>8. Mapa mental: decisões na Tarefa 07</h2>
+
+      <p>Quando for implementar a Tarefa 07, você precisa tomar três decisões:</p>
+
+      <table>
+        <thead>
+          <tr><th>Decisão</th><th>Opção errada</th><th>Opção correta</th><th>Por quê</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Quem percorre a lista?</td>
+            <td>Todas as threads</td>
+            <td>Apenas uma (<code>single</code>)</td>
+            <td>Evita criar N×T tarefas</td>
+          </tr>
+          <tr>
+            <td>Como capturar o nó atual?</td>
+            <td><code>shared(current)</code></td>
+            <td><code>firstprivate(current)</code></td>
+            <td>Cada tarefa fixa o ponteiro no momento da criação</td>
+          </tr>
+          <tr>
+            <td>Quando liberar as threads?</td>
+            <td>Região paralela acaba</td>
+            <td><code>taskwait</code> antes do fim</td>
+            <td>Garante que todas as tarefas terminem</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ===================== SEÇÃO 9: QUIZ ===================== -->
+    <section id="quiz">
+      <h2>9. Quiz</h2>
+
+      <div class="quiz-container" id="quiz1">
+        <div class="quiz-question" data-correct="a">
+          <p><strong>1.</strong> No modelo work-stealing, uma thread ociosa pode:</p>
+          <ol type="a">
+            <li>Roubar tarefas de outra thread ocupada</li>
+            <li>Criar novas threads extras</li>
+            <li>Terminar o programa mais cedo</li>
+          </ol>
+        </div>
+
+        <div class="quiz-question" data-correct="b">
+          <p><strong>2.</strong> Se uma task usa <code>shared(i)</code> e <code>i</code> é incrementado em um laço antes das tasks executarem, o valor de <code>i</code> visto pela task será:</p>
+          <ol type="a">
+            <li>O valor de <code>i</code> no momento exato da execução da task</li>
+            <li>O valor final de <code>i</code> após o laço terminar — provavelmente lixo para a lógica</li>
+            <li>Sempre zero, porque <code>i</code> é reinicializado</li>
+          </ol>
+        </div>
+
+        <div class="quiz-question" data-correct="a">
+          <p><strong>3.</strong> Sem <code>taskwait</code> no fim da região paralela:</p>
+          <ol type="a">
+            <li>Threads podem ser destruídas com tarefas pendentes</li>
+            <li>Tasks são automaticamente serializadas</li>
+            <li>O programa sempre gera erro de compilação</li>
+          </ol>
+        </div>
+
+        <div class="quiz-question" data-correct="b">
+          <p><strong>4.</strong> Com <code>single</code> + <code>task</code>, cada nó da lista é processado:</p>
+          <ol type="a">
+            <li>Uma vez por cada thread do time</li>
+            <li>Exatamente uma vez, por uma thread qualquer</li>
+            <li>Apenas pela thread 0</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer-nav">
+    <a href="0006-tarefa07-lista-task.html">&larr; Lição 06</a>
+    <a href="../reference/06-task-openmp.html">Referência rápida 06 &rarr;</a>
+  </footer>
+
+  <script>
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('theme', target);
+    }
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+
+    document.querySelectorAll('.quiz-question').forEach(q => {
+      q.querySelectorAll('ol li').forEach(li => {
+        li.addEventListener('click', () => {
+          const selected = q.querySelector('ol li.selected');
+          if (selected) selected.classList.remove('selected');
+          li.classList.add('selected');
+
+          const correct = li.textContent.charAt(0).toLowerCase() === q.dataset.correct;
+          const allLis = q.querySelectorAll('ol li');
+          allLis.forEach(l => l.style.pointerEvents = 'none');
+
+          if (correct) {
+            li.style.background = '#d4edda';
+            li.style.color = '#155724';
+          } else {
+            li.style.background = '#f8d7da';
+            li.style.color = '#721c24';
+            allLis.forEach(l => {
+              if (l.textContent.charAt(0).toLowerCase() === q.dataset.correct) {
+                l.style.background = '#d4edda';
+                l.style.color = '#155724';
+              }
+            });
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>

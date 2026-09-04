@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Lição prática 06: dissecção de tarefa07.c. Processamento de lista encadeada com OpenMP task, single e taskwait.">
+  <title>Lição 06: Task OpenMP. Processamento de lista encadeada</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function applyMath(el = document.body) {
+      if (window.renderMathInElement) {
+        renderMathInElement(el, {
+          delimiters: [
+            {left: '$$', right: '$$', display: true},
+            {left: '$', right: '$', display: false},
+            {left: '\\(', right: '\\)', display: false},
+            {left: '\\[', right: '\\]', display: true}
+          ],
+          throwOnError: false
+        });
+      }
+    }
+    document.addEventListener("DOMContentLoaded", () => applyMath());
+    window.addEventListener("load", () => applyMath());
+  </script>
+</head>
+<body>
+  <nav class="top-nav">
+    <div style="display: flex; gap: 16px;">
+      <a href="../reference/06-teoria-task-openmp.html">&larr; Teoria 06</a>
+      <a href="../reference/06-task-openmp.html">Referência rápida 06</a>
+      <a href="../reference/00-fundamentos-programacao-paralela.html">Índice geral</a>
+    </div>
+    <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+  </nav>
+
+  <header>
+    <div class="lesson-badge">Lição 06 &bull; DCA3703</div>
+    <h1>Lição 06: Task OpenMP. Processamento de lista encadeada</h1>
+    <div class="metadata">
+      Tarefa 07 &bull; Análise de <code>tarefa07.c</code> &bull; Processamento paralelo com <code>#pragma omp task</code>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ===================== SEÇÃO 1: O PROBLEMA ===================== -->
+    <section id="problema">
+      <h2>1. O problema</h2>
+      <p>
+        O programa constrói uma lista encadeada com nomes de arquivos fictícios e processa cada nó em paralelo usando <code>#pragma omp task</code>.
+      </p>
+      <p>
+        O objetivo central é determinar quantas vezes cada nó é processado e garantir que nenhum item seja duplicado ou omitido.
+      </p>
+    </section>
+
+    <!-- ===================== SEÇÃO 2: ESTRUTURA DO CÓDIGO ===================== -->
+    <section id="estrutura-codigo">
+      <h2>2. Estrutura de dados do nó</h2>
+
+      <pre><code><span class="hl-kw">typedef struct</span> Node {
+    <span class="hl-type">char</span> filename[<span class="hl-num">256</span>];
+    <span class="hl-kw">struct</span> Node *next;
+} Node;</code></pre>
+
+      <ul>
+        <li><code>filename</code>: armazena a cadeia de caracteres com o nome do arquivo.</li>
+        <li><code>next</code>: armazena o endereço de memória do nó seguinte da lista.</li>
+      </ul>
+    </section>
+
+    <!-- ===================== SEÇÃO 3: CRIAÇÃO DA LISTA ===================== -->
+    <section id="criacao-lista">
+      <h2>3. Funções de criação e inserção</h2>
+
+      <h3>Criação de nó</h3>
+      <pre><code>Node *create_node(<span class="hl-type">const char</span> *filename) {
+    Node *new_node = (Node *)<span class="hl-fn">malloc</span>(<span class="hl-kw">sizeof</span>(Node));
+    <span class="hl-fn">strncpy</span>(new_node-&gt;filename, filename, <span class="hl-num">255</span>);
+    new_node-&gt;filename[<span class="hl-num">255</span>] = <span class="hl-str">'\0'</span>;
+    new_node-&gt;next = NULL;
+    <span class="hl-kw">return</span> new_node;
+}</code></pre>
+
+      <h3>Inserção no início</h3>
+      <pre><code><span class="hl-type">void</span> <span class="hl-fn">insert_at_beginning</span>(Node **head, <span class="hl-type">const char</span> *filename) {
+    Node *new_node = <span class="hl-fn">create_node</span>(filename);
+    new_node-&gt;next = *head;
+    *head = new_node;
+}</code></pre>
+
+      <h3>Inserção no final</h3>
+      <pre><code><span class="hl-type">void</span> <span class="hl-fn">insert_at_end</span>(Node **head, <span class="hl-type">const char</span> *filename) {
+    Node *new_node = <span class="hl-fn">create_node</span>(filename);
+    <span class="hl-kw">if</span> (*head == NULL) {
+        *head = new_node;
+        <span class="hl-kw">return</span>;
+    }
+    Node *current = *head;
+    <span class="hl-kw">while</span> (current-&gt;next != NULL) {
+        current = current-&gt;next;
+    }
+    current-&gt;next = new_node;
+}</code></pre>
+    </section>
+
+    <!-- ===================== SEÇÃO 4: PROCESSAMENTO COM TASKS ===================== -->
+    <section id="processamento-tasks">
+      <h2>4. Processamento paralelo com tarefas</h2>
+
+      <h3>Padrão estruturado com <code>single</code>, <code>task</code> e <code>taskwait</code></h3>
+      <pre><code><span class="hl-type">void</span> <span class="hl-fn">process_list_parallel</span>(Node *head) {
+    <span class="hl-prep">#pragma omp parallel</span>
+    {
+        <span class="hl-prep">#pragma omp single</span>
+        {
+            Node *current = head;
+            <span class="hl-kw">while</span> (current != NULL) {
+                <span class="hl-prep">#pragma omp task</span> <span class="hl-kw">firstprivate</span>(current)
+                {
+                    <span class="hl-type">int</span> tid = <span class="hl-fn">omp_get_thread_num</span>();
+                    printf(<span class="hl-str">"Arquivo: %s | Thread ID: %d\n"</span>,
+                           current-&gt;filename, tid);
+                }
+                current = current-&gt;next;
+            }
+        }
+        <span class="hl-prep">#pragma omp taskwait</span>
+    }
+}</code></pre>
+
+      <h3>Papel de <code>firstprivate(current)</code></h3>
+      <ul>
+        <li>O ponteiro <code>current</code> avança a cada iteração do laço sequencial.</li>
+        <li>Sem <code>firstprivate</code>, as tarefas compartilham a referência e leem <code>NULL</code> quando o laço encerra.</li>
+        <li>A cláusula <code>firstprivate(current)</code> copia o valor exato do ponteiro no instante de criação da tarefa.</li>
+      </ul>
+
+      <h3>Papel de <code>single</code></h3>
+      <ul>
+        <li>Sem <code>single</code>, todas as threads do time executam o laço de travessia.</li>
+        <li>Cada thread percorreria a lista completa, gerando $N \times T$ tarefas.</li>
+        <li>A diretiva <code>single</code> restringe a travessia a uma única thread produtora.</li>
+      </ul>
+
+      <h3>Papel de <code>taskwait</code></h3>
+      <ul>
+        <li>O encerramento do bloco <code>single</code> não bloqueia tarefas assíncronas pendentes.</li>
+        <li>A diretiva <code>taskwait</code> estabelece uma barreira explícita para as tarefas filhas geradas no contexto.</li>
+      </ul>
+    </section>
+
+    <!-- ===================== SEÇÃO 5: MAIN ===================== -->
+    <section id="main">
+      <h2>5. Função principal</h2>
+
+      <pre><code><span class="hl-type">int</span> <span class="hl-fn">main</span>() {
+    Node *head = NULL;
+
+    insert_at_end(&head, <span class="hl-str">"documento1.txt"</span>);
+    insert_at_end(&head, <span class="hl-str">"documento2.txt"</span>);
+    insert_at_end(&head, <span class="hl-str">"documento3.txt"</span>);
+    insert_at_end(&head, <span class="hl-str">"documento4.txt"</span>);
+    insert_at_end(&head, <span class="hl-str">"documento5.txt"</span>);
+
+    printf(<span class="hl-str">"Processando lista com OpenMP tasks...\n"</span>);
+    <span class="hl-fn">process_list_parallel</span>(head);
+
+    <span class="hl-kw">return</span> <span class="hl-num">0</span>;
+}</code></pre>
+    </section>
+
+    <!-- ===================== SEÇÃO 6: COMPILAÇÃO E EXECUÇÃO ===================== -->
+    <section id="compilacao">
+      <h2>6. Compilação e execução</h2>
+
+      <pre><code>$ gcc -O2 -fopenmp -o tarefa07 tarefa07.c -lm
+$ ./tarefa07
+Processando lista com OpenMP tasks...
+Arquivo: documento1.txt | Thread ID: 0
+Arquivo: documento2.txt | Thread ID: 2
+Arquivo: documento3.txt | Thread ID: 1
+Arquivo: documento4.txt | Thread ID: 3
+Arquivo: documento5.txt | Thread ID: 0</code></pre>
+
+      <p>
+        O identificador da thread varia entre execuções porque o escalonador do OpenMP distribui o trabalho dinamicamente.
+      </p>
+    </section>
+
+    <!-- ===================== SEÇÃO 7: REFLEXÃO ===================== -->
+    <section id="reflexao">
+      <h2>7. Reflexão sobre a contagem de execuções</h2>
+
+      <p>
+        Com a combinação de <code>single</code> e <code>task</code>, cada nó é processado exatamente uma vez:
+      </p>
+
+      <ol>
+        <li>A diretiva <code>single</code> assegura que apenas uma thread percorra a lista.</li>
+        <li>Cada iteração instancia exatamente uma tarefa para o nó correspondente.</li>
+        <li>O runtime distribui as tarefas entre as threads do time, executando cada tarefa uma única vez.</li>
+      </ol>
+
+      <div class="callout callout-info">
+        <strong>Resultado operacional:</strong> uma lista com $N$ nós gera $N$ tarefas distintas. Cada nó é exibido uma única vez.
+      </div>
+
+      <h3>Fatores não-determinísticos entre execuções</h3>
+      <ul>
+        <li>A thread responsável pela execução de cada tarefa.</li>
+        <li>A ordem temporal em que as tarefas completam o processamento.</li>
+        <li>O tempo total de execução.</li>
+      </ul>
+
+      <h3>Fatores determinísticos</h3>
+      <ul>
+        <li>A quantidade total de processamentos por nó, mantida estritamente em uma execução por nó.</li>
+        <li>Os dados lidos do campo <code>filename</code> de cada elemento.</li>
+      </ul>
+    </section>
+
+    <!-- ===================== SEÇÃO 8: MAPEAMENTO DE TAREFAS ===================== -->
+    <section id="quais-tarefas">
+      <h2>8. Mapeamento de tarefas por nó</h2>
+
+      <p>Para uma lista com 5 nós, o programa gera 5 tarefas:</p>
+
+      <table>
+        <thead>
+          <tr><th>Tarefa</th><th>Arquivo (nó)</th><th>Thread criadora</th><th>Thread executora</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>task_1</td><td>documento1.txt</td><td>Única (single)</td><td>Dinâmica</td></tr>
+          <tr><td>task_2</td><td>documento2.txt</td><td>Única (single)</td><td>Dinâmica</td></tr>
+          <tr><td>task_3</td><td>documento3.txt</td><td>Única (single)</td><td>Dinâmica</td></tr>
+          <tr><td>task_4</td><td>documento4.txt</td><td>Única (single)</td><td>Dinâmica</td></tr>
+          <tr><td>task_5</td><td>documento5.txt</td><td>Única (single)</td><td>Dinâmica</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ===================== SEÇÃO 9: PODER COMPUTACIONAL ===================== -->
+    <section id="poder-computacional">
+      <h2>9. Poder computacional e paralelismo de tarefas</h2>
+
+      <h3>Limitações físicas de processadores sequenciais</h3>
+      <p>
+        Historicamente, o ganho de desempenho em núcleo único ocorreu pelo aumento de frequência de clock e pela ampliação da profundidade de pipeline. Limites físicos de dissipação térmica e fuga de corrente elétrica resultaram na estagnação da frequência de clock, fenômeno conhecido como barreira térmica (*Power Wall*).
+      </p>
+
+      <h3>Transição para múltiplos núcleos lógicos</h3>
+      <p>
+        A continuidade no aumento de capacidade computacional passou a exigir múltiplos núcleos em um mesmo encapsulamento. Para acelerar o processamento, aplicações decompõem o trabalho em unidades executáveis paralelamente.
+      </p>
+
+      <h3>Diferença entre paralelismo de laço e paralelismo de tarefas</h3>
+      <p>
+        A diretiva <code>parallel for</code> requer contadores de iteração com limites pré-computáveis. Em estruturas dinâmicas como listas encadeadas, o comprimento total só é descoberto durante a travessia.
+      </p>
+      <p>
+        A diretiva <code>task</code> resolve esse cenário ao desacoplar a geração das tarefas de sua execução pelas threads disponíveis.
+      </p>
+    </section>
+
+    <!-- ===================== SEÇÃO 10: QUIZ ===================== -->
+    <section id="quiz">
+      <h2>10. Questionário de fixação</h2>
+
+      <div class="quiz-container" id="quiz1">
+        <div class="quiz-question" data-quiz="1" data-correct="b">
+          <p><strong>1.</strong> Qual é a função da diretiva <code>single</code> no percurso da lista?</p>
+          <ol type="a">
+            <li>Dividir o vetor igualmente entre as threads disponíveis na região</li>
+            <li>Garantir que apenas uma thread percorra os nós e instancie as tarefas</li>
+            <li>Acelerar o acesso aos blocos de memória alocados na pilha do processo</li>
+          </ol>
+        </div>
+
+        <div class="quiz-question" data-quiz="2" data-correct="b">
+          <p><strong>2.</strong> O que ocorre quando a travessia é feita em <code>parallel</code> sem <code>single</code>?</p>
+          <ol type="a">
+            <li>Cada nó é processado uma única vez pela thread mestre da região</li>
+            <li>Cada nó é processado $T$ vezes, gerando $N \times T$ tarefas no total</li>
+            <li>O programa interrompe a execução com erro de compilação imediato</li>
+          </ol>
+        </div>
+
+        <div class="quiz-question" data-quiz="3" data-correct="a">
+          <p><strong>3.</strong> Qual é a finalidade da diretiva <code>taskwait</code>?</p>
+          <ol type="a">
+            <li>Aguardar a conclusão de todas as tarefas geradas no contexto atual</li>
+            <li>Distribuir novas tarefas adicionais para núcleos que estejam livres</li>
+            <li>Elevar a prioridade de escalonamento das tarefas no pool de execução</li>
+          </ol>
+        </div>
+
+        <div class="quiz-question" data-quiz="4" data-correct="b">
+          <p><strong>4.</strong> Por que a cláusula <code>firstprivate(current)</code> é necessária?</p>
+          <ol type="a">
+            <li>Para permitir escrita concorrente no mesmo ponteiro por várias threads</li>
+            <li>Para copiar o valor de <code>current</code> no instante exato de criação da tarefa</li>
+            <li>Para liberar a memória alocada dinamicamente pelo nó de forma automática</li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer-nav">
+    <a href="../reference/06-teoria-task-openmp.html">&larr; Teoria 06</a>
+    <a href="../reference/06-task-openmp.html">Referência rápida 06 &rarr;</a>
+  </footer>
+
+  <script>
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('theme', target);
+    }
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+
+    document.querySelectorAll('.quiz-question').forEach(q => {
+      q.querySelectorAll('ol li').forEach(li => {
+        li.addEventListener('click', () => {
+          const selected = q.querySelector('ol li.selected');
+          if (selected) selected.classList.remove('selected');
+          li.classList.add('selected');
+
+          const correct = li.textContent.charAt(0).toLowerCase() === q.dataset.correct;
+          const allLis = q.querySelectorAll('ol li');
+          allLis.forEach(l => l.style.pointerEvents = 'none');
+
+          if (correct) {
+            li.style.background = '#d4edda';
+            li.style.color = '#155724';
+          } else {
+            li.style.background = '#f8d7da';
+            li.style.color = '#721c24';
+            allLis.forEach(l => {
+              if (l.textContent.charAt(0).toLowerCase() === q.dataset.correct) {
+                l.style.background = '#d4edda';
+                l.style.color = '#155724';
+              }
+            });
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>
