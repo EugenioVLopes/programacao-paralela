@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description"
+    content="Licao 08 sobre Monte Carlo de pi com rand, rand_r, critical, vetor e falso compartilhamento.">
+  <title>Licao 08 sobre pi estocastico, rand e false sharing</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>function applyMath(el = document.body) { if (window.renderMathInElement) { renderMathInElement(el, { delimiters: [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }, { left: '\\(', right: '\\)', display: false }, { left: '\\[', right: '\\]', display: true }], throwOnError: false }); } } document.addEventListener("DOMContentLoaded", () => applyMath()); window.addEventListener("load", () => applyMath());</script>
+</head>
+
+<body>
+  <nav class="top-nav">
+    <div style="display:flex;gap:16px;"><a href="../reference/08-teoria-coerencia-cache-false-sharing.html">&larr;
+        Teoria 08</a><a href="../reference/08-rand-randr-openmp.html">Ref. rapida 08</a><a
+        href="../reference/00-fundamentos-programacao-paralela.html">Indice geral</a></div><button
+      class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+  </nav>
+  <header>
+    <div class="lesson-badge">Licao 08 &bull; DCA3703</div>
+    <h1>Licao sobre pi estocastico, rand e false sharing</h1>
+    <div class="metadata">Tarefa 08 com 4 versoes em tarefa08 pi ponto c. Critical contra vetor, rand contra rand_r.
+    </div>
+  </header>
+  <main>
+    <section>
+      <h2>1. O problema em 30 segundos</h2>
+      <p>Sorteie N pontos x, y uniformes em menos 1 a 1. Conte N dentro do circulo x ao quadrado mais y ao quadrado
+        menor ou igual a 1. Entao pi vale cerca de 4 vezes N dentro sobre N, com erro perto de 1 sobre raiz de N. O
+        metodo e paralelo por natureza. O desafio e somar acertos sem serializar.</p>
+      <p>Voce vai construir 4 programas.</p>
+      <ul>
+        <li>V1 usa contador privado com critical e rand</li>
+        <li>V2 usa vetor hits por id e rand</li>
+        <li>V3 usa contador privado com critical e rand_r</li>
+        <li>V4 usa vetor hits por id e rand_r</li>
+      </ul>
+      <p>Depois compare tempos e explique com coerencia MESI. Eu gosto dessa tarefa porque ela pune o descuido na hora.
+        Mais threads deixam o codigo ruim mais lento, nao mais rapido.</p>
+      <div class="callout">
+        <div class="callout-title">Por que isso importa</div>Poder computacional e resolver problema grande rapido, como
+        clima, genoma, IA e CFD. Frequencia parou perto de 4 GHz. Mais GHz derrete o chip, pela relacao P perto de C
+        vezes V ao quadrado vezes f. A saida foi usar varios nucleos logicos em paralelo. Essa tarefa mostra que
+        paralelizar sem entender cache e gerador aleatorio gera slowdown, nao speedup.
+      </div>
+    </section>
+    <section>
+      <h2>2. Disseccao linha a linha</h2>
+      <h3>V1 com privada, critical e rand</h3>
+      <pre><code><span class="hl-fn">srand</span>(<span class="hl-num">12345</span>); <span class="hl-com">// estado global unico, todas disputam</span>
+<span class="hl-prep">#pragma</span> omp parallel shared(total,N) default(none)
+{
+  <span class="hl-type">long</span> local = <span class="hl-num">0</span>; <span class="hl-com">// pilha privada, sem MESI, sem lock</span>
+  <span class="hl-prep">#pragma</span> omp for
+  <span class="hl-kw">for</span> (i=<span class="hl-num">0</span>;i&lt;N;i++) {
+    <span class="hl-type">double</span> x = (<span class="hl-type">double</span>)<span class="hl-fn">rand</span>()/RAND_MAX*<span class="hl-num">2.0</span>-<span class="hl-num">1.0</span>; <span class="hl-com">// lock interno aqui</span>
+    <span class="hl-kw">if</span> (x*x+y*y &lt;= <span class="hl-num">1.0</span>) local++; <span class="hl-com">// barato, registrador</span>
+  }
+  <span class="hl-prep">#pragma</span> omp critical
+  total += local; <span class="hl-com">// 1 vez por thread, custo O de p</span>
+}</code></pre>
+      <p>Rand guarda estado global com lock. Cada ponto vira trecho serial. O critical final roda uma vez por thread.
+        Ele nao e o vilao.</p>
+      <h3>V2 com vetor compartilhado e rand</h3>
+      <pre><code><span class="hl-type">long</span> *hits = <span class="hl-fn">calloc</span>(P,<span class="hl-kw">sizeof</span>(<span class="hl-type">long</span>)); <span class="hl-com">// P longs cabem em 1 linha de 64B</span>
+<span class="hl-type">int</span> tid = <span class="hl-fn">omp_get_thread_num</span>();
+<span class="hl-kw">if</span> (hit) hits[tid]++; <span class="hl-com">// escrita por acerto, MESI dispara</span>
+<span class="hl-kw">for</span> (i=<span class="hl-num">0</span>;i&lt;P;i++) total+=hits[i]; <span class="hl-com">// soma serial apos regiao</span></code></pre>
+      <h3>V3 e v4 trocam rand por rand_r</h3>
+      <pre><code><span class="hl-type">unsigned int</span> seed = <span class="hl-num">12345u</span> + <span class="hl-num">7919u</span>*(<span class="hl-type">unsigned int</span>)<span class="hl-fn">omp_get_thread_num</span>();
+<span class="hl-type">double</span> x = (<span class="hl-type">double</span>)<span class="hl-fn">rand_r</span>(&amp;seed)/RAND_MAX*<span class="hl-num">2.0</span>-<span class="hl-num">1.0</span>; <span class="hl-com">// estado na pilha, sem lock</span></code></pre>
+      <p>Seeds distintas evitam sequencias iguais, que viciariam pi. Eu uso 7919 para espacar as subsequencias do LCG.
+      </p>
+      <h3>Cura do falso compartilhamento</h3>
+      <pre><code><span class="hl-kw">typedef struct</span> { <span class="hl-type">long</span> v; <span class="hl-type">char</span> pad[<span class="hl-num">64</span>-<span class="hl-kw">sizeof</span>(<span class="hl-type">long</span>)]; } Slot __attribute__((aligned(<span class="hl-num">64</span>)));</code></pre>
+      <p>Cada hits por id ganha linha exclusiva. Da no mesmo usar acumulador local com uma escrita, ou reduction com
+        mais total.</p>
+    </section>
+    <section>
+      <h2>3. O que eu medi de verdade</h2>
+      <p>Compile com gcc menos O2 menos fopenmp menos Wall, com menos lm no fim. Rode com OMP_NUM_THREADS igual a 1, 2,
+        4 e 8 e N igual a 2000000.</p>
+      <table
+        style="width:100%;border-collapse:collapse;margin:1.2em 0;font-family:'Inter',sans-serif;font-size:0.85rem;">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border);text-align:left;">
+            <th style="padding:6px;">thr</th>
+            <th style="padding:6px;">v1 crit rand</th>
+            <th style="padding:6px;">v2 vet rand</th>
+            <th style="padding:6px;">v3 crit rand_r</th>
+            <th style="padding:6px;">v4 vet rand_r</th>
+            <th style="padding:6px;">v4 pad</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;">1</td>
+            <td style="padding:6px;">0,095s</td>
+            <td style="padding:6px;">0,101s</td>
+            <td style="padding:6px;">0,023s</td>
+            <td style="padding:6px;">0,036s</td>
+            <td style="padding:6px;">0,036s</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;">2</td>
+            <td style="padding:6px;">0,287s</td>
+            <td style="padding:6px;">0,416s</td>
+            <td style="padding:6px;">0,013s</td>
+            <td style="padding:6px;">0,023s</td>
+            <td style="padding:6px;">0,019s</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px;">4</td>
+            <td style="padding:6px;">0,343s</td>
+            <td style="padding:6px;">0,344s</td>
+            <td style="padding:6px;">0,007s</td>
+            <td style="padding:6px;">0,012s</td>
+            <td style="padding:6px;">0,011s</td>
+          </tr>
+          <tr>
+            <td style="padding:6px;">8</td>
+            <td style="padding:6px;">0,572s</td>
+            <td style="padding:6px;">0,682s</td>
+            <td style="padding:6px;">0,004s</td>
+            <td style="padding:6px;">0,014s</td>
+            <td style="padding:6px;">0,006s</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>V1 e v2 ficam lentos e pioram com p. O lock do rand domina. O vetor nao ajuda nem atrapalha muito, fica
+        mascarado.</p>
+      <p>V3 escala, com ganho de 5,5 vezes em 8 threads. Sem estado global, o unico serial e 1 critical por thread.</p>
+      <p>V4 fica pior que v3 e degrada em 8 threads. MESI puro aparece. Pad recupera 2,4 vezes, de 0,014 para 0,006s.
+      </p>
+      <div class="callout">
+        <div class="callout-title">Frase para o relatorio</div>Com rand o gargalo e software, lock global. Com rand_r o
+        gargalo vira hardware, MESI no vetor. So contador privado com rand_r escala. Vetor colado pede padding.
+      </div>
+    </section>
+    <section>
+      <h2>4. Quizzes para fixar</h2>
+      <div class="quiz-container" id="quiz1">
+        <div class="quiz-header"><span>Questao 1 de 2</span><span id="q1-badge"
+            style="font-size:0.8rem;font-family:'Inter',sans-serif;"></span></div>
+        <div class="quiz-question">Por que v1 e v2 com rand ficam mais lentos com mais threads?</div>
+        <div class="quiz-options" id="q1-opts"><button class="quiz-option-btn" onclick="answer('q1',0,false)">O critical
+            final bloqueia threads durante todo o laco paralelo.</button><button class="quiz-option-btn"
+            onclick="answer('q1',1,true)">O estado global do rand serializa threads a cada ponto.</button><button
+            class="quiz-option-btn" onclick="answer('q1',2,false)">O vetor hits causa apenas misses de capacidade no
+            L3.</button><button class="quiz-option-btn" onclick="answer('q1',3,false)">O escalonador OpenMP distribui
+            iteracoes de forma muito desigual.</button></div>
+        <div class="quiz-explanation" id="q1-exp">Correto. Rand guarda estado global com lock. Cada ponto vira trecho
+          serial. O critical roda 1 vez por thread e nao pesa.</div><button class="quiz-reset-btn" id="q1-reset"
+          onclick="resetQuiz('q1')" style="display:none;">Tentar novamente</button>
+      </div>
+      <div class="quiz-container" id="quiz2">
+        <div class="quiz-header"><span>Questao 2 de 2</span><span id="q2-badge"
+            style="font-size:0.8rem;font-family:'Inter',sans-serif;"></span></div>
+        <div class="quiz-question">Por que v4 com rand_r e mais lenta que v3 e o padding cura?</div>
+        <div class="quiz-options" id="q2-opts"><button class="quiz-option-btn" onclick="answer('q2',0,false)">Cada seed
+            privada de rand_r disputa o barramento de memoria.</button><button class="quiz-option-btn"
+            onclick="answer('q2',1,false)">A reducao serial final domina o tempo total da execucao
+            paralela.</button><button class="quiz-option-btn" onclick="answer('q2',2,true)">Hits vizinhos dividem a
+            linha e invalidam caches entre nucleos.</button><button class="quiz-option-btn"
+            onclick="answer('q2',3,false)">Threads escrevem no mesmo contador global sem qualquer protecao
+            usada.</button></div>
+        <div class="quiz-explanation" id="q2-exp">Correto. Hits por id a cada acerto poe 8 contadores na mesma linha de
+          64 bytes. Cada escrita invalida vizinhos por MESI. Padding isola linhas.</div><button class="quiz-reset-btn"
+          id="q2-reset" onclick="resetQuiz('q2')" style="display:none;">Tentar novamente</button>
+      </div>
+    </section>
+    <section>
+      <h2>5. Fonte primaria e proximos passos</h2>
+      <div class="source-card">Leia primeiro Pacheco, An Introduction to Parallel Programming, capitulo sobre OpenMP e
+        apendice sobre sincronizacao e rand_r. O site e cs.usfca.edu barra peter barra ipp. Complete com Hennessy e
+        Patterson, parte sobre coerencia MESI e false sharing.</div>
+      <ol>
+        <li>Compile as 5 versoes e reproduza a tabela com OMP_NUM_THREADS igual a 1, 2, 4 e 8.</li>
+        <li>Troque hits por id com acumulador local e confirme que v4 vira v3.</li>
+        <li>Se algo travar, me pergunte. Eu detalho MESI, seeds e Amdahl.</li>
+      </ol>
+    </section>
+  </main>
+  <footer class="footer-nav"><a href="../reference/08-teoria-coerencia-cache-false-sharing.html">&larr; Teoria 08</a><a
+      href="../reference/08-rand-randr-openmp.html">Referencia rapida &rarr;</a></footer>
+  <script>function toggleTheme() { const c = document.documentElement.getAttribute('data-theme'); const t = c === 'dark' ? 'light' : 'dark'; document.documentElement.setAttribute('data-theme', t); localStorage.setItem('theme', t); } const s = localStorage.getItem('theme'); if (s) { document.documentElement.setAttribute('data-theme', s); } function answer(qid, idx, correct) { const opts = document.querySelectorAll('#' + qid + '-opts .quiz-option-btn'); opts.forEach(b => b.disabled = true); opts[idx].classList.add(correct ? 'correct' : 'wrong'); if (!correct) { opts.forEach(b => { if (b.getAttribute('onclick').includes(', true)')) { b.classList.add('correct'); } }); } const exp = document.getElementById(qid + '-exp'); exp.classList.add('visible'); const badge = document.getElementById(qid + '-badge'); badge.textContent = correct ? 'Acertou' : 'Errou'; badge.style.color = correct ? 'var(--success)' : 'var(--error)'; document.getElementById(qid + '-reset').style.display = 'inline-block'; } function resetQuiz(qid) { const opts = document.querySelectorAll('#' + qid + '-opts .quiz-option-btn'); opts.forEach(b => { b.disabled = false; b.classList.remove('correct', 'wrong'); }); document.getElementById(qid + '-exp').classList.remove('visible'); document.getElementById(qid + '-badge').textContent = ''; document.getElementById(qid + '-reset').style.display = 'none'; }</script>
+</body>
+
+</html>
