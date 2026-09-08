@@ -1,6 +1,3 @@
-/* v3: rand_r() + contador privado + critical (1x por thread)
- * Cada thread tem seed privada: elimina o gargalo global do rand().
- */
 #define _POSIX_C_SOURCE 199309L
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,7 +17,7 @@ int main(int argc, char *argv[]){
     
     #pragma omp parallel shared(total,total_elementos) default(none)
     {
-        unsigned int seed = 12345u + 7919u*(unsigned int)omp_get_thread_num();
+        unsigned int seed = 123456789U ^ (unsigned int)omp_get_thread_num();
         long local = 0;
         
         #pragma omp for

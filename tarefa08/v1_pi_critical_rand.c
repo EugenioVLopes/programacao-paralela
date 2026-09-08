@@ -1,7 +1,3 @@
-/* v1: rand() + contador privado + critical (1x por thread)
- * Compilar: gcc -O2 -fopenmp -Wall -o pi_critical_rand pi_critical_rand.c -lm
- * Uso: OMP_NUM_THREADS=4 ./pi_critical_rand [total_elementos]
- */
 #define _POSIX_C_SOURCE 199309L
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,6 +1,3 @@
-/* v2: rand() + vetor compartilhado hits[tid]++ (false sharing proposital)
- * Compilar: gcc -O2 -fopenmp -Wall -o pi_vector_rand pi_vector_rand.c -lm
- */
 #define _POSIX_C_SOURCE 199309L
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,8 +12,8 @@ static double agora(void){
 
 int main(int argc, char *argv[]){
     long total_elementos = argc>1 ? atol(argv[1]) : 5000000L;
-    int P = omp_get_max_threads();
-    long *hits = calloc(P, sizeof(long));
+    int total_threads = omp_get_max_threads();
+    long *hits = calloc(total_threads, sizeof(long));
     
     srand(12345);
     
@@ -39,7 +36,7 @@ int main(int argc, char *argv[]){
     
     long total = 0;
     
-    for(int i = 0; i < P; i++) {
+    for(int i = 0; i < total_threads; i++) {
         total += hits[i];
     }
     
