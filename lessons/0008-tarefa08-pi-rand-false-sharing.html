@@ -17,7 +17,7 @@
 <body>
   <nav class="top-nav">
     <div style="display:flex;gap:16px;"><a href="../reference/08-teoria-coerencia-cache-false-sharing.html">&larr;
-        Teoria 08</a><a href="../reference/08-rand-randr-openmp.html">Ref. rapida 08</a><a
+        Teoria 08</a><a
         href="../reference/00-fundamentos-programacao-paralela.html">Indice geral</a></div><button
       class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
   </nav>
@@ -186,8 +186,7 @@
       </ol>
     </section>
   </main>
-  <footer class="footer-nav"><a href="../reference/08-teoria-coerencia-cache-false-sharing.html">&larr; Teoria 08</a><a
-      href="../reference/08-rand-randr-openmp.html">Referencia rapida &rarr;</a></footer>
+  <footer class="footer-nav"><a href="../reference/08-teoria-coerencia-cache-false-sharing.html">&larr; Teoria 08</a></footer>
   <script>function toggleTheme() { const c = document.documentElement.getAttribute('data-theme'); const t = c === 'dark' ? 'light' : 'dark'; document.documentElement.setAttribute('data-theme', t); localStorage.setItem('theme', t); } const s = localStorage.getItem('theme'); if (s) { document.documentElement.setAttribute('data-theme', s); } function answer(qid, idx, correct) { const opts = document.querySelectorAll('#' + qid + '-opts .quiz-option-btn'); opts.forEach(b => b.disabled = true); opts[idx].classList.add(correct ? 'correct' : 'wrong'); if (!correct) { opts.forEach(b => { if (b.getAttribute('onclick').includes(', true)')) { b.classList.add('correct'); } }); } const exp = document.getElementById(qid + '-exp'); exp.classList.add('visible'); const badge = document.getElementById(qid + '-badge'); badge.textContent = correct ? 'Acertou' : 'Errou'; badge.style.color = correct ? 'var(--success)' : 'var(--error)'; document.getElementById(qid + '-reset').style.display = 'inline-block'; } function resetQuiz(qid) { const opts = document.querySelectorAll('#' + qid + '-opts .quiz-option-btn'); opts.forEach(b => { b.disabled = false; b.classList.remove('correct', 'wrong'); }); document.getElementById(qid + '-exp').classList.remove('visible'); document.getElementById(qid + '-badge').textContent = ''; document.getElementById(qid + '-reset').style.display = 'none'; }</script>
 </body>
 

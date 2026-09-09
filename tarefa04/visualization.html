@@ -3,646 +3,765 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tarefa 04 — Visualização Paralela</title>
+<meta name="description" content="Tarefa 04 — Visualização interativa: dois kernels, dois gargalos. Memory-bound satura o barramento; CPU-bound escala com os núcleos. i7-14700HX, N=5M, média de 10 execuções.">
+<title>Tarefa 04 — Dois Kernels, Dois Gargalos</title>
+<link rel="stylesheet" href="../assets/style.css">
 <style>
-  :root {
-    --bg: #0f172a; --surface: #1e293b; --border: #334155;
-    --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8;
-    --mem: #3b82f6; --cpu: #ef4444; --green: #22c55e;
+  :root{
+    --bg:#0f172a; --surface:#1e293b; --surface2:#0c1322; --border:#334155;
+    --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8;
+    --mem:#7fb3ff; --mem-soft:rgba(59,130,246,.15);
+    --cpu:#ff8a8a; --cpu-soft:rgba(239,68,68,.14);
+    --green:#22c55e; --amber:#fbbf24; --purple:#c084fc;
+    --radius:12px;
   }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: var(--bg); color: var(--text); font-family: 'SF Mono', 'Fira Code', monospace; }
-  h1 { text-align: center; padding: 24px 0 8px; font-size: 1.4rem; color: var(--accent); }
-  .subtitle { text-align: center; color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; }
-
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 1200px; margin: 0 auto; padding: 0 16px 24px; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
-  .card h2 { font-size: 0.95rem; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
-  .card h2 .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-  .full { grid-column: 1 / -1; }
-
-  canvas { width: 100%; border-radius: 6px; background: #0c1322; display: block; }
-
-  .controls { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
-  button { background: var(--accent); color: #000; border: none; padding: 6px 16px; border-radius: 6px;
-           font-family: inherit; font-weight: 600; cursor: pointer; font-size: 0.8rem; }
-  button:hover { opacity: 0.85; }
-  button.secondary { background: var(--border); color: var(--text); }
-  button:focus-visible, input[type=range]:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-  select, input[type=range] { background: var(--bg); color: var(--text); border: 1px solid var(--border);
-    border-radius: 4px; padding: 4px 8px; font-family: inherit; font-size: 0.8rem; }
-  label { color: var(--muted); font-size: 0.78rem; }
-
-  .legend { display: flex; gap: 16px; font-size: 0.75rem; color: var(--muted); margin-top: 8px; }
-  .legend span { display: flex; align-items: center; gap: 4px; }
-  .legend .swatch { width: 12px; height: 12px; border-radius: 2px; }
-
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
-  .stat { background: var(--bg); border-radius: 6px; padding: 8px; text-align: center; }
-  .stat .val { font-size: 1.1rem; font-weight: 700; color: var(--accent); }
-  .stat .lbl { font-size: 0.65rem; color: var(--muted); margin-top: 2px; }
-
-  .code-block { background: #0c1322; border-radius: 6px; padding: 12px; font-size: 0.72rem;
-    line-height: 1.5; overflow-x: auto; white-space: pre; color: var(--muted); }
-  .code-block .kw { color: #c084fc; }
-  .code-block .fn { color: #38bdf8; }
-  .code-block .cm { color: #475569; }
-  .code-block .num { color: #fbbf24; }
-  .code-block .hl-mem { background: rgba(59,130,246,0.15); display: inline; }
-  .code-block .hl-cpu { background: rgba(239,68,68,0.15); display: inline; }
-
-  @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } .stats { grid-template-columns: repeat(2,1fr); } }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;line-height:1.6}
+  code,pre,.mono{font-family:'SF Mono','Fira Code','JetBrains Mono',Consolas,monospace}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 18px 48px}
+  /* top nav */
+  .top-nav{display:flex;justify-content:space-between;align-items:center;gap:12px;max-width:1180px;margin:0 auto;padding:14px 18px;flex-wrap:wrap}
+  .top-nav a{color:var(--muted);text-decoration:none;font-size:.82rem}
+  .top-nav a:hover{color:var(--accent)}
+  .theme-toggle-btn{background:transparent;border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:8px;cursor:pointer;font-size:.8rem}
+  /* hero */
+  .hero{text-align:center;padding:26px 18px 8px;max-width:900px;margin:0 auto}
+  .kicker{display:inline-block;font-size:.75rem;letter-spacing:.06em;color:var(--accent);border:1px solid var(--border);border-radius:999px;padding:5px 14px;margin-bottom:14px;background:rgba(56,189,248,.08)}
+  .hero h1{font-size:clamp(1.5rem,3.4vw,2.3rem);line-height:1.15;margin-bottom:10px}
+  .hero h1 .b1{color:var(--mem)} .hero h1 .b2{color:var(--cpu)}
+  .hero p.lead{color:var(--muted);font-size:.98rem;max-width:760px;margin:0 auto}
+  .hero .hw{margin-top:10px;font-size:.78rem;color:var(--muted)}
+  .hero .hw code{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1px 7px;font-size:.76rem}
+  /* KPI */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px auto;max-width:1180px;padding:0 18px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center}
+  .kpi .v{font-size:1.45rem;font-weight:800}
+  .kpi .l{font-size:.75rem;letter-spacing:.06em;color:var(--muted);margin-top:2px}
+  .kpi .s{font-size:.74rem;color:var(--muted);margin-top:4px}
+  .kpi.mem .v{color:var(--mem)} .kpi.cpu .v{color:var(--cpu)}
+  /* step guide */
+  .steps{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:6px 0 18px}
+  .steps a{font-size:.76rem;color:var(--muted);text-decoration:none;border:1px solid var(--border);border-radius:999px;padding:5px 12px;background:var(--surface)}
+  .steps a:hover{color:var(--accent);border-color:var(--accent)}
+  /* cards */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px}
+  .card.full{grid-column:1/-1}
+  .card h2{font-size:1rem;margin-bottom:4px;display:flex;align-items:center;gap:9px}
+  .card h2 .dot{width:10px;height:10px;border-radius:50%;flex:none}
+  .card .desc{font-size:.83rem;color:var(--muted);margin-bottom:12px}
+  .card .desc strong{color:var(--text)}
+  canvas.chart{width:100%;border-radius:8px;background:var(--surface2);display:block;cursor:crosshair}
+  .controls{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+  button.btn{background:var(--accent);color:#001018;border:none;padding:7px 16px;border-radius:8px;font-weight:700;cursor:pointer;font-size:.8rem;font-family:inherit}
+  button.btn:hover{filter:brightness(1.1)}
+  button.btn.secondary{background:transparent;color:var(--text);border:1px solid var(--border)}
+  button.btn.active{outline:2px solid #fff;outline-offset:1px}
+  button.btn:focus-visible,input[type=range]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  select{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:.8rem;font-family:inherit}
+  label.lbl{color:var(--muted);font-size:.78rem;display:flex;align-items:center;gap:8px}
+  input[type=range]{accent-color:var(--accent)}
+  .legend{display:flex;gap:14px;font-size:.75rem;color:var(--muted);margin-top:8px;flex-wrap:wrap}
+  .legend span{display:flex;align-items:center;gap:5px}
+  .swatch{width:12px;height:12px;border-radius:3px;display:inline-block}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+  .stat{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px;text-align:center}
+  .stat .val{font-size:1.05rem;font-weight:800;color:var(--accent)}
+  .stat .lbl{font-size:.62rem;letter-spacing:.08em;color:var(--muted);margin-top:2px;text-transform:uppercase}
+  /* code */
+  .code-tabs{display:flex;gap:6px;margin-bottom:10px}
+  .code-tabs button{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:5px 12px;font-size:.76rem;cursor:pointer;font-family:inherit}
+  .code-tabs button.active{background:var(--surface2);color:var(--text);border-color:var(--accent)}
+  .code-block{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:13px;font-size:.74rem;line-height:1.55;overflow-x:auto;white-space:pre;color:var(--muted)}
+  .code-block .kw{color:var(--purple)} .code-block .fn{color:var(--accent)}
+  .code-block .cm{color:#54647c;font-style:italic} .code-block .num{color:var(--amber)}
+  .code-block .hl-mem{background:var(--mem-soft);border-left:1px solid var(--mem);display:block;padding-left:10px;margin-left:-11px}
+  .code-block .hl-cpu{background:var(--cpu-soft);border-left:1px solid var(--cpu);display:block;padding-left:10px;margin-left:-11px}
+  /* insight boxes */
+  .insight{border-radius:8px;padding:10px 12px;font-size:.8rem;margin-top:10px;border:1px solid}
+  .insight.mem{background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.35)}
+  .insight.cpu{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.35)}
+  .insight.neutral{background:rgba(56,189,248,.07);border-color:var(--border)}
+  .insight strong{color:var(--text)}
+  /* tooltip */
+  .tip{position:fixed;pointer-events:none;background:#020617;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:.78rem;color:var(--text);display:none;z-index:50;max-width:260px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  .tip .t-mem{color:var(--mem)} .tip .t-cpu{color:var(--cpu)}
+  /* table */
+  details.data{margin-top:10px}
+  details.data summary{cursor:pointer;color:var(--muted);font-size:.78rem}
+  .table-wrap{overflow-x:auto;margin-top:8px}
+  table{border-collapse:collapse;width:100%;font-size:.78rem}
+  th,td{border:1px solid var(--border);padding:5px 8px;text-align:right;white-space:nowrap}
+  th{background:var(--surface2);color:var(--text)} td{color:var(--muted)}
+  td:first-child,th:first-child{text-align:center}
+  tr.hl td{background:rgba(56,189,248,.08);color:var(--text)}
+  /* roofline badges */
+  .badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .badge{font-size:.78rem;border:1px solid var(--border);border-radius:999px;padding:4px 11px;color:#c3cede;background:var(--surface2)}
+  .badge b{color:var(--text)}
+  footer.footer-nav{display:flex;justify-content:space-between;gap:12px;max-width:1180px;margin:26px auto 0;padding:18px;font-size:.82rem;flex-wrap:wrap}
+  footer.footer-nav a{color:var(--muted);text-decoration:none} footer.footer-nav a:hover{color:var(--accent)}
+  /* ── Overdrive A: sonda global sincronizada ── */
+  .probe{position:sticky;top:0;z-index:20;background:rgba(12,19,34,.92);backdrop-filter:blur(8px);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+  .probe .pt{font-size:1.25rem;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums;min-width:64px}
+  .probe .pmeta{font-size:.78rem;color:#c3cede}
+  .probe .pmeta b{color:var(--text);font-variant-numeric:tabular-nums}
+  .probe input[type=range]{flex:1;min-width:140px}
+  .probe .dot-m{color:var(--mem)} .probe .dot-c{color:var(--cpu)}
+  ::selection{background:rgba(56,189,248,.35);color:#fff}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+  ::-webkit-scrollbar{width:10px;height:10px} ::-webkit-scrollbar-thumb{background:#334155;border-radius:6px} ::-webkit-scrollbar-track{background:#0c1322}
+  .stat .val,.kpi .v,.probe .pt{font-variant-numeric:tabular-nums}
+  @media (max-width:820px){.grid{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}.stats{grid-template-columns:repeat(2,1fr)}.probe{gap:8px}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 
-<h1>Tarefa 04 — Dois Kernels, Dois Mundos</h1>
-<p class="subtitle">Memory-bound vs CPU-bound com OpenMP — 5M elementos, até 28 threads (média de 10 execuções)</p>
+<nav class="top-nav" aria-label="Navegação do projeto">
+  <div style="display:flex;gap:16px;flex-wrap:wrap">
+    <a href="../lessons/0004-tarefa04-memory-cpu-bound.html">&larr; Lição 04</a>
+    <a href="../reference/04-teoria-memory-bound-cpu-bound.html">Teoria 04</a>
+    <a href="../reference/04-teoria-memory-bound-cpu-bound.html#referencia-rapida">Referência rápida 04</a>
+  </div>
+  <button class="theme-toggle-btn" onclick="toggleTheme()" aria-label="Alternar tema">Alternar tema</button>
+</nav>
+
+<header class="hero">
+  <span class="kicker">Tarefa 04 &bull; OpenMP &bull; i7-14700HX (8P+6E, 28 threads)</span>
+  <h1>Dois kernels, <span class="b1">dois gargalos</span>:<br>barramento vs <span class="b2">núcleos</span></h1>
+  <p class="lead">O mesmo <code class="mono">#pragma omp parallel for</code> produz dois destinos opostos. A soma de vetores <strong>satura a memória em ~7 threads e depois piora</strong>; o cálculo com <code class="mono">sqrt+sin</code> <strong>escala até ~22 threads</strong>. Passe o mouse nos gráficos — tudo está sincronizado.</p>
+  <p class="hw">N = 5.000.000 elementos &bull; 4 vetores × 40&nbsp;MB = <strong>160&nbsp;MB</strong> &bull; cada ponto = <strong>média de 10 execuções</strong> &plusmn; desvio padrão &bull; <code class="mono">gcc -O2 -fopenmp -lm</code> &bull; <a href="results.csv" style="color:var(--accent)">results.csv</a> &bull; <a href="tarefa04.c" style="color:var(--accent)">tarefa04.c</a></p>
+</header>
+
+<div class="kpis" role="list" aria-label="Resultados principais">
+  <div class="kpi mem" role="listitem"><div class="v">3,83&times;</div><div class="l">Teto memory-bound</div><div class="s">@ 7 threads &bull; depois degrada até <strong>0,92&times;</strong> @ 27T (pior que serial)</div></div>
+  <div class="kpi cpu" role="listitem"><div class="v">10,74&times;</div><div class="l">Pico CPU-bound</div><div class="s">@ 22 threads &bull; 8 núcleos P lideram, 6 E somam pouco</div></div>
+  <div class="kpi" role="listitem"><div class="v">0,042 <span style="font-size:.8rem">FLOP/B</span></div><div class="l">IA da soma C=A+B</div><div class="s">1 FLOP / 24 bytes &rarr; telhado = banda (55 GB/s)</div></div>
+  <div class="kpi" role="listitem"><div class="v">65,6 <span style="font-size:.8rem">FLOP/B</span></div><div class="l">IA do sqrt+sin ×50</div><div class="s">~1050 FLOPs / 16 bytes &rarr; telhado = pico (350 GFLOP/s)</div></div>
+</div>
+
+<div class="wrap">
+<div class="steps" aria-label="Roteiro de leitura">
+  <a href="#sec-kernels">1 · Os kernels</a><a href="#sec-exec">2 · Execução</a><a href="#sec-tempo">3 · Tempo</a><a href="#sec-speedup">4 · Speedup</a><a href="#sec-roofline">5 · Roofline</a><a href="#sec-numa">6 · Por que satura?</a>
+</div>
+<div class="probe" role="group" aria-label="Sonda global de threads — controla todos os gráficos">
+  <span class="pt" id="probeT">7T</span>
+  <input type="range" id="probeSlider" min="1" max="28" step="1" value="7" aria-label="Sonda global de threads">
+  <span class="pmeta"><span class="dot-m">●</span> mem <b id="probeMem">—</b> · <span class="dot-c">■</span> cpu <b id="probeCpu">—</b></span>
+  <span class="pmeta" id="probeSp">speedup —</span>
+  <button class="btn secondary" id="tourBtn" onclick="toggleTour()" style="padding:5px 12px;font-size:.74rem">▶ Tour 1→28</button>
+</div>
 
 <div class="grid">
 
-  <!-- CODE VIEW -->
-  <div class="card">
-    <h2><span class="dot" style="background:#c084fc"></span> Código C</h2>
-    <div class="code-block" id="codeBlock"></div>
+  <!-- 1. KERNELS -->
+  <div class="card" id="sec-kernels">
+    <h2><span class="dot" style="background:#c084fc"></span> 1 · Os dois kernels</h2>
+    <p class="desc">Mesmo esqueleto OpenMP, <strong>intensidades aritméticas</strong> em extremos opostos. Troque a aba:</p>
+    <div class="code-tabs" role="tablist">
+      <button id="tabMem" class="active" onclick="showKernel('mem')" role="tab">Memory-bound · C=A+B</button>
+      <button id="tabCpu" onclick="showKernel('cpu')" role="tab">CPU-bound · sqrt+sin ×50</button>
+    </div>
+    <div class="code-block" id="codeBlock" aria-live="polite"></div>
+    <div class="insight mem" id="kernelInsight"></div>
   </div>
 
-  <!-- MEMORY LAYOUT -->
+  <!-- 2. MEMORY LAYOUT -->
   <div class="card">
-    <h2><span class="dot" style="background:var(--mem)"></span> Layout de Memória</h2>
-    <canvas id="memCanvas" height="220" role="img" aria-label="Diagrama do layout de memória mostrando os arrays A[], B[], C[] e V[]"></canvas>
+    <h2><span class="dot" style="background:var(--mem)"></span> Memória: 160 MB em 4 vetores</h2>
+    <p class="desc">N=5M doubles (8 B cada). A soma lê <strong>A+B (80 MB)</strong> e escreve <strong>C (40 MB)</strong>; o kernel CPU relê <strong>V (40 MB)</strong>. Tudo cabe na RAM, <strong>não</strong> no cache — cada iteração paga o barramento.</p>
+    <canvas id="memCanvas" class="chart" height="230" role="img" aria-label="Diagrama dos 4 vetores de 40 MB e o tráfego por elemento"></canvas>
     <div class="legend">
-      <span><span class="swatch" style="background:#3b82f6"></span> A[]</span>
-      <span><span class="swatch" style="background:#8b5cf6"></span> B[]</span>
-      <span><span class="swatch" style="background:#22c55e"></span> C[] = A+B</span>
-      <span><span class="swatch" style="background:#ef4444"></span> V[] (sqrt+sin)</span>
+      <span><span class="swatch" style="background:#3b82f6"></span> A[] 40 MB</span>
+      <span><span class="swatch" style="background:#8b5cf6"></span> B[] 40 MB</span>
+      <span><span class="swatch" style="background:#22c55e"></span> C[] 40 MB</span>
+      <span><span class="swatch" style="background:#ef4444"></span> V[] 40 MB</span>
     </div>
+    <div class="badges"><span class="badge">Soma: <b>24 B</b>/elem</span><span class="badge">sqrt+sin: <b>16 B</b>/elem</span><span class="badge">DDR5 dual-channel: <b>~55 GB/s</b> prática</span></div>
   </div>
 
-  <!-- PHASE ANIMATION -->
-  <div class="card full">
-    <h2><span class="dot" style="background:var(--green)"></span> Execução Paralela</h2>
+  <!-- 3. EXECUTION -->
+  <div class="card full" id="sec-exec">
+    <h2><span class="dot" style="background:var(--green)"></span> 2 · Execução paralela — o que cada thread sente</h2>
+    <p class="desc">Arraste o slider e aperte play. <strong>Azul = esperando o barramento; vermelho = calculando.</strong> No modo memória, mais threads = filas maiores no mesmo barramento. No modo CPU, mais threads = mais ALUs trabalhando. O medidor à direita mostra a <strong>saturação do barramento</strong>.</p>
     <div class="controls">
-      <button id="btnMem" onclick="startPhase('mem')">▶ Fase Memory-Bound</button>
-      <button id="btnCpu" onclick="startPhase('cpu')">▶ Fase CPU-Bound</button>
-      <button class="secondary" onclick="resetAll()">↺ Reset</button>
-      <label for="threadSlider">Threads: <input type="range" id="threadSlider" min="1" max="28" value="4" aria-label="Número de threads"> <span id="threadVal">4</span></label>
+      <button class="btn" id="btnMem" onclick="startPhase('mem')">▶ Soma (memória)</button>
+      <button class="btn secondary" id="btnCpu" onclick="startPhase('cpu')">▶ sqrt+sin (CPU)</button>
+      <button class="btn secondary" onclick="resetAll()">↺ Reset</button>
+      <label class="lbl" for="threadSlider">Threads: <input type="range" id="threadSlider" min="1" max="28" value="7" aria-label="Número de threads"> <strong id="threadVal" style="color:var(--text)">7</strong></label>
+      <label class="lbl">Velocidade:
+        <select id="speedSel" aria-label="Velocidade da animação"><option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option></select>
+      </label>
+      <span class="lbl" style="font-size:.72rem">←/→ no teclado também move a sonda</span>
     </div>
-    <canvas id="phaseCanvas" height="300" role="img" aria-label="Animação da execução paralela mostrando threads processando blocos de memória"></canvas>
-    <div class="stats" id="statsBar">
-      <div class="stat"><div class="val" id="statThreads">4</div><div class="lbl">THREADS</div></div>
-      <div class="stat"><div class="val" id="statProgress">0%</div><div class="lbl">PROGRESSO</div></div>
-      <div class="stat"><div class="val" id="statTime">—</div><div class="lbl">TEMPO (s)</div></div>
-      <div class="stat"><div class="val" id="statType">—</div><div class="lbl">TIPO</div></div>
+    <canvas id="phaseCanvas" class="chart" height="320" role="img" aria-label="Animação das threads processando blocos contíguos"></canvas>
+    <div class="stats">
+      <div class="stat"><div class="val" id="statThreads">7</div><div class="lbl">Threads</div></div>
+      <div class="stat"><div class="val" id="statProgress">0%</div><div class="lbl">Progresso</div></div>
+      <div class="stat"><div class="val" id="statTime">—</div><div class="lbl">Tempo medido (s)</div></div>
+      <div class="stat"><div class="val" id="statBw">—</div><div class="lbl" id="statBwLbl">Banda / GFLOP/s</div></div>
+    </div>
+    <div class="insight neutral" id="phaseInsight">Dica: rode com <strong>4 threads</strong> nos dois modos e compare o medidor. Depois rode a soma com <strong>27 threads</strong> e observe: mais faixas, mesmo barramento — o tempo <em>aumenta</em>.</div>
+  </div>
+
+  <!-- 4. TIME CHART -->
+  <div class="card" id="sec-tempo">
+    <h2><span class="dot" style="background:var(--accent)"></span> 3 · Tempo × threads <span style="font-weight:400;color:var(--muted);font-size:.75rem">(média ± DP, 10 execuções)</span></h2>
+    <p class="desc">Eixo Y logarítmico: a curva <strong style="color:var(--mem)">azul</strong> achata em ~6 ms (teto do barramento); a <strong style="color:var(--cpu)">vermelha</strong> despenca de 4,4 s para 0,4 s. Barras = desvio padrão — note a <strong>explosão de variância</strong> da curva azul após 8 threads.</p>
+    <div class="controls">
+      <label class="lbl"><input type="checkbox" id="chkErr" checked> barras de erro</label>
+      <label class="lbl"><input type="checkbox" id="chkLog" checked> escala log</label>
+    </div>
+    <canvas id="chartCanvas" class="chart" height="250" role="img" aria-label="Gráfico tempo versus threads com barras de desvio padrão"></canvas>
+    <div class="insight mem"><strong>3 regiões da curva azul:</strong> ① 1→7T esconde latência (23,4→6,1 ms) ② 8→18T estagna (6–11 ms, DP até 13 ms) ③ 19→28T degrada (até 25 ms, DP 34 ms em T27).</div>
+  </div>
+
+  <!-- 5. SPEEDUP -->
+  <div class="card" id="sec-speedup">
+    <h2><span class="dot" style="background:var(--green)"></span> 4 · Speedup × threads <span style="font-weight:400;color:var(--muted);font-size:.75rem">(T₁/Tₙ)</span></h2>
+    <p class="desc">Linha tracejada = ideal linear. O kernel CPU chega a <strong style="color:var(--cpu)">10,74× @22T</strong>; o de memória atinge <strong style="color:var(--mem)">3,83× @7T</strong> e cruza para <strong>abaixo de 1×</strong> — paralelizar passou a atrapalhar.</p>
+    <div class="controls">
+      <label class="lbl"><input type="checkbox" id="chkIdeal" checked> linha ideal</label>
+      <label class="lbl"><input type="checkbox" id="chkEff" onchange="drawSpeedupChart()"> mostrar eficiência (%)</label>
+    </div>
+    <canvas id="speedCanvas" class="chart" height="250" role="img" aria-label="Gráfico de speedup versus threads com linha ideal"></canvas>
+    <div class="insight cpu"><strong>Leitura correta:</strong> speedup de 10,7× em 22 threads = eficiência de ~49%. Os 8 núcleos P entregam o ganho principal; os 6 E (menor IPC, menos cache) adicionam pouco — por isso o pico fica longe dos 28× teóricos.</div>
+  </div>
+
+  <!-- 6. ROOFLINE -->
+  <div class="card full" id="sec-roofline">
+    <h2><span class="dot" style="background:var(--amber)"></span> 5 · Roofline: por que os tetos são diferentes</h2>
+    <p class="desc">Desempenho = min(pico, banda × IA). A soma (IA=0,042) bate no <strong>telhado inclinado da banda</strong>; o sqrt+sin (IA=65,6) bate no <strong>telhado plano do pico</strong>. Pontos = threads selecionadas (1·4·8·14·22·28T). Passe o mouse para ver GFLOP/s.</p>
+    <canvas id="roofCanvas" class="chart" height="300" role="img" aria-label="Modelo Roofline com pontos operacionais dos dois kernels"></canvas>
+    <div class="badges">
+      <span class="badge">Pico FP64: <b>350 GFLOP/s</b></span>
+      <span class="badge">Banda STREAM: <b>55 GB/s</b></span>
+      <span class="badge">Crista: <b>AI = 6,36</b></span>
+      <span class="badge">Soma @7T: <b>~0,82 GFLOP/s</b></span>
+      <span class="badge">sqrt+sin @22T: <b>~12,7 GFLOP/s</b></span>
+    </div>
+    <div class="insight neutral">Como ler: pontos <strong style="color:var(--mem)">azuis (●)</strong> sobem com threads até encostar na reta inclinada e param — não há como passar da banda. Pontos <strong style="color:var(--cpu)">vermelhos (■)</strong> sobem quase na vertical (mesma IA, mais GFLOP/s) em direção ao teto de 350 — cada núcleo soma ALUs.</div>
+  </div>
+
+  <!-- 7. WHY -->
+  <div class="card full" id="sec-numa">
+    <h2><span class="dot" style="background:var(--purple)"></span> 6 · Por que a curva azul satura? (P-cores × E-cores)</h2>
+    <p class="desc">i7-14700HX: <strong>8 núcleos P</strong> (rápidos, Hyper-Threading) + <strong>6 núcleos E</strong> (econômicos, sem HT). Até ~8 threads o SO usa os P; depois, threads caem nos E — com menos unidades de execução, menos cache L2 e mesma disputa pelo barramento DDR5 dual-channel.</p>
+    <canvas id="coreCanvas" class="chart" height="170" role="img" aria-label="Diagrama dos núcleos P e E disputando o barramento de memória"></canvas>
+    <div class="grid" style="margin-top:12px;grid-template-columns:repeat(3,1fr)" id="regionGrid">
+      <div class="insight mem"><strong>Fase ① · 1→7T — esconder latência</strong><br>Enquanto uma thread espera a DRAM, outra soma. Speedup 1→3,83×. Variância baixa (DP ~2 ms).</div>
+      <div class="insight neutral"><strong>Fase ② · 8→18T — banda saturada</strong><br>Barramento em ~55 GB/s. Threads extras viram fila no controlador. Tempo oscila 6–11 ms; DP dispara (até 13 ms) conforme o SO mistura P/E.</div>
+      <div class="insight cpu"><strong>Fase ③ · 19→28T — contenção</strong><br>Mais tráfego, mesma banda + threads nos E. Média sobe a 15–25 ms. Em T27, DP (34 ms) &gt; média (25 ms): o escalonamento decide o resultado.</div>
     </div>
   </div>
 
-  <!-- CHART: Time vs Threads -->
-  <div class="card">
-    <h2><span class="dot" style="background:var(--accent)"></span> Tempo vs Threads (log)</h2>
-    <canvas id="chartCanvas" height="240" role="img" aria-label="Gráfico de tempo de execução versus número de threads em escala logarítmica"></canvas>
+  <!-- TAKEAWAY -->
+  <div class="card full">
+    <h2><span class="dot" style="background:var(--green)"></span> Leve para a prova</h2>
+    <p class="desc" style="font-size:.9rem;color:var(--text)">“<strong>Multithreading ajuda memory-bound até saturar a banda</strong> (esconde latência); depois, threads extras só aumentam a fila. <strong>Em CPU-bound, cada núcleo soma ALUs</strong> — o speedup acompanha os núcleos físicos, com os E-cores rendendo menos. IA baixa → telhado da banda; IA alta → telhado do pico.”</p>
+    <details class="data">
+      <summary>Ver tabela completa de dados (média ± DP, 10 execuções) — clique para expandir</summary>
+      <div class="table-wrap"><table id="dataTable" aria-label="Tabela de tempos medidos"></table></div>
+    </details>
   </div>
 
-  <!-- CHART: Speedup -->
-  <div class="card">
-    <h2><span class="dot" style="background:var(--green)"></span> Speedup vs Threads</h2>
-    <canvas id="speedCanvas" height="240" role="img" aria-label="Gráfico de speedup versus número de threads com linha de referência ideal"></canvas>
-  </div>
+</div><!-- /grid -->
+</div><!-- /wrap -->
 
-</div>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<footer class="footer-nav">
+  <span><a href="../lessons/0004-tarefa04-memory-cpu-bound.html">&larr; Lição 04</a> · <a href="../reference/04-teoria-memory-bound-cpu-bound.html">Teoria 04</a> · <a href="../reference/00-fundamentos-programacao-paralela.html">Índice geral</a></span>
+  <span style="color:var(--muted)">Fonte: <a href="results.csv">results.csv</a> · <a href="tarefa04.c">tarefa04.c</a> · <a href="relatorio.pdf">relatório PDF</a></span>
+</footer>
 
 <script>
-// ─── DATA ──────────────────────────────────────────────
-const DATA = [
-  {t:1,  mem:0.0326, cpu:4.4788},
-  {t:2,  mem:0.0160, cpu:2.3539},
-  {t:3,  mem:0.0104, cpu:1.6746},
-  {t:4,  mem:0.0077, cpu:1.2679},
-  {t:5,  mem:0.0064, cpu:1.0518},
-  {t:6,  mem:0.0064, cpu:0.9266},
-  {t:7,  mem:0.0068, cpu:0.8337},
-  {t:8,  mem:0.0070, cpu:0.7417},
-  {t:9,  mem:0.0063, cpu:0.6925},
-  {t:10, mem:0.0068, cpu:0.6600},
-  {t:11, mem:0.0060, cpu:0.6129},
-  {t:12, mem:0.0061, cpu:0.5781},
-  {t:13, mem:0.0060, cpu:0.5469},
-  {t:14, mem:0.0062, cpu:0.5192},
-  {t:15, mem:0.0066, cpu:0.5010},
-  {t:16, mem:0.0053, cpu:0.4752},
-  {t:17, mem:0.0063, cpu:0.4591},
-  {t:18, mem:0.0064, cpu:0.4445},
-  {t:19, mem:0.0067, cpu:0.4315},
-  {t:20, mem:0.0065, cpu:0.4287},
-  {t:21, mem:0.0067, cpu:0.4266},
-  {t:22, mem:0.0065, cpu:0.4190},
-  {t:23, mem:0.0066, cpu:0.4233},
-  {t:24, mem:0.0065, cpu:0.4144},
-  {t:25, mem:0.0070, cpu:0.4196},
-  {t:26, mem:0.0073, cpu:0.4236},
-  {t:27, mem:0.0071, cpu:0.4140},
-  {t:28, mem:0.0076, cpu:0.4375},
+// ═══════════ DADOS REAIS (results.csv, N=5M, média de 10 execuções) ═══════════
+const DATA=[
+ {t:1,mem:0.02335887,memSd:0.004594372,cpu:4.429636315,cpuSd:0.972680649},
+ {t:2,mem:0.013881175,memSd:0.003655642,cpu:2.415796635,cpuSd:0.534712154},
+ {t:3,mem:0.00969926,memSd:0.002778197,cpu:1.630652604,cpuSd:0.291026692},
+ {t:4,mem:0.007902079,memSd:0.002191246,cpu:1.252250698,cpuSd:0.208867435},
+ {t:5,mem:0.006826977,memSd:0.002781112,cpu:1.018302607,cpuSd:0.136447431},
+ {t:6,mem:0.006353219,memSd:0.002599471,cpu:0.885678238,cpuSd:0.110532996},
+ {t:7,mem:0.006099573,memSd:0.002476039,cpu:0.773265457,cpuSd:0.085487728},
+ {t:8,mem:0.006253054,memSd:0.002579353,cpu:0.723160894,cpuSd:0.067075631},
+ {t:9,mem:0.007185475,memSd:0.001638318,cpu:0.677131671,cpuSd:0.078047293},
+ {t:10,mem:0.008827855,memSd:0.006621046,cpu:0.632085489,cpuSd:0.080701133},
+ {t:11,mem:0.009990856,memSd:0.008602768,cpu:0.595758522,cpuSd:0.069542883},
+ {t:12,mem:0.011069636,memSd:0.010810103,cpu:0.560148608,cpuSd:0.063509792},
+ {t:13,mem:0.00817435,memSd:0.005734415,cpu:0.528825838,cpuSd:0.066791051},
+ {t:14,mem:0.009945355,memSd:0.010731132,cpu:0.515090527,cpuSd:0.053325228},
+ {t:15,mem:0.00853314,memSd:0.009293057,cpu:0.494523488,cpuSd:0.056866525},
+ {t:16,mem:0.011291452,memSd:0.013033402,cpu:0.486452829,cpuSd:0.053090984},
+ {t:17,mem:0.009594742,memSd:0.010976845,cpu:0.471347003,cpuSd:0.064756481},
+ {t:18,mem:0.007732995,memSd:0.010068434,cpu:0.457091947,cpuSd:0.060896801},
+ {t:19,mem:0.004918543,memSd:0.001198619,cpu:0.425078084,cpuSd:0.032130027},
+ {t:20,mem:0.011672896,memSd:0.013912531,cpu:0.454221454,cpuSd:0.102179727},
+ {t:21,mem:0.013217059,memSd:0.025359012,cpu:0.428207763,cpuSd:0.046593794},
+ {t:22,mem:0.008246412,memSd:0.009745123,cpu:0.412257222,cpuSd:0.056175563},
+ {t:23,mem:0.018319698,memSd:0.022413996,cpu:0.42650499,cpuSd:0.083766493},
+ {t:24,mem:0.017152851,memSd:0.016352074,cpu:0.416744354,cpuSd:0.079807491},
+ {t:25,mem:0.018922075,memSd:0.021476161,cpu:0.420564705,cpuSd:0.08867189},
+ {t:26,mem:0.014743487,memSd:0.016068908,cpu:0.428745818,cpuSd:0.069806737},
+ {t:27,mem:0.02528186,memSd:0.034507792,cpu:0.571502011,cpuSd:0.467346417},
+ {t:28,mem:0.016045325,memSd:0.011228597,cpu:0.415032975,cpuSd:0.067078965},
 ];
-
-// ─── CODE DISPLAY ──────────────────────────────────────
-const codeLines = [
-  ['<span class="cm">// Aloca 4 vetores de 50M doubles (~1.6 GB)</span>'],
-  ['<span class="kw">double</span> *A = <span class="fn">malloc</span>(N * <span class="kw">sizeof</span>(<span class="kw">double</span>));'],
-  ['<span class="kw">double</span> *B = <span class="fn">malloc</span>(N * <span class="kw">sizeof</span>(<span class="kw">double</span>));'],
-  ['<span class="kw">double</span> *C = <span class="fn">malloc</span>(N * <span class="kw">sizeof</span>(<span class="kw">double</span>));'],
-  ['<span class="kw">double</span> *V = <span class="fn">malloc</span>(N * <span class="kw">sizeof</span>(<span class="kw">double</span>));'],
-  [''],
-  ['<span class="cm">// Inicialização sequencial</span>'],
-  ['<span class="kw">for</span> (<span class="kw">long</span> i = <span class="num">0</span>; i &lt; N; ++i) {'],
-  ['    A[i] = i * <span class="num">0.5</span>;  B[i] = i * <span class="num">0.25</span>;  V[i] = i * <span class="num">0.1</span>;'],
-  ['}'],
-  [''],
-  ['<span class="cm">// ═══ FASE 1: MEMORY-BOUND ═══</span>'],
-  ['<span class="hl-mem"><span class="kw">#pragma omp parallel for</span></span>'],
-  ['<span class="hl-mem"><span class="kw">for</span> (<span class="kw">long</span> i = <span class="num">0</span>; i &lt; N; ++i) {</span>'],
-  ['<span class="hl-mem">    C[i] = A[i] + B[i];  <span class="cm">// 1 FLOP, 24 bytes</span></span>'],
-  ['<span class="hl-mem">}</span>'],
-  [''],
-  ['<span class="cm">// ═══ FASE 2: CPU-BOUND ═══</span>'],
-  ['<span class="hl-cpu"><span class="kw">#pragma omp parallel for</span></span>'],
-  ['<span class="hl-cpu"><span class="kw">for</span> (<span class="kw">long</span> i = <span class="num">0</span>; i &lt; N; ++i) {</span>'],
-  ['<span class="hl-cpu">    <span class="kw">double</span> val = V[i];</span>'],
-  ['<span class="hl-cpu">    <span class="kw">for</span> (<span class="kw">int</span> j = <span class="num">0</span>; j &lt; <span class="num">50</span>; ++j) {</span>'],
-  ['<span class="hl-cpu">        val = <span class="fn">sqrt</span>(val + j*<span class="num">0.01</span>) + <span class="fn">sin</span>(val);</span>'],
-  ['<span class="hl-cpu">    }</span>'],
-  ['<span class="hl-cpu">    V[i] = val;  <span class="cm">// ~1050 FLOPs, 16 bytes</span></span>'],
-  ['<span class="hl-cpu">}</span>'],
-];
-document.getElementById('codeBlock').innerHTML = codeLines.map(l => l[0]).join('\n');
-
-// ─── CANVAS UTILS ──────────────────────────────────────
-const _canvasCache = {};
-
-function initCanvas(id) {
-  const c = document.getElementById(id);
-  const dpr = window.devicePixelRatio || 1;
-  const rect = c.getBoundingClientRect();
-  c.width = rect.width * dpr;
-  c.height = rect.height * dpr;
-  const ctx = c.getContext('2d');
-  ctx.scale(dpr, dpr);
-  _canvasCache[id] = { c, ctx, w: rect.width, h: rect.height };
-  return _canvasCache[id];
+const N=5000000, PEAK=350, BW=55, AI_MEM=1/24, AI_CPU=1050/16;
+const T1M=DATA[0].mem, T1C=DATA[0].cpu;
+const spM=t=>T1M/row(t).mem, spC=t=>T1C/row(t).cpu;
+function row(t){return DATA.find(r=>r.t===t)||DATA[DATA.length-1];}
+function gflopsMem(t){return (1*N)/(row(t).mem*1e9);}
+function gflopsCpu(t){return (1050*N)/(row(t).cpu*1e9);}
+let selThreads=+document.getElementById('threadSlider').value;
+// ── Overdrive A: sonda com física de mola (um valor move todos os painéis) ──
+const probe={target:selThreads,display:selThreads,vel:0,meter:0,meterVel:0,tourTimer:null,reduceMotion:window.matchMedia('(prefers-reduced-motion: reduce)').matches};
+function interpRow(tf,kind){const a=Math.max(1,Math.min(28,Math.floor(tf))),b=Math.max(1,Math.min(28,Math.ceil(tf))),f=tf-a;const ra=row(a),rb=row(b);const v=ra[kind]+(rb[kind]-ra[kind])*f;const s=ra[kind+'Sd']+(rb[kind+'Sd']-ra[kind+'Sd'])*f;return{v,s};}
+function pulseProbe(){
+ try{
+  const el=document.getElementById('probeT');
+  if(probe.reduceMotion||!el.animate)return;
+  el.animate([{transform:'scale(1)'},{transform:'scale(1.18)'},{transform:'scale(1)'}],{duration:220,easing:'cubic-bezier(.2,.9,.25,1.2)'});
+ }catch(e){}
+}
+function syncProbeUI(){
+ const t=Math.round(probe.display),r=row(t);
+ document.getElementById('probeT').textContent=(probe.display).toFixed(1).replace('.',',')+'T';
+ document.getElementById('probeMem').textContent=r.mem.toFixed(4)+'s · '+spM(t).toFixed(2)+'×';
+ document.getElementById('probeCpu').textContent=r.cpu.toFixed(3)+'s · '+spC(t).toFixed(2)+'×';
+ document.getElementById('probeSp').innerHTML='eff mem <b>'+(spM(t)/t*100).toFixed(0)+'%</b> · eff cpu <b>'+(spC(t)/t*100).toFixed(0)+'%</b>';
+ const ps=document.getElementById('probeSlider');if(document.activeElement!==ps)ps.value=t;
+}
+let probeTicking=false;
+function tickProbe(){
+ probeTicking=true;
+ const k=0.14,damp=0.72;
+ probe.vel+=(probe.target-probe.display)*k;probe.vel*=damp;probe.display+=(probe.vel);
+ if(Math.abs(probe.target-probe.display)<0.002&&Math.abs(probe.vel)<0.002){probe.display=probe.target;probe.vel=0;}
+ // medidor com mola própria (amortece o salto GB/s)
+ const r=row(Math.round(probe.display));
+ const satT=phase.type==='cpu'?((1050*N)/(r.cpu*1e9))/PEAK:((N*24)/(r.mem*1e9))/BW;
+ probe.meterVel+=(satT-probe.meter)*0.12;probe.meterVel*=0.75;probe.meter+=probe.meterVel;
+ drawTimeChart();drawSpeedupChart();drawRoof();drawProbeOverlays();syncProbeUI();
+ if(probe.display!==probe.target||Math.abs(probe.vel)>0.0005||Math.abs(probe.meterVel)>0.0005){requestAnimationFrame(tickProbe);}
+ else{probeTicking=false;highlightAll(Math.round(probe.target),true);}
+}
+function kickProbe(){if(probe.reduceMotion){probe.display=probe.target;highlightAll(probe.target);syncProbeUI();return;}if(!probeTicking)requestAnimationFrame(tickProbe);}
+function toggleTour(){
+ const btn=document.getElementById('tourBtn');
+ if(probe.tourTimer){clearInterval(probe.tourTimer);probe.tourTimer=null;btn.textContent='▶ Tour 1→28';return;}
+ btn.textContent='⏸ Parar tour';let t=1;setThreads(1);
+ probe.tourTimer=setInterval(()=>{t++;if(t>28){clearInterval(probe.tourTimer);probe.tourTimer=null;btn.textContent='▶ Tour 1→28';return;}setThreads(t);},320);
+}
+function drawProbeOverlays(){
+ // linha vertical sincronizada em Tempo e Speedup + anel no Roofline
+ try{
+  if(timeGeom){const {ctx}=_cache['chartCanvas'];const x=timeGeom.xs(probe.display);
+   ctx.save();ctx.strokeStyle='rgba(226,232,240,.55)';ctx.setLineDash([3,3]);ctx.lineWidth=1;
+   ctx.beginPath();ctx.moveTo(x,timeGeom.pad.t);ctx.lineTo(x,250-timeGeom.pad.b);ctx.stroke();ctx.setLineDash([]);
+   const mi=interpRow(probe.display,'mem'),ci=interpRow(probe.display,'cpu');
+   const ym=timeGeom.ys(mi.v),yc=timeGeom.ys(ci.v);
+   ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,ym,5,0,7);ctx.fill();ctx.fillStyle='#3b82f6';ctx.beginPath();ctx.arc(x,ym,3.4,0,7);ctx.fill();
+   ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,yc,5,0,7);ctx.fill();ctx.fillStyle='#ef4444';ctx.beginPath();ctx.arc(x,yc,3.4,0,7);ctx.fill();
+   ctx.restore();}
+  if(speedGeom){const {ctx}=_cache['speedCanvas'];const x=speedGeom.xs(probe.display);
+   ctx.save();ctx.strokeStyle='rgba(226,232,240,.55)';ctx.setLineDash([3,3]);ctx.lineWidth=1;
+   const pad={t:12,b:30};ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,250-pad.b);ctx.stroke();ctx.setLineDash([]);ctx.restore();}
+  if(roofGeom){const {ctx}=_cache['roofCanvas'];const t=Math.round(probe.display);
+   roofGeom.pts.forEach(p=>{if(p.t!==t)return;ctx.save();ctx.strokeStyle='#fbbf24';ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(p.x,p.y,p.kind==='mem'?10:11,0,7);ctx.stroke();ctx.restore();});}
+ }catch(e){}
 }
 
-function getCachedCanvas(id) {
-  return _canvasCache[id] || initCanvas(id);
+// ═══════════ TEMA ═══════════
+function toggleTheme(){const c=document.documentElement.getAttribute('data-theme');const t=c==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem('theme',t);}catch(e){}}
+try{const s=localStorage.getItem('theme');if(s)document.documentElement.setAttribute('data-theme',s);}catch(e){}
+
+// ═══════════ KERNEL TABS ═══════════
+const KERNELS={
+ mem:{html:
+ '<span class="cm">// FASE 1 — MEMORY-BOUND · 1 FLOP a cada 24 bytes (IA = 0,042)</span>\n'+ 
+ '<span class="kw">#pragma omp parallel for</span>\n'+ 
+ '<span class="hl-mem"><span class="kw">for</span> (<span class="kw">long</span> i = <span class="num">0</span>; i &lt; N; ++i)\n    C[i] = A[i] + B[i];  <span class="cm">// 2 leituras + 1 escrita</span></span>',
+ insight:'<strong>Por que não escala?</strong> Cada iteração trafega 24 B e soma 1 FLOP. Com 55 GB/s, o teto é 55 × 0,042 ≈ <strong>2,3 GFLOP/s</strong> — atingido com ~7 threads. O resto é fila no controlador de memória.'},
+ cpu:{html:
+ '<span class="cm">// FASE 2 — CPU-BOUND · ~1050 FLOPs a cada 16 bytes (IA = 65,6)</span>\n'+ 
+ '<span class="kw">#pragma omp parallel for</span>\n'+ 
+ '<span class="hl-cpu"><span class="kw">for</span> (<span class="kw">long</span> i = <span class="num">0</span>; i &lt; N; ++i) {\n    <span class="kw">double</span> val = V[i];  <span class="cm">// 1 leitura p/ registrador</span>\n    <span class="kw">for</span> (<span class="kw">int</span> j = <span class="num">0</span>; j &lt; <span class="num">50</span>; ++j)\n        val = <span class="fn">sqrt</span>(val + j*<span class="num">0.01</span>) + <span class="fn">sin</span>(val);\n    V[i] = val;  <span class="cm">// 1 escrita</span>\n}</span>',
+ insight:'<strong>Por que escala?</strong> Cada elemento roda 50× sqrt+sin (~21 FLOPs cada) em registrador. O barramento quase não é usado; cada núcleo soma ALUs. Pico de <strong>10,74× @22T</strong>, limitado pelos E-cores mais fracos.'}};
+function showKernel(k){
+ document.getElementById('codeBlock').innerHTML=KERNELS[k].html;
+ document.getElementById('kernelInsight').className='insight '+(k==='mem'?'mem':'cpu');
+ document.getElementById('kernelInsight').innerHTML=KERNELS[k].insight;
+ document.getElementById('tabMem').classList.toggle('active',k==='mem');
+ document.getElementById('tabCpu').classList.toggle('active',k==='cpu');
+}
+showKernel('mem');
+
+// ═══════════ CANVAS UTILS ═══════════
+const _cache={};
+function ctxOf(id){if(_cache[id])return _cache[id];const c=document.getElementById(id);const dpr=window.devicePixelRatio||1;const r=c.getBoundingClientRect();const hAttr=+c.getAttribute('height')||250;const W=r.width||c.parentElement.clientWidth||600;const H=hAttr;c.width=W*dpr;c.height=H*dpr;const x=c.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);return _cache[id]={c,ctx:x,w:W,h:H};}
+function clearCache(){for(const k in _cache)delete _cache[k];}
+const tip=document.getElementById('tip');
+function showTip(e,html){tip.innerHTML=html;tip.style.display='block';tip.style.left=Math.min(e.clientX+14,window.innerWidth-270)+'px';tip.style.top=(e.clientY+14)+'px';}
+function hideTip(){tip.style.display='none';}
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+
+// ═══════════ MEM LAYOUT ═══════════
+function drawMemory(){
+ const {ctx,w}=ctxOf('memCanvas');const H=230;ctx.clearRect(0,0,w,H);
+ const cols=['#3b82f6','#8b5cf6','#22c55e','#ef4444'];const names=['A[]','B[]','C[] = A+B','V[]'];
+ const traffic=['lê 8 B','lê 8 B','escreve 8 B','lê+escreve 16 B'];
+ const n=4,gap=10,x0=16,bw=(w-x0*2-gap*(n-1))/n,y0=34,bh=44;
+ ctx.textAlign='center';
+ for(let a=0;a<n;a++){const x=x0+a*(bw+gap);
+  for(let s=0;s<16;s++){ctx.globalAlpha=.35+.65*(s/16);ctx.fillStyle=cols[a];ctx.fillRect(x+s*(bw/16),(y0),bw/16-1,bh);}
+  ctx.globalAlpha=1;ctx.strokeStyle='#475569';ctx.strokeRect(x,y0,bw,bh);
+  ctx.fillStyle='#e2e8f0';ctx.font='bold 11px monospace';ctx.fillText(names[a],x+bw/2,y0+bh/2+4);
+  ctx.fillStyle='#94a3b8';ctx.font='9px monospace';ctx.fillText('40 MB',x+bw/2,y0+bh+15);ctx.fillText(traffic[a],x+bw/2,y0+bh+27);}
+ // arrows
+ ctx.font='10px monospace';
+ ctx.strokeStyle='#22c55e';ctx.fillStyle='#22c55e';ctx.setLineDash([4,4]);ctx.beginPath();
+ const ax1=x0+bw/2,ax2=x0+2*(bw+gap)+bw/2,ay=y0+bh+44;
+ ctx.moveTo(ax1,ay);ctx.lineTo(ax2,ay);ctx.stroke();ctx.setLineDash([]);
+ ctx.fillText('C[i] = A[i] + B[i]  ·  24 B/elem',w/2,ay-6);
+ const vx=x0+3*(bw+gap)+bw/2;ctx.strokeStyle='#ef4444';ctx.fillStyle='#ef4444';ctx.setLineDash([4,4]);
+ ctx.beginPath();ctx.moveTo(vx,y0+bh+34);ctx.lineTo(vx,y0+bh+58);ctx.stroke();ctx.setLineDash([]);
+ ctx.fillText('sqrt+sin ×50 em registrador',vx,y0+bh+71);
+ ctx.fillStyle='#64748b';ctx.font='9px monospace';ctx.textAlign='left';
+ ctx.fillText('Cache L3 (~30 MB) << 160 MB → todo acesso vaza p/ DRAM',16,H-8);
 }
 
-// ─── MEMORY LAYOUT ANIMATION ───────────────────────────
-let memAnim;
-function drawMemoryLayout() {
-  const { ctx, w, h } = initCanvas('memCanvas');
-  const N = 50_000_000;
-  const arrW = (w - 80) / 4;
-  const arrH = 40;
-  const y0 = 40;
-  const colors = ['#3b82f6', '#8b5cf6', '#22c55e', '#ef4444'];
-  const labels = ['A[]', 'B[]', 'C[] = A+B', 'V[] (sqrt+sin)'];
-  const descs = [
-    `${(N*8/1e9).toFixed(1)} GB — i * 0.5`,
-    `${(N*8/1e9).toFixed(1)} GB — i * 0.25`,
-    `${(N*8/1e9).toFixed(1)} GB — saída`,
-    `${(N*8/1e9).toFixed(1)} GB — saída`
-  ];
-
-  ctx.clearRect(0, 0, w, h);
-
-  // Draw arrays as segmented bars
-  for (let a = 0; a < 4; a++) {
-    const x = 20 + a * (arrW + 10);
-    // Segments to show it's chunked across threads
-    const segs = 16;
-    const segW = (arrW - 2) / segs;
-    for (let s = 0; s < segs; s++) {
-      const brightness = 0.4 + 0.6 * (s / segs);
-      ctx.fillStyle = colors[a];
-      ctx.globalAlpha = brightness;
-      ctx.fillRect(x + s * segW, y0, segW - 1, arrH);
-    }
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = '#475569';
-    ctx.strokeRect(x, y0, arrW, arrH);
-    ctx.fillStyle = '#e2e8f0';
-    ctx.font = 'bold 11px SF Mono, monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(labels[a], x + arrW/2, y0 + arrH/2 + 4);
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '9px SF Mono, monospace';
-    ctx.fillText(descs[a], x + arrW/2, y0 + arrH + 16);
-  }
-
-  // Arrows showing data flow
-  ctx.globalAlpha = 0.5;
-  // A+B -> C
-  const arrowY = y0 + arrH + 35;
-  ctx.strokeStyle = '#22c55e';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  ctx.moveTo(20 + arrW/2, arrowY);
-  ctx.lineTo(20 + 2*(arrW+10) + arrW/2, arrowY);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = '#22c55e';
-  ctx.font = '10px SF Mono';
-  ctx.fillText('C[i] = A[i] + B[i]', w/2, arrowY - 6);
-
-  // V processing
-  ctx.strokeStyle = '#ef4444';
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  const vx = 20 + 3*(arrW+10) + arrW/2;
-  ctx.moveTo(vx, y0 + arrH + 30);
-  ctx.lineTo(vx, y0 + arrH + 55);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = '#ef4444';
-  ctx.fillText('sqrt+sin ×50', vx, y0 + arrH + 68);
-
-  ctx.globalAlpha = 1;
-
-  // Bandwidth info
-  ctx.fillStyle = '#94a3b8';
-  ctx.font = '9px SF Mono';
-  ctx.textAlign = 'left';
-  ctx.fillText('DDR5-5600 dual-channel ≈ 55 GB/s (prático)', 20, h - 25);
-  ctx.fillText('Ridge point: AI = 6.36 FLOP/byte', 20, h - 12);
+// ═══════════ PHASE ANIMATION ═══════════
+let phase={running:false,type:'mem',progress:0,threads:7,t0:0},raf=null;
+function startPhase(type){
+ cancelAnimationFrame(raf);
+ phase={running:true,type,progress:0,threads:+document.getElementById('threadSlider').value,t0:performance.now()};
+ document.getElementById('btnMem').classList.toggle('active',type==='mem');
+ document.getElementById('btnCpu').classList.toggle('active',type==='cpu');
+ updatePhaseInsight();animatePhase();
 }
-
-// ─── THREAD TIMELINE ANIMATION ─────────────────────────
-let phaseState = { running: false, type: null, progress: 0, threads: 4, startTime: 0 };
-let phaseRAF;
-
-function startPhase(type) {
-  cancelAnimationFrame(phaseRAF);
-  phaseState = { running: true, type, progress: 0, threads: +document.getElementById('threadSlider').value, startTime: performance.now() };
-  document.getElementById('statType').textContent = type === 'mem' ? 'MEMORY' : 'CPU';
-  document.getElementById('statType').style.color = type === 'mem' ? '#3b82f6' : '#ef4444';
-  animatePhase();
+function resetAll(){cancelAnimationFrame(raf);phase.running=false;phase.progress=0;
+ const {ctx,w,h}=ctxOf('phaseCanvas');ctx.clearRect(0,0,w,h);
+ document.getElementById('statProgress').textContent='0%';document.getElementById('statTime').textContent='—';document.getElementById('statBw').textContent='—';
+ document.getElementById('btnMem').classList.remove('active');document.getElementById('btnCpu').classList.remove('active');}
+function updatePhaseInsight(){
+ const r=row(phase.threads||selThreads);
+ const el=document.getElementById('phaseInsight');
+ if(phase.type==='mem'){const bw=(N*24)/(r.mem*1e9);
+  el.innerHTML=`Com <strong>${phase.threads} threads</strong>: soma em <strong>${r.mem.toFixed(4)} s</strong> ± ${(r.memSd*1000).toFixed(1)} ms → banda efetiva <strong>${bw.toFixed(1)} GB/s</strong> (teto ~55). Speedup <strong>${(T1M/r.mem).toFixed(2)}×</strong>.`;
+ }else{const g=(1050*N)/(r.cpu*1e9);
+  el.innerHTML=`Com <strong>${phase.threads} threads</strong>: sqrt+sin em <strong>${r.cpu.toFixed(3)} s</strong> ± ${r.cpuSd.toFixed(3)} s → <strong>${g.toFixed(1)} GFLOP/s</strong> (teto 350). Speedup <strong>${(T1C/r.cpu).toFixed(2)}×</strong>.`;
+ }
 }
-
-function resetAll() {
-  cancelAnimationFrame(phaseRAF);
-  phaseState = { running: false, type: null, progress: 0, threads: 4, startTime: 0 };
-  const { ctx, w, h } = getCachedCanvas('phaseCanvas');
-  ctx.clearRect(0, 0, w, h);
-  document.getElementById('statProgress').textContent = '0%';
-  document.getElementById('statTime').textContent = '—';
-  document.getElementById('statType').textContent = '—';
-  document.getElementById('statType').style.color = 'var(--accent)';
+function animatePhase(){
+ if(!phase.running)return;
+ const {ctx,w,h}=ctxOf('phaseCanvas');const {type,threads}=phase;
+ const speed=+document.getElementById('speedSel').value||2;
+ const dur=(type==='mem'?2600:3600)/speed;
+ phase.progress=Math.min((performance.now()-phase.t0)/dur,1);
+ const p=phase.progress,r=row(threads);
+ const tReal=type==='mem'?r.mem:r.cpu;
+ document.getElementById('statThreads').textContent=threads;
+ document.getElementById('statProgress').textContent=(p*100).toFixed(0)+'%';
+ document.getElementById('statTime').textContent=tReal.toFixed(type==='mem'?4:3)+' s';
+ const effBW=(N*24)/(tReal*1e9);
+ const PRACT=19.7;
+ const satRaw=type==='mem'?effBW/PRACT:((1050*N)/(tReal*1e9))/PEAK;
+ const sat=type==='mem'?Math.min(satRaw,1.35):Math.min(satRaw,1);
+ const overload=type==='mem'?Math.max(0,satRaw-1):0;
+ const queueN=type==='mem'?Math.max(0,threads-7):0;
+ document.getElementById('statBw').textContent=type==='mem'?((N*24)/(tReal*1e9)).toFixed(1)+' GB/s':(((1050*N)/(tReal*1e9))).toFixed(1)+' GF/s';
+ document.getElementById('statBwLbl').textContent=type==='mem'?'Banda efetiva':'Throughput';
+ ctx.clearRect(0,0,w,h);
+ const col=type==='mem'?'#3b82f6':'#ef4444';
+ ctx.fillStyle=col;ctx.font='bold 12px Inter,sans-serif';ctx.textAlign='left';
+ ctx.fillText(type==='mem'?'C[i] = A[i] + B[i]  ·  MEMORY-BOUND  (azul = fila no barramento)':'sqrt+sin ×50  ·  CPU-BOUND  (vermelho = ALU ocupada)',12,20);
+ // bus saturation meter (right)
+ const mx=w-118,mw=100;
+ ctx.fillStyle='#94a3b8';ctx.font='9px monospace';ctx.textAlign='left';
+ ctx.fillText(type==='mem'?'BARRAMENTO':'PICO FP',mx,44);
+ ctx.fillStyle='#1a2332';ctx.fillRect(mx,50,mw,12);
+ const g2=ctx.createLinearGradient(mx,0,mx+mw,0);
+ if(type==='mem'){g2.addColorStop(0,'#3b82f6');g2.addColorStop(1,'#22c55e');}else{g2.addColorStop(0,'#ef4444');g2.addColorStop(1,'#fbbf24');}
+ const fillFrac=type==='mem'?Math.min(sat,1)*p:Math.max(sat*p,0.02);
+ ctx.fillStyle=g2;ctx.fillRect(mx,50,mw*Math.max(fillFrac,0.02),12);
+ if(type==='mem'&&overload>0&&p>0.05){ctx.fillStyle=`rgba(239,68,68,${Math.min(0.85,0.4+overload)})`;const ow=mw*Math.min(overload,0.6)*p;ctx.fillRect(mx+mw-ow,50,ow,12);}
+ ctx.strokeStyle='#334155';ctx.strokeRect(mx,50,mw,12);
+ ctx.fillStyle='#e2e8f0';ctx.font='bold 10px monospace';
+ const pctTxt=type==='mem'?Math.round(Math.min(sat,1)*p*100)+'%'+(overload>0.02?' +FILA':''):Math.round(sat*p*100)+'%';
+ ctx.fillText(pctTxt,mx,76);
+ ctx.fillStyle='#64748b';ctx.font='9px monospace';ctx.fillText(type==='mem'?'teto pratico ~20 GB/s (55 teor.)':'teto 350 GF/s',mx,88);
+ if(type==='mem'&&queueN>0){ctx.fillStyle='#f87171';ctx.font='bold 9px monospace';ctx.fillText(`FILA: ${queueN} threads esperando`,mx,100);}
+ // lanes
+ const laneW=w-200,x0=58;
+ const laneH=Math.max(8,Math.min(26,(h-130)/Math.max(threads,1)));
+ const gap=3;
+ ctx.save();ctx.translate(12,h/2);ctx.rotate(-Math.PI/2);ctx.fillStyle='#64748b';ctx.font='9px monospace';ctx.textAlign='center';ctx.fillText('THREADS',0,0);ctx.restore();
+ ctx.fillStyle='#64748b';ctx.font='9px monospace';ctx.textAlign='center';ctx.fillText('ELEMENTOS  (N = 5M, blocos contíguos por thread)',x0+laneW/2,h-8);
+ for(let th=0;th<threads;th++){
+  const y=32+th*(laneH+gap);
+  if(y+laneH>h-42)break;
+  ctx.fillStyle='#94a3b8';ctx.font='8px monospace';ctx.textAlign='right';ctx.fillText('T'+th,x0-7,y+laneH/2+3);
+  const cx=x0+th*(laneW/threads),cw=laneW/threads;
+  ctx.fillStyle='#141d30';ctx.fillRect(cx,y,cw,laneH);
+  ctx.fillStyle=type==='mem'?'rgba(59,130,246,.12)':'rgba(239,68,68,.12)';ctx.fillRect(cx,y,cw,laneH);
+  const done=cw*p;
+  const gr=ctx.createLinearGradient(cx,0,cx+done,0);
+  if(type==='mem'){gr.addColorStop(0,'rgba(59,130,246,.35)');gr.addColorStop(1,'rgba(34,197,94,.75)');}
+  else{gr.addColorStop(0,'rgba(239,68,68,.35)');gr.addColorStop(1,'rgba(251,191,36,.75)');}
+  ctx.fillStyle=gr;ctx.fillRect(cx,y,done,laneH);
+  // texture: mem = sparse ticks (pouco trabalho por byte), cpu = dense
+  if(type==='mem'){ctx.fillStyle='rgba(147,197,253,.5)';const n=Math.floor(done/7);for(let d=0;d<Math.min(n,80);d++)ctx.fillRect(cx+d*7,y+2,4,laneH-4);}
+  else{ctx.fillStyle='rgba(252,165,165,.45)';const n=Math.floor(done/10);for(let b=0;b<Math.min(n,50);b++)ctx.fillRect(cx+b*10,y+1,7,laneH-2);}
+  if(p>0&&p<1){const hx=cx+done;const gl=ctx.createRadialGradient(hx,y+laneH/2,0,hx,y+laneH/2,11);gl.addColorStop(0,type==='mem'?'rgba(34,197,94,.9)':'rgba(251,191,36,.9)');gl.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=gl;ctx.fillRect(hx-11,y-3,22,laneH+6);}
+  ctx.strokeStyle='#334155';ctx.lineWidth=1;ctx.strokeRect(cx,y,cw,laneH);
+ }
+ // info bar
+ const iy=h-38;
+ ctx.fillStyle='#1e293b';ctx.fillRect(x0,iy,laneW,26);ctx.strokeStyle='#334155';ctx.strokeRect(x0,iy,laneW,26);
+ ctx.font='10px monospace';ctx.textAlign='left';
+ if(type==='mem'){const st=queueN>0?` · BARRAMENTO CHEIO + FILA de ${queueN}`:` · barramento folgado`;ctx.fillStyle='#60a5fa';ctx.fillText('Leitura seq. A,B + escrita C  ·  IA 0,042 → TETO = BANDA'+st,x0+8,iy+17);}
+ else{ctx.fillStyle='#f87171';ctx.fillText('V em registrador + 50× sqrt+sin  ·  IA 65,6 → TETO = PICO',x0+8,iy+17);}
+ if(p<1){raf=requestAnimationFrame(animatePhase);}else{document.getElementById('statProgress').textContent='100% ✓';updatePhaseInsight();}
 }
-
-function animatePhase() {
-  if (!phaseState.running) return;
-  const { ctx, w, h } = getCachedCanvas('phaseCanvas');
-  const { type, threads } = phaseState;
-
-  // Speed: memory-bound is ~0.007s real, cpu-bound ~1.2s for 4 threads
-  // We animate over ~3 seconds
-  const elapsed = (performance.now() - phaseState.startTime) / 1000;
-  const animDuration = type === 'mem' ? 2.5 : 3.5;
-  phaseState.progress = Math.min(elapsed / animDuration, 1);
-
-  const progress = phaseState.progress;
-  document.getElementById('statProgress').textContent = (progress * 100).toFixed(0) + '%';
-
-  // Real time estimate
-  const t1 = type === 'mem' ? DATA[0].mem : DATA[0].cpu;
-  const tN = interpolateTime(threads, type);
-  document.getElementById('statTime').textContent = tN.toFixed(4);
-
-  ctx.clearRect(0, 0, w, h);
-
-  // Draw thread lanes
-  const laneH = Math.min(30, (h - 60) / threads);
-  const laneGap = 4;
-  const laneW = w - 80;
-  const x0 = 60;
-
-  // Title
-  ctx.fillStyle = type === 'mem' ? '#3b82f6' : '#ef4444';
-  ctx.font = 'bold 12px SF Mono';
-  ctx.textAlign = 'left';
-  ctx.fillText(type === 'mem' ? 'C[i] = A[i] + B[i]  (Memory-Bound)' : 'sqrt+sin ×50  (CPU-Bound)', 10, 18);
-
-  // Y-axis label
-  ctx.save();
-  ctx.translate(12, h/2);
-  ctx.rotate(-Math.PI/2);
-  ctx.fillStyle = '#94a3b8';
-  ctx.font = '10px SF Mono';
-  ctx.textAlign = 'center';
-  ctx.fillText('THREADS', 0, 0);
-  ctx.restore();
-
-  // X-axis label
-  ctx.fillStyle = '#94a3b8';
-  ctx.font = '10px SF Mono';
-  ctx.textAlign = 'center';
-  ctx.fillText('ELEMENTOS (N = 50M)', w/2, h - 6);
-
-  for (let th = 0; th < threads; th++) {
-    const y = 30 + th * (laneH + laneGap);
-
-    // Thread label
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '9px SF Mono';
-    ctx.textAlign = 'right';
-    ctx.fillText(`T${th}`, x0 - 8, y + laneH/2 + 3);
-
-    // Background lane
-    ctx.fillStyle = '#1a2332';
-    ctx.fillRect(x0, y, laneW, laneH);
-
-    // Work chunk: each thread processes N/threads elements
-    // Visualize as processing from left to right
-    const chunkW = laneW / threads;
-    const thX = x0 + th * chunkW;
-    const processed = chunkW * progress;
-
-    // Unprocessed portion
-    ctx.fillStyle = type === 'mem' ? 'rgba(59,130,246,0.1)' : 'rgba(239,68,68,0.1)';
-    ctx.fillRect(thX, y, chunkW, laneH);
-
-    // Processed portion with gradient
-    const grad = ctx.createLinearGradient(thX, 0, thX + processed, 0);
-    if (type === 'mem') {
-      grad.addColorStop(0, 'rgba(59,130,246,0.3)');
-      grad.addColorStop(1, 'rgba(34,197,94,0.6)');
-    } else {
-      grad.addColorStop(0, 'rgba(239,68,68,0.3)');
-      grad.addColorStop(1, 'rgba(251,191,36,0.6)');
-    }
-    ctx.fillStyle = grad;
-    ctx.fillRect(thX, y, processed, laneH);
-
-    // Processing head (glow effect)
-    if (progress > 0 && progress < 1) {
-      const headX = thX + processed;
-      const glow = ctx.createRadialGradient(headX, y + laneH/2, 0, headX, y + laneH/2, 12);
-      glow.addColorStop(0, type === 'mem' ? 'rgba(34,197,94,0.8)' : 'rgba(251,191,36,0.8)');
-      glow.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = glow;
-      ctx.fillRect(headX - 12, y - 4, 24, laneH + 8);
-    }
-
-    // Memory access pattern indicator
-    if (type === 'mem') {
-      // Show 3 memory accesses per element (read A, read B, write C)
-      ctx.fillStyle = 'rgba(59,130,246,0.4)';
-      const dots = Math.floor(processed / 8);
-      for (let d = 0; d < Math.min(dots, 60); d++) {
-        ctx.fillRect(thX + d * 8, y + 2, 5, laneH - 4);
-      }
-    } else {
-      // Show compute density (thicker bars)
-      ctx.fillStyle = 'rgba(239,68,68,0.3)';
-      const blocks = Math.floor(processed / 12);
-      for (let b = 0; b < Math.min(blocks, 40); b++) {
-        ctx.fillRect(thX + b * 12, y + 1, 9, laneH - 2);
-      }
-    }
-
-    // Border
-    ctx.strokeStyle = '#334155';
-    ctx.strokeRect(thX, y, chunkW, laneH);
-  }
-
-  // Access pattern info box
-  const infoY = 30 + threads * (laneH + laneGap) + 15;
-  if (infoY < h - 40) {
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(x0, infoY, laneW, 36);
-    ctx.strokeStyle = '#334155';
-    ctx.strokeRect(x0, infoY, laneW, 36);
-    ctx.font = '10px SF Mono';
-    ctx.textAlign = 'left';
-    if (type === 'mem') {
-      ctx.fillStyle = '#3b82f6';
-      ctx.fillText('Padrão de acesso: leitura sequencial (A, B) + escrita sequencial (C)', x0 + 8, infoY + 14);
-      ctx.fillStyle = '#94a3b8';
-      ctx.fillText('Intensidade aritmética: 0.042 FLOP/byte → LIMITADO POR LARGURA DE BANDA', x0 + 8, infoY + 28);
-    } else {
-      ctx.fillStyle = '#ef4444';
-      ctx.fillText('Padrão de acesso: leitura/escrita sequencial (V) + 50 iterações de sqrt+sin', x0 + 8, infoY + 14);
-      ctx.fillStyle = '#94a3b8';
-      ctx.fillText('Intensidade aritmética: 65.6 FLOP/byte → LIMITADO POR CPU', x0 + 8, infoY + 28);
-    }
-  }
-
-  if (progress < 1) {
-    phaseRAF = requestAnimationFrame(animatePhase);
-  } else {
-    document.getElementById('statProgress').textContent = '100% ✓';
-  }
-}
-
-function interpolateTime(threads, type) {
-  const d = DATA.find(r => r.t === threads);
-  if (d) return type === 'mem' ? d.mem : d.cpu;
-  // Linear interpolation
-  for (let i = 0; i < DATA.length - 1; i++) {
-    if (threads >= DATA[i].t && threads <= DATA[i+1].t) {
-      const frac = (threads - DATA[i].t) / (DATA[i+1].t - DATA[i].t);
-      const v0 = type === 'mem' ? DATA[i].mem : DATA[i].cpu;
-      const v1 = type === 'mem' ? DATA[i+1].mem : DATA[i+1].cpu;
-      return v0 + frac * (v1 - v0);
-    }
-  }
-  return type === 'mem' ? DATA[DATA.length-1].mem : DATA[DATA.length-1].cpu;
-}
-
-document.getElementById('threadSlider').addEventListener('input', e => {
-  document.getElementById('threadVal').textContent = e.target.value;
-  document.getElementById('statThreads').textContent = e.target.value;
+document.getElementById('threadSlider').addEventListener('input',e=>{
+ selThreads=+e.target.value;document.getElementById('threadVal').textContent=e.target.value;
+ document.getElementById('statThreads').textContent=e.target.value;
+ phase.threads=selThreads;
+ // live-update stats even when paused
+ const r=row(selThreads);
+ if(!phase.running||true){const t=phase.type==='cpu'?r.cpu:r.mem;
+  document.getElementById('statTime').textContent=t.toFixed(phase.type==='cpu'?3:4)+' s';
+  document.getElementById('statBw').textContent=phase.type==='cpu'?((1050*N)/(r.cpu*1e9)).toFixed(1)+' GF/s':((N*24)/(r.mem*1e9)).toFixed(1)+' GB/s';}
+ highlightAll(selThreads);
 });
 
-// ─── CHARTS ────────────────────────────────────────────
-function drawTimeChart() {
-  const { ctx, w, h } = initCanvas('chartCanvas');
-  const pad = { l: 55, r: 15, t: 15, b: 35 };
-  const pw = w - pad.l - pad.r;
-  const ph = h - pad.t - pad.b;
-
-  // Log scale for Y
-  const allY = DATA.flatMap(d => [d.mem, d.cpu]);
-  const minY = Math.log10(Math.min(...allY) * 0.8);
-  const maxY = Math.log10(Math.max(...allY) * 1.2);
-
-  const xScale = t => pad.l + ((t - 1) / 27) * pw;
-  const yScale = v => pad.t + ph - ((Math.log10(v) - minY) / (maxY - minY)) * ph;
-
-  // Grid
-  ctx.strokeStyle = '#1e293b';
-  ctx.lineWidth = 1;
-  for (let p = Math.ceil(minY); p <= Math.floor(maxY); p++) {
-    const y = yScale(Math.pow(10, p));
-    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '9px SF Mono';
-    ctx.textAlign = 'right';
-    ctx.fillText(`10^${p}`, pad.l - 4, y + 3);
-  }
-
-  // X labels
-  ctx.fillStyle = '#94a3b8';
-  ctx.font = '9px SF Mono';
-  ctx.textAlign = 'center';
-  [1, 4, 8, 14, 20, 28].forEach(t => {
-    const x = xScale(t);
-    ctx.fillText(t, x, h - pad.b + 14);
-    ctx.strokeStyle = '#1e293b';
-    ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, h - pad.b); ctx.stroke();
-  });
-
-  // Memory-bound line
-  ctx.strokeStyle = '#3b82f6';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  DATA.forEach((d, i) => {
-    const fn = i === 0 ? 'moveTo' : 'lineTo';
-    ctx[fn](xScale(d.t), yScale(d.mem));
-  });
-  ctx.stroke();
-  DATA.forEach(d => {
-    ctx.beginPath();
-    ctx.arc(xScale(d.t), yScale(d.mem), 3, 0, Math.PI * 2);
-    ctx.fillStyle = '#3b82f6';
-    ctx.fill();
-  });
-
-  // CPU-bound line
-  ctx.strokeStyle = '#ef4444';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  DATA.forEach((d, i) => {
-    const fn = i === 0 ? 'moveTo' : 'lineTo';
-    ctx[fn](xScale(d.t), yScale(d.cpu));
-  });
-  ctx.stroke();
-  DATA.forEach(d => {
-    ctx.beginPath();
-    ctx.arc(xScale(d.t), yScale(d.cpu), 3, 0, Math.PI * 2);
-    ctx.fillStyle = '#ef4444';
-    ctx.fill();
-  });
-
-  // Labels
-  ctx.font = '9px SF Mono';
-  ctx.fillStyle = '#3b82f6';
-  ctx.textAlign = 'left';
-  ctx.fillText('Memory-bound', pad.l + 4, yScale(DATA[0].mem) - 8);
-  ctx.fillStyle = '#ef4444';
-  ctx.fillText('CPU-bound', pad.l + 4, yScale(DATA[0].cpu) - 8);
+// ═══════════ TIME CHART ═══════════
+let timeGeom=null;
+function drawTimeChart(){
+ const {ctx,w,h}=ctxOf('chartCanvas');const H=250;ctx.clearRect(0,0,w,H);
+ const showErr=document.getElementById('chkErr').checked, log=document.getElementById('chkLog').checked;
+ const pad={l:52,r:12,t:12,b:30},pw=w-pad.l-pad.r,ph=H-pad.t-pad.b;
+ const xs=t=>pad.l+((t-1)/27)*pw;
+ let ys;
+ if(log){const all=DATA.flatMap(d=>[d.mem-d.memSd*.5,d.cpu]);const mn=Math.log10(Math.min(...all)*.7),mx=Math.log10(Math.max(...all)*1.25);
+  ys=v=>pad.t+ph-((Math.log10(Math.max(v,1e-4))-mn)/(mx-mn))*ph;
+  ctx.strokeStyle='#1e293b';ctx.fillStyle='#64748b';ctx.font='8px monospace';ctx.textAlign='right';
+  for(let p=Math.ceil(mn);p<=Math.floor(mx);p++){const y=ys(Math.pow(10,p));ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(w-pad.r,y);ctx.stroke();ctx.fillText('1e'+p,pad.l-5,y+3);}
+ }else{const mx=Math.max(...DATA.map(d=>d.cpu))*1.05;ys=v=>pad.t+ph-(v/mx)*ph;
+  ctx.strokeStyle='#1e293b';ctx.fillStyle='#64748b';ctx.font='8px monospace';ctx.textAlign='right';
+  for(let s=0;s<=mx;s+=1){const y=ys(s);ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(w-pad.r,y);ctx.stroke();ctx.fillText(s.toFixed(0)+'s',pad.l-5,y+3);}
+  ctx.fillStyle='#f87171';ctx.font='8px monospace';ctx.textAlign='left';ctx.fillText('↑ escala linear esmaga a curva azul — use log',pad.l+6,pad.t+10);
+ }
+ ctx.fillStyle='#64748b';ctx.font='8px monospace';ctx.textAlign='center';
+ [1,4,8,14,22,28].forEach(t=>ctx.fillText(t,xs(t),H-8));
+ ctx.fillText('threads →',w-pad.r-30,H-8);
+ // error bars first
+ timeGeom={xs,ys,pad,pts:[]};
+ function series(get,sd,col){
+  if(showErr){ctx.strokeStyle=col+'88';ctx.lineWidth=1.5;
+   DATA.forEach(d=>{const x=xs(d.t),y=ys(get(d));let y1=ys(Math.max(get(d)-sd(d),1e-4)),y2=ys(get(d)+sd(d));
+    // clip linear
+    if(!document.getElementById('chkLog').checked){y1=ys(Math.max(get(d)-sd(d),0));y2=ys(get(d)+sd(d));}
+    ctx.beginPath();ctx.moveTo(x,y1);ctx.lineTo(x,y2);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x-3,y1);ctx.lineTo(x+3,y1);ctx.moveTo(x-3,y2);ctx.lineTo(x+3,y2);ctx.stroke();});}
+  ctx.strokeStyle=col;ctx.lineWidth=2;ctx.beginPath();
+  DATA.forEach((d,i)=>{const x=xs(d.t),y=ys(get(d));i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();
+  DATA.forEach(d=>{const x=xs(d.t),y=ys(get(d));ctx.beginPath();ctx.arc(x,y,d.t===selThreads?5.5:3,0,7);ctx.fillStyle=col;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#0c1322';ctx.stroke();timeGeom.pts.push({x,y,t:d.t});});
+ }
+ series(d=>d.mem,d=>d.memSd,'#3b82f6');
+ series(d=>d.cpu,d=>d.cpuSd,'#ef4444');
+ ctx.font='9px monospace';ctx.textAlign='left';
+ ctx.fillStyle='#3b82f6';ctx.fillText('— Memory '+row(selThreads).mem.toFixed(4)+'s',pad.l+6,pad.t+12);
+ ctx.fillStyle='#ef4444';ctx.fillText('— CPU '+row(selThreads).cpu.toFixed(3)+'s',pad.l+6,pad.t+24);
+ // highlight T27 outlier
+ const o=row(27);ctx.fillStyle='#fbbf24';ctx.font='8px monospace';
+ ctx.fillText('T27: DP 34ms > média — escalonador P/E',xs(27)+7,ys(o.mem)-8);
 }
-
-function drawSpeedupChart() {
-  const { ctx, w, h } = initCanvas('speedCanvas');
-  const pad = { l: 55, r: 15, t: 15, b: 35 };
-  const pw = w - pad.l - pad.r;
-  const ph = h - pad.t - pad.b;
-
-  const t1_mem = DATA[0].mem;
-  const t1_cpu = DATA[0].cpu;
-  const maxSpeedup = Math.max(...DATA.map(d => t1_cpu / d.cpu)) * 1.1;
-
-  const xScale = t => pad.l + ((t - 1) / 27) * pw;
-  const yScale = s => pad.t + ph - (s / maxSpeedup) * ph;
-
-  // Ideal speedup line
-  ctx.strokeStyle = '#475569';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  ctx.moveTo(xScale(1), yScale(1));
-  ctx.lineTo(xScale(28), yScale(28));
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = '#475569';
-  ctx.font = '8px SF Mono';
-  ctx.textAlign = 'left';
-  ctx.fillText('Ideal (linear)', xScale(20), yScale(20) - 6);
-
-  // Grid
-  ctx.strokeStyle = '#1e293b';
-  for (let s = 0; s <= maxSpeedup; s += 5) {
-    const y = yScale(s);
-    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '9px SF Mono';
-    ctx.textAlign = 'right';
-    ctx.fillText(s.toFixed(0) + 'x', pad.l - 4, y + 3);
-  }
-
-  // X labels
-  ctx.fillStyle = '#94a3b8';
-  ctx.textAlign = 'center';
-  [1, 4, 8, 14, 20, 28].forEach(t => {
-    ctx.fillText(t, xScale(t), h - pad.b + 14);
-  });
-
-  // Memory speedup
-  ctx.strokeStyle = '#3b82f6';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  DATA.forEach((d, i) => {
-    const s = t1_mem / d.mem;
-    ctx[i === 0 ? 'moveTo' : 'lineTo'](xScale(d.t), yScale(s));
-  });
-  ctx.stroke();
-
-  // CPU speedup
-  ctx.strokeStyle = '#ef4444';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  DATA.forEach((d, i) => {
-    const s = t1_cpu / d.cpu;
-    ctx[i === 0 ? 'moveTo' : 'lineTo'](xScale(d.t), yScale(s));
-  });
-  ctx.stroke();
-
-  // Points
-  DATA.forEach(d => {
-    ctx.beginPath();
-    ctx.arc(xScale(d.t), yScale(t1_mem / d.mem), 2.5, 0, Math.PI * 2);
-    ctx.fillStyle = '#3b82f6';
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(xScale(d.t), yScale(t1_cpu / d.cpu), 2.5, 0, Math.PI * 2);
-    ctx.fillStyle = '#ef4444';
-    ctx.fill();
-  });
-
-  // Annotate peak
-  const peakCpu = DATA.reduce((best, d) => d.cpu < best.cpu ? d : best);
-  const peakSpeedup = t1_cpu / peakCpu.cpu;
-  ctx.fillStyle = '#ef4444';
-  ctx.font = 'bold 9px SF Mono';
-  ctx.textAlign = 'left';
-  ctx.fillText(`${peakSpeedup.toFixed(1)}x @ ${peakCpu.t}T`, xScale(peakCpu.t) + 6, yScale(peakSpeedup) - 6);
+// ═══════════ SPEEDUP ═══════════
+let speedGeom=null;
+function drawSpeedupChart(){
+ const {ctx,w,h}=ctxOf('speedCanvas');const H=250;ctx.clearRect(0,0,w,H);
+ const showIdeal=document.getElementById('chkIdeal').checked, showEff=document.getElementById('chkEff').checked;
+ const pad={l:44,r:12,t:12,b:30},pw=w-pad.l-pad.r,ph=H-pad.t-pad.b;
+ const maxS=Math.max(T1C/row(22).cpu,28)*1.06;
+ const xs=t=>pad.l+((t-1)/27)*pw, ys=s=>pad.t+ph-(s/maxS)*ph;
+ ctx.strokeStyle='#1e293b';ctx.fillStyle='#64748b';ctx.font='8px monospace';ctx.textAlign='right';
+ for(let s=0;s<=maxS;s+=4){const y=ys(s);ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(w-pad.r,y);ctx.stroke();ctx.fillText(s+'×',pad.l-5,y+3);}
+ ctx.textAlign='center';[1,4,8,14,22,28].forEach(t=>ctx.fillText(t,xs(t),H-8));
+ if(showIdeal){ctx.strokeStyle='#64748b';ctx.setLineDash([5,4]);ctx.beginPath();ctx.moveTo(xs(1),ys(1));ctx.lineTo(xs(28),ys(28));ctx.stroke();ctx.setLineDash([]);ctx.fillStyle='#64748b';ctx.font='8px monospace';ctx.textAlign='left';ctx.fillText('ideal',xs(23),ys(23)-6);}
+ speedGeom={xs,ys,pts:[]};
+ function line(sp,col){ctx.strokeStyle=col;ctx.lineWidth=2;ctx.beginPath();DATA.forEach((d,i)=>{const x=xs(d.t),y=ys(sp(d.t));i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();
+  DATA.forEach(d=>{const x=xs(d.t),y=ys(sp(d.t));ctx.beginPath();ctx.arc(x,y,d.t===selThreads?5.5:2.6,0,7);ctx.fillStyle=col;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#0c1322';ctx.stroke();speedGeom.pts.push({x,y,t:d.t});});}
+ line(spM,'#3b82f6');line(spC,'#ef4444');
+ // annotations
+ const pk=22;ctx.font='bold 9px monospace';ctx.textAlign='left';
+ ctx.fillStyle='#ef4444';ctx.fillText(spC(pk).toFixed(1)+'× @22T',xs(pk)+7,ys(spC(pk))-7);
+ ctx.fillStyle='#3b82f6';ctx.fillText(spM(7).toFixed(2)+'× @7T (teto)',xs(7)+7,ys(spM(7))+12);
+ // sub-1 zone
+ ctx.fillStyle='rgba(239,68,68,.08)';const y1=ys(1);ctx.fillRect(pad.l,y1,pw,pad.t+ph-y1);
+ ctx.fillStyle='#f87171';ctx.font='8px monospace';ctx.fillText('pior que serial (<1×)',pad.l+6,y1+12);
+ if(showEff){ctx.fillStyle='#e2e8f0';ctx.font='bold 10px monospace';ctx.textAlign='right';
+  ctx.fillText('Eff @'+selThreads+'T: mem '+(spM(selThreads)/selThreads*100).toFixed(0)+'% · cpu '+(spC(selThreads)/selThreads*100).toFixed(0)+'%',w-pad.r,pad.t+12);}
 }
-
-// ─── INIT ──────────────────────────────────────────────
-window.addEventListener('load', () => {
-  drawMemoryLayout();
-  drawTimeChart();
-  drawSpeedupChart();
+// ═══════════ ROOFLINE ═══════════
+let roofGeom=null;
+function drawRoof(){
+ const {ctx,w}=ctxOf('roofCanvas');const H=300;ctx.clearRect(0,0,w,H);
+ const pad={l:56,r:14,t:14,b:36},pw=w-pad.l-pad.r,ph=H-pad.t-pad.b;
+ const lx0=Math.log10(.01),lx1=Math.log10(500),ly0=Math.log10(.05),ly1=Math.log10(900);
+ const xs=ai=>pad.l+((Math.log10(ai)-lx0)/(lx1-lx0))*pw;
+ const ys=g=>pad.t+ph-((Math.log10(Math.max(g,.05))-ly0)/(ly1-ly0))*ph;
+ // fill under roof
+ ctx.beginPath();const NPT=120;
+ for(let i=0;i<=NPT;i++){const ai=Math.pow(10,lx0+(lx1-lx0)*i/NPT);const r=Math.min(PEAK,BW*ai);const x=xs(ai),y=ys(r);i?ctx.lineTo(x,y):ctx.moveTo(x,y);}
+ ctx.lineTo(xs(500),ys(.05));ctx.lineTo(xs(.01),ys(.05));ctx.closePath();ctx.fillStyle='rgba(148,163,184,.07)';ctx.fill();
+ // roofs
+ ctx.strokeStyle='#e2e8f0';ctx.lineWidth=2.2;ctx.beginPath();
+ for(let i=0;i<=NPT;i++){const ai=Math.pow(10,lx0+(lx1-lx0)*i/NPT);const r=Math.min(PEAK,BW*ai);const x=xs(ai),y=ys(r);i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();
+ // 1-core ref
+ ctx.strokeStyle='#475569';ctx.setLineDash([5,4]);ctx.lineWidth=1.2;ctx.beginPath();
+ for(let i=0;i<=NPT;i++){const ai=Math.pow(10,lx0+(lx1-lx0)*i/NPT);const r=Math.min(28,20*ai);const x=xs(ai),y=ys(r);i?ctx.lineTo(x,y):ctx.moveTo(x,y);}ctx.stroke();ctx.setLineDash([]);
+ ctx.fillStyle='#64748b';ctx.font='8px monospace';ctx.textAlign='left';ctx.fillText('teto 1 núcleo (28 GF/s)',xs(.03),ys(Math.min(28,20*.03))-6);
+ // ridge
+ const ridge=PEAK/BW;
+ ctx.strokeStyle='#64748b';ctx.setLineDash([2,3]);ctx.beginPath();ctx.moveTo(xs(ridge),pad.t);ctx.lineTo(xs(ridge),pad.t+ph);ctx.stroke();ctx.setLineDash([]);
+ ctx.fillStyle='#94a3b8';ctx.font='bold 8px monospace';ctx.textAlign='center';ctx.fillText('CRISTA 6,36',xs(ridge),pad.t+12);
+ // grid labels
+ ctx.fillStyle='#64748b';ctx.font='8px monospace';
+ [.01,.1,1,10,100].forEach(a=>{ctx.textAlign='center';ctx.fillText(a,xs(a),H-20);});
+ [.1,1,10,100].forEach(g=>{ctx.textAlign='right';ctx.fillText(g,pad.l-6,ys(g)+3);ctx.strokeStyle='#1e293b';ctx.beginPath();ctx.moveTo(pad.l,ys(g));ctx.lineTo(w-pad.r,ys(g));ctx.stroke();});
+ ctx.textAlign='center';ctx.fillText('intensidade aritmética (FLOP/byte) →',pad.l+pw/2,H-7);
+ ctx.save();ctx.translate(11,pad.t+ph/2);ctx.rotate(-Math.PI/2);ctx.fillText('desempenho (GFLOP/s)',0,0);ctx.restore();
+ // region tags
+ ctx.font='bold 11px Inter,sans-serif';ctx.globalAlpha=.28;
+ ctx.fillStyle='#3b82f6';ctx.textAlign='left';ctx.fillText('MEMÓRIA',xs(.03),ys(2));
+ ctx.fillStyle='#ef4444';ctx.textAlign='center';ctx.fillText('CPU',xs(120),ys(200));ctx.globalAlpha=1;
+ // points
+ roofGeom={xs,ys,pts:[]};
+ const sel=[1,4,8,14,22,28];
+ sel.forEach(t=>{
+  let x=xs(AI_MEM),y=ys(gflopsMem(t));
+  ctx.beginPath();ctx.arc(x,y,t===selThreads?7:5,0,7);ctx.fillStyle='#3b82f6';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#fff';ctx.stroke();
+  ctx.fillStyle='#93c5fd';ctx.font='bold 8px monospace';ctx.textAlign='left';ctx.fillText(t+'T',x+8,y+3);
+  roofGeom.pts.push({x,y,t,kind:'mem'});
+  let x2=xs(AI_CPU),y2=ys(gflopsCpu(t));
+  ctx.fillStyle='#ef4444';ctx.fillRect(x2-5,y2-5,10,10);ctx.lineWidth=2;ctx.strokeStyle='#fff';ctx.strokeRect(x2-5,y2-5,10,10);
+  if(t===selThreads){ctx.strokeStyle='#fbbf24';ctx.strokeRect(x2-7,y2-7,14,14);}
+  ctx.fillStyle='#fca5a5';ctx.font='bold 8px monospace';ctx.fillText(t+'T',x2+8,y2+3);
+  roofGeom.pts.push({x:x2,y:y2,t,kind:'cpu'});
+ });
+ // AI markers
+ ctx.fillStyle='#93c5fd';ctx.font='8px monospace';ctx.textAlign='center';ctx.fillText('0,042',xs(AI_MEM),ys(.05)-14);
+ ctx.fillStyle='#fca5a5';ctx.fillText('65,6',xs(AI_CPU),ys(.05)-14);
+}
+// ═══════════ CORE DIAGRAM ═══════════
+function drawCores(){
+ const {ctx,w}=ctxOf('coreCanvas');const H=170;ctx.clearRect(0,0,w,H);
+ ctx.textAlign='center';
+ const busY=H-34;
+ // bus
+ ctx.fillStyle='#1a2332';ctx.fillRect(20,busY,w-40,16);
+ ctx.strokeStyle='#38bdf8';ctx.lineWidth=1.5;ctx.strokeRect(20,busY,w-40,16);
+ ctx.fillStyle='#38bdf8';ctx.font='bold 9px monospace';ctx.fillText('BARRAMENTO DDR5  ·  ~55 GB/s compartilhados',w/2,busY+12);
+ // cores
+ const n=14,gap=8,cw=(w-60-gap*(n-1))/n;
+ for(let i=0;i<n;i++){
+  const x=30+i*(cw+gap),isP=i<8;
+  const ch=isP?70:44;
+  ctx.fillStyle=isP?'rgba(239,68,68,.75)':'rgba(148,163,184,.55)';
+  ctx.fillRect(x,26,cw,ch);
+  ctx.strokeStyle=isP?'#ef4444':'#64748b';ctx.strokeRect(x,26,cw,ch);
+  ctx.fillStyle='#0f172a';ctx.font='bold 8px monospace';ctx.fillText(isP?'P'+(i+1):'E'+(i-7),x+cw/2,26+ch/2+3);
+  // link to bus with width = bandwidth share
+  ctx.strokeStyle=isP?'rgba(239,68,68,.6)':'rgba(148,163,184,.5)';ctx.lineWidth=isP?3:1.5;
+  ctx.beginPath();ctx.moveTo(x+cw/2,26+ch);ctx.lineTo(x+cw/2,busY);ctx.stroke();
+ }
+ ctx.fillStyle='#f87171';ctx.font='9px monospace';ctx.textAlign='left';ctx.fillText('8× P — rápidos, com HT (2 threads cada)',30,16);
+ ctx.fillStyle='#94a3b8';ctx.textAlign='right';ctx.fillText('6× E — econômicos, 1 thread cada',w-30,16);
+ ctx.fillStyle='#64748b';ctx.font='8px monospace';ctx.textAlign='center';
+ ctx.fillText('8 threads → só P · 14+ threads → P+E disputando o mesmo barramento',w/2,H-6);
+}
+// ═══════════ TOOLTIPS / SYNC ═══════════
+function nearest(pts,mx,my,maxD=26){let b=null,bd=1e9;pts.forEach(p=>{const d=Math.hypot(p.x-mx,p.y-my);if(d<bd){bd=d;b=p;}});return bd<=maxD?b:null;}
+function fmtT(t){
+ const r=row(t);
+ return `<strong>${t} threads</strong><br><span class="t-mem">● mem ${r.mem.toFixed(4)}s ±${(r.memSd*1000).toFixed(1)}ms · ${spM(t).toFixed(2)}×</span><br><span class="t-cpu">■ cpu ${r.cpu.toFixed(3)}s ±${r.cpuSd.toFixed(3)}s · ${spC(t).toFixed(2)}×</span>`;
+}
+function bindHover(id,geomFn,fmt){
+ const c=document.getElementById(id);
+ c.addEventListener('mousemove',e=>{
+  const g=geomFn();if(!g)return;const r=c.getBoundingClientRect();
+  const hit=nearest(g.pts,e.clientX-r.left,e.clientY-r.top);
+  if(hit){showTip(e,fmt(hit.t,hit));c.style.cursor='pointer';}else hideTip();
+ });
+ c.addEventListener('mouseleave',hideTip);
+ c.addEventListener('click',e=>{
+  const g=geomFn();if(!g)return;const r=c.getBoundingClientRect();
+  const hit=nearest(g.pts,e.clientX-r.left,e.clientY-r.top,32);
+  if(hit){setThreads(hit.t);}
+ });
+}
+function setThreads(t){
+ selThreads=t;phase.threads=t;
+ if(probe.tourTimer&&document.activeElement!==document.getElementById('probeSlider')){/* tour conduz */}
+ document.getElementById('threadSlider').value=t;
+ document.getElementById('threadVal').textContent=t;
+ document.getElementById('probeSlider').value=t;
+ document.getElementById('statThreads').textContent=t;
+ const r=row(t);
+ document.getElementById('statTime').textContent=(phase.type==='cpu'?r.cpu:r.mem).toFixed(phase.type==='cpu'?3:4)+' s';
+ highlightAll(t);
+}
+document.getElementById('probeSlider').addEventListener('input',e=>{setThreads(+e.target.value);});
+document.addEventListener('keydown',e=>{
+ const tag=(document.activeElement&&document.activeElement.tagName)||'';
+ if(tag==='INPUT'&&document.activeElement.type==='range'&&document.activeElement.id!=='probeSlider')return;
+ if(tag==='SELECT'||tag==='TEXTAREA')return;
+ if(e.key==='ArrowRight'||e.key==='ArrowLeft'){
+  const d=e.key==='ArrowRight'?1:-1;
+  const nt=Math.max(1,Math.min(28,Math.round(probe.target)+d));
+  e.preventDefault();setThreads(nt);
+  document.getElementById('probeSlider').focus({preventScroll:true});
+ }
 });
-window.addEventListener('resize', () => {
-  Object.keys(_canvasCache).forEach(k => delete _canvasCache[k]);
-  drawMemoryLayout();
-  drawTimeChart();
-  drawSpeedupChart();
-});
+function highlightAll(t,snap){if(!snap&&!probe.reduceMotion){probe.target=t;kickProbe();pulseProbe();
+ // atualiza controles imediatamente, gráficos acompanham a mola
+ document.getElementById('threadSlider').value=t;document.getElementById('threadVal').textContent=t;
+ document.getElementById('statThreads').textContent=t;phase.threads=t;updatePhaseInsight();return;}
+ probe.target=t;probe.display=t;probe.vel=0;
+ drawTimeChart();drawSpeedupChart();drawRoof();drawProbeOverlays();syncProbeUI();
+ document.getElementById('threadSlider').value=t;document.getElementById('threadVal').textContent=t;
+ document.getElementById('probeSlider').value=t;
+ document.getElementById('statThreads').textContent=t;phase.threads=t;updatePhaseInsight();
+ let h='<tr><th>T</th><th>mem (s)</th><th>± DP</th><th>speedup</th><th>cpu (s)</th><th>± DP</th><th>speedup</th></tr>';
+ DATA.forEach(r=>{const hl=r.t===t?' class="hl"':'';
+  h+=`<tr${hl}><td>${r.t}</td><td>${r.mem.toFixed(4)}</td><td>${(r.memSd*1000).toFixed(1)} ms</td><td>${spM(r.t).toFixed(2)}×</td><td>${r.cpu.toFixed(3)}</td><td>${r.cpuSd.toFixed(3)}</td><td>${spC(r.t).toFixed(2)}×</td></tr>`;});
+ const dt=document.getElementById('dataTable');if(dt)dt.innerHTML=h;}
+bindHover('chartCanvas',()=>timeGeom,(t)=>fmtT(t));
+bindHover('speedCanvas',()=>speedGeom,(t)=>fmtT(t)+`<br>eff mem ${(spM(t)/t*100).toFixed(0)}% · eff cpu ${(spC(t)/t*100).toFixed(0)}%`);
+bindHover('roofCanvas',()=>roofGeom,(t,h)=>h.kind==='mem'?`<strong>${t}T · memory</strong><br><span class="t-mem">IA 0,042 · ${gflopsMem(t).toFixed(2)} GFLOP/s</span><br>banda ${(N*24)/(row(t).mem*1e9).toFixed(1)} GB/s`: `<strong>${t}T · cpu</strong><br><span class="t-cpu">IA 65,6 · ${gflopsCpu(t).toFixed(1)} GFLOP/s</span><br>tempo ${row(t).cpu.toFixed(3)} s`);
+['chkErr','chkLog'].forEach(id=>document.getElementById(id).addEventListener('change',drawTimeChart));
+['chkIdeal'].forEach(id=>document.getElementById(id).addEventListener('change',drawSpeedupChart));
+// ═══════════ DATA TABLE ═══════════
+(function(){
+ let h='<tr><th>T</th><th>mem (s)</th><th>± DP</th><th>speedup</th><th>cpu (s)</th><th>± DP</th><th>speedup</th></tr>';
+ DATA.forEach(r=>{const hl=r.t===selThreads?' class="hl"':'';
+  h+=`<tr${hl}><td>${r.t}</td><td>${r.mem.toFixed(4)}</td><td>${(r.memSd*1000).toFixed(1)} ms</td><td>${spM(r.t).toFixed(2)}×</td><td>${r.cpu.toFixed(3)}</td><td>${r.cpuSd.toFixed(3)}</td><td>${spC(r.t).toFixed(2)}×</td></tr>`;});
+ document.getElementById('dataTable').innerHTML=h;
+})();
+// ═══════════ INIT ═══════════
+function drawAll(){drawMemory();drawTimeChart();drawSpeedupChart();drawRoof();drawCores();drawProbeOverlays();syncProbeUI();
+ const r=row(selThreads);
+ document.getElementById('statThreads').textContent=selThreads;
+ document.getElementById('statTime').textContent=r.mem.toFixed(4)+' s';
+ document.getElementById('statBw').textContent=((N*24)/(r.mem*1e9)).toFixed(1)+' GB/s';
+ updatePhaseInsight();
+}
+window.addEventListener('load',()=>{clearCache();drawAll();if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){startPhase('mem');}});
+window.addEventListener('resize',()=>{clearCache();drawAll();});
 </script>
 </body>
 </html>

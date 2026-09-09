@@ -31,7 +31,6 @@
   <nav class="top-nav">
     <div style="display: flex; gap: 16px;">
       <a href="00-fundamentos-programacao-paralela.html">&larr; Índice Geral</a>
-      <a href="04-memory-bound-cpu-bound.html">Referência Rápida 04</a>
       <a href="../lessons/0004-tarefa04-memory-cpu-bound.html">Lição 04</a>
     </div>
     <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
@@ -93,12 +92,47 @@
         <li><strong>Em aplicações limitadas por memória:</strong> Mais threads disputam o mesmo barramento saturado. O tempo de execução estagna ou piora devido à contenção.</li>
       </ul>
     </section>
-  </main>
+  
+    <section id="referencia-rapida">
+      <h2>Apêndice: Referência rápida</h2>
+      <p><em>Conteúdo consolidado do antigo arquivo de referência rápida. Mantido aqui para consulta rápida sem trocar de página.</em></p>
+<section>
+      <h2>1. Controle de threads no terminal</h2>
+      <p>A variável de ambiente <code>OMP_NUM_THREADS</code> define o total de threads da execução:</p>
+      
+      <pre><code><span class="hl-com"># Compilação padrão ativando OpenMP</span>
+$ gcc -std=c11 -Wall -Wextra -fopenmp programa.c -o programa -lm
+
+<span class="hl-com"># Define para 4 threads e executa</span>
+$ <span class="hl-kw">export</span> OMP_NUM_THREADS=4
+$ ./programa
+
+<span class="hl-com"># Executa definindo a variável inline</span>
+$ OMP_NUM_THREADS=2 ./programa
+</code></pre>
+    </section>
+
+    <section>
+      <h2>2. Divisão de laços com OpenMP</h2>
+      <pre><code><span class="hl-prep">#pragma</span> omp parallel for
+<span class="hl-kw">for</span> (<span class="hl-type">long</span> i = 0; i &lt; total_elementos; ++i) {
+    C[i] = A[i] + B[i];
+}
+</code></pre>
+      
+      <h3>Funções da biblioteca OpenMP</h3>
+      <pre><code><span class="hl-prep">#include</span> <span class="hl-str">&lt;omp.h&gt;</span>
+
+<span class="hl-type">int</span> total_threads = <span class="hl-fn">omp_get_max_threads</span>(); <span class="hl-com">// Retorna o limite de threads</span>
+<span class="hl-type">int</span> id_thread = <span class="hl-fn">omp_get_thread_num</span>();     <span class="hl-com">// Retorna o ID da thread atual (0 a N-1)</span>
+</code></pre>
+    </section>
+    </section>
+</main>
 
   <footer class="footer-nav">
     <a href="../lessons/0004-tarefa04-memory-cpu-bound.html">&larr; Lição Prática 04</a>
-    <a href="04-memory-bound-cpu-bound.html">Referência Rápida &rarr;</a>
-  </footer>
+    </footer>
 
   <script>
     function toggleTheme() {

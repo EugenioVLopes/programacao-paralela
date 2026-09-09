@@ -4,28 +4,33 @@ Este repositório contém as implementações e análises de desempenho das ativ
 
 ## 1. Regra para o fluxo de ensino (/teach)
 
-Para cada tarefa da disciplina (Tarefas 01 a 13), o agente deve gerar **três documentos integrados**:
+Para cada tarefa da disciplina (Tarefas 01 a 13), o agente deve gerar **dois documentos integrados** (teoria única + lição):
 
-### A. Documento de teoria aprofundada em ./reference/ (ex: `reference/01-teoria-ponto-flutuante-hardware.html`)
-Documento teórico dedicado à tarefa, cobrindo:
+### A. Documento único de teoria em ./reference/ (ex: `reference/01-teoria-ponto-flutuante-hardware.html`)
+
+Documento teórico dedicado à tarefa, cobrindo em um único arquivo:
+
 1. **Fundamentos de hardware**: Explicação física dos gargalos da tarefa (Memory Wall, Power Wall, hierarquia de cache, linhas de 64 bytes, dependências RAW, falso compartilhamento, NUMA).
 2. **Modelagem matemática**: Fórmulas de convergência, erro de truncamento, representação numérica (IEEE 754), speedup, leis de Amdahl e Gustafson.
 3. **Contexto em HPC**: Motivação do problema e limites de hardware testados.
+4. **Apêndice de referência rápida** (seção final obrigatória no mesmo arquivo):
+   - **Tabelas de sintaxe**: Tipos C, funções da biblioteca padrão, pragmas e flags do compilador.
+   - **Resumo executivo**: Fórmulas essenciais, constantes e regras práticas.
+   - Deve usar `<section id="referencia-rapida">` com `<h2>Apêndice: Referência rápida</h2>` para âncora direta.
 
-### B. Documento de referência rápida em ./reference/ (ex: `reference/01-ponto-flutuante-e-leibniz.html`)
-Guia resumido para consulta rápida, contendo:
-1. **Tabelas de sintaxe**: Tipos C, funções da biblioteca padrão, pragmas e flags do compilador.
-2. **Resumo executivo**: Fórmulas essenciais, constantes e regras práticas.
+Não criar arquivo separado de referência rápida (`reference/01-ponto-flutuante-e-leibniz.html` é o padrão antigo — proibido para tarefas novas; os antigos foram consolidados e apagados).
 
-### C. Lição prática em ./lessons/ (ex: `lessons/0001-tarefa01-leibniz-pi.html`)
+### B. Lição prática em ./lessons/ (ex: `lessons/0001-tarefa01-leibniz-pi.html`)
+
 Arquivo HTML autocontido focado na prática e na teoria aplicada, contendo:
+
 1. **Análise do código C**: Explicação linha a linha de tipos, ponteiros, laços e chamadas de sistema.
 2. **Conceitos de programação paralela**:
    - **Poder computacional**: Definição e aplicações reais que demandam maior capacidade (simulações científicas, previsão do tempo, IA, modelos de linguagem).
    - **Limitação de processadores sequenciais**: Limites físicos espaciais e energéticos, estagnação de frequência e barreira térmica (Power Wall).
    - **Cores lógicos**: Transição do aumento de frequência em núcleo único para o uso de múltiplos núcleos lógicos operando paralelamente.
 3. **Quizzes simétricos**: Questões de múltipla escolha com opções de tamanho e contagem de palavras idênticos.
-4. **Navegação**: Links relativos para o documento de teoria da tarefa, referência rápida da tarefa e documento geral `reference/00-fundamentos-programacao-paralela.html`.
+4. **Navegação**: Links relativos apenas para o documento único de teoria da tarefa e para o documento geral `reference/00-fundamentos-programacao-paralela.html`. Não linkar arquivo separado de referência rápida.
 
 ## 2. Portabilidade, GitHub Pages e links
 
@@ -34,7 +39,7 @@ Arquivo HTML autocontido focado na prática e na teoria aplicada, contendo:
   - Materiais HTML (lições, teoria e referência rápida) devem usar URLs absolutas do GitHub Pages: `https://eugeniovlopes.github.io/programacao-paralela/...` para abrir a página renderizada diretamente no navegador.
   - Códigos C e relatórios PDF devem usar links relativos do repositório (`tarefaXX/` e `tarefaXX/relatorio.pdf`).
 - **Atualização contínua de índices**: Ao concluir qualquer tarefa, atualizar obrigatoriamente:
-  1. `index.html` na raiz (adicionar o card da tarefa com links para a lição, teoria, referência e relatório).
+  1. `index.html` na raiz (adicionar o card da tarefa com links para a lição, teoria única — incluindo âncora `#referencia-rapida` se preciso — e relatório).
   2. `reference/00-fundamentos-programacao-paralela.html` (adicionar a linha da tarefa na tabela de mapeamento).
   3. `README.md` (adicionar a linha na tabela de tarefas com links para o GitHub Pages).
 

@@ -47,7 +47,7 @@
   <main>
     <section id="sobre">
       <p>
-        Materiais da disciplina DCA3703 (Programação Paralela) do curso de Engenharia de Computação da UFRN. Cada tarefa reúne lição prática com código dissecado, documento de teoria de hardware, resumo de sintaxe e relatório em LaTeX.
+        Materiais da disciplina DCA3703 (Programação Paralela) do curso de Engenharia de Computação da UFRN. Cada tarefa reúne lição prática com código dissecado, documento único de teoria de hardware (com apêndice de referência rápida) e relatório em LaTeX.
       </p>
     </section>
 
@@ -68,7 +68,6 @@
           <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;">
             <a href="lessons/0001-tarefa01-leibniz-pi.html">Lição 01 &rarr;</a>
             <a href="reference/01-teoria-ponto-flutuante-hardware.html">Teoria 01 &rarr;</a>
-            <a href="reference/01-ponto-flutuante-e-leibniz.html">Referência 01 &rarr;</a>
             <a href="tarefa01/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a>
           </div>
         </div>
@@ -85,7 +84,6 @@
           <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;">
             <a href="lessons/0002-tarefa02-mxv-cache.html">Lição 02 &rarr;</a>
             <a href="reference/02-teoria-hierarquia-memoria-cache.html">Teoria 02 &rarr;</a>
-            <a href="reference/02-mxv-cache-localidade.html">Referência 02 &rarr;</a>
             <a href="tarefa02/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a>
           </div>
         </div>
@@ -102,7 +100,6 @@
           <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;">
             <a href="lessons/0003-tarefa03-ilp-acumuladores.html">Lição 03 &rarr;</a>
             <a href="reference/03-teoria-ilp-pipeline-superscalar.html">Teoria 03 &rarr;</a>
-            <a href="reference/03-ilp-acumuladores-otimizacao.html">Referência 03 &rarr;</a>
             <a href="tarefa03/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a>
           </div>
         </div>
@@ -119,7 +116,6 @@
           <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;">
             <a href="lessons/0004-tarefa04-memory-cpu-bound.html">Lição 04 &rarr;</a>
             <a href="reference/04-teoria-memory-bound-cpu-bound.html">Teoria 04 &rarr;</a>
-            <a href="reference/04-memory-bound-cpu-bound.html">Referência 04 &rarr;</a>
             <a href="tarefa04/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a>
           </div>
         </div>
@@ -136,7 +132,6 @@
           <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;">
             <a href="lessons/0005-tarefa05-primos-openmp.html">Lição 05 &rarr;</a>
             <a href="reference/05-teoria-primos-openmp.html">Teoria 05 &rarr;</a>
-            <a href="reference/05-primos-openmp.html">Referência 05 &rarr;</a>
             <a href="tarefa05/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a>
           </div>
         </div>
@@ -153,7 +148,6 @@
           <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;">
             <a href="lessons/0010-tarefa06-montecarlo-escopo.html">Lição 06 &rarr;</a>
             <a href="reference/06-teoria-clausulas-escopo.html">Teoria 06 &rarr;</a>
-            <a href="reference/06-clausulas-escopo-openmp.html">Referência 06 &rarr;</a>
             <a href="tarefa06/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a>
           </div>
         </div>
@@ -170,7 +164,6 @@
             <a href="lessons/0006-tarefa07-lista-task.html">Lição 07 &rarr;</a>
             <a href="lessons/0007-tarefa07-taskwork-stealing.html">Lição 07 (aprof.) &rarr;</a>
             <a href="reference/06-teoria-task-openmp.html">Teoria 07 &rarr;</a>
-            <a href="reference/06-task-openmp.html">Referência 07 &rarr;</a>
             <a href="tarefa07/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a>
           </div>
         </div>
@@ -178,8 +171,8 @@
       </div>
     </section>
 
-        <!-- Tarefa 08 --><div class="source-card" style="margin: 0;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"><h3 style="margin: 0; font-size: 1.2rem;">Tarefa 08: pi estocástico, rand/rand_r e false sharing</h3><span class="lesson-badge" style="margin: 0; background-color: var(--success-bg); color: var(--success);">Concluída</span></div><p style="margin-bottom: 12px; font-size: 0.95rem; color: var(--text-muted);">Monte Carlo com <code>rand()</code> vs <code>rand_r()</code>, redução via <code>critical</code> vs vetor <code>hits[tid]</code>, protocolo MESI e padding de 64 bytes.</p><div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;"><a href="lessons/0008-tarefa08-pi-rand-false-sharing.html">Lição 08 &rarr;</a><a href="reference/08-teoria-coerencia-cache-false-sharing.html">Teoria 08 &rarr;</a><a href="reference/08-rand-randr-openmp.html">Referência 08 &rarr;</a><a href="tarefa08/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a></div></div>
-        <!-- Tarefa 09 --><div class="source-card" style="margin: 0;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"><h3 style="margin: 0; font-size: 1.2rem;">Tarefa 09: listas, critical nomeado e locks</h3><span class="lesson-badge" style="margin: 0; background-color: var(--success-bg); color: var(--success);">Concluída</span></div><p style="margin-bottom: 12px; font-size: 0.95rem; color: var(--text-muted);">Tasks com <code>rand_r()</code>, <code>critical(lista0)</code> vs <code>critical(lista1)</code> e vetor <code>locks[N]</code> com <code>init/set/unset/destroy</code>.</p><div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;"><a href="lessons/0009-tarefa09-critical-locks.html">Lição 09 &rarr;</a><a href="reference/09-teoria-critical-locks-tasks.html">Teoria 09 &rarr;</a><a href="reference/09-critical-locks-openmp.html">Referência 09 &rarr;</a><a href="tarefa09/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a></div></div>
+        <!-- Tarefa 08 --><div class="source-card" style="margin: 0;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"><h3 style="margin: 0; font-size: 1.2rem;">Tarefa 08: pi estocástico, rand/rand_r e false sharing</h3><span class="lesson-badge" style="margin: 0; background-color: var(--success-bg); color: var(--success);">Concluída</span></div><p style="margin-bottom: 12px; font-size: 0.95rem; color: var(--text-muted);">Monte Carlo com <code>rand()</code> vs <code>rand_r()</code>, redução via <code>critical</code> vs vetor <code>hits[tid]</code>, protocolo MESI e padding de 64 bytes.</p><div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;"><a href="lessons/0008-tarefa08-pi-rand-false-sharing.html">Lição 08 &rarr;</a><a href="reference/08-teoria-coerencia-cache-false-sharing.html">Teoria 08 &rarr;</a><a href="tarefa08/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a></div></div>
+        <!-- Tarefa 09 --><div class="source-card" style="margin: 0;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"><h3 style="margin: 0; font-size: 1.2rem;">Tarefa 09: listas, critical nomeado e locks</h3><span class="lesson-badge" style="margin: 0; background-color: var(--success-bg); color: var(--success);">Concluída</span></div><p style="margin-bottom: 12px; font-size: 0.95rem; color: var(--text-muted);">Tasks com <code>rand_r()</code>, <code>critical(lista0)</code> vs <code>critical(lista1)</code> e vetor <code>locks[N]</code> com <code>init/set/unset/destroy</code>.</p><div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;"><a href="lessons/0009-tarefa09-critical-locks.html">Lição 09 &rarr;</a><a href="reference/09-teoria-critical-locks-tasks.html">Teoria 09 &rarr;</a><a href="tarefa09/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a></div></div>
     <section id="fundamentos-gerais" style="margin-top: 2.5em;">
       <h2>Documentação base</h2>
       <div class="source-card">

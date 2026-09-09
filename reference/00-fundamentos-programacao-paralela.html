@@ -45,8 +45,8 @@
 
   <main>
     <p>
-      Este documento reúne a fundamentação teórica geral da disciplina. Cada tarefa individual possui um trio de
-      arquivos integrados em <code>lessons/</code> e <code>reference/</code>.
+      Este documento reúne a fundamentação teórica geral da disciplina. Cada tarefa individual possui uma dupla de
+      arquivos integrados em <code>lessons/</code> e <code>reference/</code> (teoria única com apêndice de referência rápida + lição prática).
     </p>
 
     <div class="callout" style="border-left-color: var(--accent); background-color: var(--card-bg);">
@@ -57,7 +57,7 @@
         <li><a href="#hierarquia-memoria">Hierarquia de memória, UMA e NUMA</a></li>
         <li><a href="#modelos-desempenho">Métricas de desempenho: speedup, Amdahl e Gustafson</a></li>
         <li><a href="#patologias-concorrencia">Problemas de concorrência: condições de corrida e cache</a></li>
-        <li><a href="#mapeamento-tarefas">Estrutura de 3 documentos por tarefa</a></li>
+        <li><a href="#mapeamento-tarefas">Estrutura de 2 documentos por tarefa</a></li>
       </ol>
     </div>
 
@@ -125,9 +125,9 @@
 
     <!-- Seção 6 -->
     <section id="mapeamento-tarefas">
-      <h2>6. Estrutura de 3 documentos por tarefa</h2>
+      <h2>6. Estrutura de 2 documentos por tarefa</h2>
       <p>
-        Cada tarefa da disciplina possui 3 documentos integrados no repositório:
+        Cada tarefa da disciplina possui 2 documentos integrados no repositório (teoria única + lição):
       </p>
 
       <table
@@ -135,64 +135,54 @@
         <thead>
           <tr style="border-bottom: 2px solid var(--border); text-align: left;">
             <th style="padding: 8px;">Tarefa</th>
-            <th style="padding: 8px;">Documento 1: Teoria Aprofundada</th>
-            <th style="padding: 8px;">Documento 2: Referência Rápida</th>
-            <th style="padding: 8px;">Documento 3: Lição Prática</th>
+            <th style="padding: 8px;">Documento 1: Teoria Única</th>
+            <th style="padding: 8px;">Documento 2: Lição Prática</th>
           </tr>
         </thead>
         <tbody>
           <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 8px;"><strong>T01 (Leibniz)</strong></td>
             <td style="padding: 8px;"><a href="01-teoria-ponto-flutuante-hardware.html">Teoria 01</a></td>
-            <td style="padding: 8px;"><a href="01-ponto-flutuante-e-leibniz.html">Referência 01</a></td>
             <td style="padding: 8px;"><a href="../lessons/0001-tarefa01-leibniz-pi.html">Lição 01</a></td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 8px;"><strong>T02 (MxV)</strong></td>
             <td style="padding: 8px;"><a href="02-teoria-hierarquia-memoria-cache.html">Teoria 02</a></td>
-            <td style="padding: 8px;"><a href="02-mxv-cache-localidade.html">Referência 02</a></td>
             <td style="padding: 8px;"><a href="../lessons/0002-tarefa02-mxv-cache.html">Lição 02</a></td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 8px;"><strong>T03 (ILP)</strong></td>
             <td style="padding: 8px;"><a href="03-teoria-ilp-pipeline-superscalar.html">Teoria 03</a></td>
-            <td style="padding: 8px;"><a href="03-ilp-acumuladores-otimizacao.html">Referência 03</a></td>
             <td style="padding: 8px;"><a href="../lessons/0003-tarefa03-ilp-acumuladores.html">Lição 03</a></td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 8px;"><strong>T04 (CPU vs Mem)</strong></td>
             <td style="padding: 8px;"><a href="04-teoria-memory-bound-cpu-bound.html">Teoria 04</a></td>
-            <td style="padding: 8px;"><a href="04-memory-bound-cpu-bound.html">Referência 04</a></td>
             <td style="padding: 8px;"><a href="../lessons/0004-tarefa04-memory-cpu-bound.html">Lição 04</a></td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 8px;"><strong>T05 (Primos/Race)</strong></td>
             <td style="padding: 8px;"><a href="05-teoria-primos-openmp.html">Teoria 05</a></td>
-            <td style="padding: 8px;"><a href="05-primos-openmp.html">Referência 05</a></td>
             <td style="padding: 8px;"><a href="../lessons/0005-tarefa05-primos-openmp.html">Lição 05</a></td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 8px;"><strong>T06 (Monte Carlo)</strong></td>
             <td style="padding: 8px;"><a href="06-teoria-clausulas-escopo.html">Teoria 06</a></td>
-            <td style="padding: 8px;"><a href="06-clausulas-escopo-openmp.html">Referência 06</a></td>
             <td style="padding: 8px;"><a href="../lessons/0010-tarefa06-montecarlo-escopo.html">Lição 06</a></td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 8px;"><strong>T07 (Task/List)</strong></td>
             <td style="padding: 8px;"><a href="06-teoria-task-openmp.html">Teoria 07</a></td>
-            <td style="padding: 8px;"><a href="06-task-openmp.html">Referência 07</a></td>
             <td style="padding: 8px;"><a href="../lessons/0006-tarefa07-lista-task.html">Lição 07</a></td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 8px;"><strong>T08 (rand/FS)</strong></td>
             <td style="padding: 8px;"><a href="08-teoria-coerencia-cache-false-sharing.html">Teoria 08</a></td>
-            <td style="padding: 8px;"><a href="08-rand-randr-openmp.html">Referência 08</a></td>
             <td style="padding: 8px;"><a href="../lessons/0008-tarefa08-pi-rand-false-sharing.html">Lição 08</a></td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 8px;"><strong>T09 (crit/locks)</strong></td>
             <td style="padding: 8px;"><a href="09-teoria-critical-locks-tasks.html">Teoria 09</a></td>
-            <td style="padding: 8px;"><a href="09-critical-locks-openmp.html">Referência 09</a></td>
             <td style="padding: 8px;"><a href="../lessons/0009-tarefa09-critical-locks.html">Lição 09</a></td>
           </tr>
         </tbody>

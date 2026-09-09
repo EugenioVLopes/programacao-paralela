@@ -31,9 +31,7 @@
   <nav class="top-nav">
     <div style="display: flex; gap: 16px;">
       <a href="00-fundamentos-programacao-paralela.html">&larr; Índice Geral</a>
-      <a href="05-primos-openmp.html">Referência Rápida 05</a>
-      <a href="../lessons/0005-tarefa05-primos-openmp.html">Lição 05</a>
-    </div>
+      </div>
     <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
   </nav>
 
@@ -102,12 +100,67 @@
       </p>
     </section>
 
-  </main>
+  
+    <section id="referencia-rapida">
+      <h2>Apêndice: Referência rápida</h2>
+      <p><em>Conteúdo consolidado do antigo arquivo de referência rápida. Mantido aqui para consulta rápida sem trocar de página.</em></p>
+<section>
+      <h2>1. Compilação e execução</h2>
+      <pre><code><span class="hl-com"># Compilação com OpenMP</span>
+$ gcc -std=c11 -Wall -Wextra -fopenmp tarefa05.c -o tarefa05 -lm
+
+<span class="hl-com"># Executa com o padrão de threads do sistema</span>
+$ ./tarefa05 5000000
+
+<span class="hl-com"># Define 4 threads e executa</span>
+$ <span class="hl-kw">export</span> OMP_NUM_THREADS=4
+$ ./tarefa05 5000000
+
+<span class="hl-com"># Executa definindo a variável inline</span>
+$ OMP_NUM_THREADS=2 ./tarefa05 5000000
+</code></pre>
+      <ul>
+        <li>O argumento é o limite superior $N$ para contagem de primos.</li>
+        <li>A saída mostra <code>seq_time</code>, <code>par_time</code>, <code>seq_count</code> e <code>par_count</code>.</li>
+        <li>Use <code>./execute.sh</code> para rodar o experimento completo com todas as thread counts e gerar os gráficos.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>2. Sintaxe básica</h2>
+      <pre><code><span class="hl-prep">#pragma</span> omp parallel for
+<span class="hl-kw">for</span> (<span class="hl-type">long</span> numero_atual = <span class="hl-num">0</span>; numero_atual &lt; limite_superior; numero_atual++) {
+    <span class="hl-comment">// Operações independentes sobre o número atual</span>
+}</code></pre>
+      <ul>
+        <li>O laço precisa de limites fixos. O OpenMP calcula a divisão antes de executar.</li>
+        <li>Variáveis declaradas dentro do laço são privadas por padrão.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>3. Escalonamento (schedule)</h2>
+      <p>A cláusula <code>schedule(tipo, tamanho_bloco)</code> controla a divisão das iterações.</p>
+      <ul>
+        <li><code>schedule(static)</code> — Divide as iterações em blocos iguais no início. Custo mínimo. Ideal para carga uniforme.</li>
+        <li><code>schedule(dynamic, tamanho_bloco)</code> — Cada thread requisita um bloco sob demanda. Mais overhead, mas equilibra carga desigual.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>4. Race condition com variável compartilhada</h2>
+      <pre><code><span class="hl-type">long</span> total_primos = <span class="hl-num">0</span>;
+<span class="hl-prep">#pragma</span> omp parallel for
+<span class="hl-kw">for</span> (<span class="hl-type">long</span> numero_atual = <span class="hl-num">0</span>; numero_atual &lt; limite_superior; numero_atual++) {
+    <span class="hl-kw">if</span> (<span class="hl-fn">eh_primo</span>(numero_atual)) total_primos++;  <span class="hl-comment">// Race condition: resultado incorreto</span>
+}</code></pre>
+      <p>Múltiplas threads leem e escrevem <code>total_primos</code> ao mesmo tempo. O resultado fica corrompido.</p>
+    </section>
+    </section>
+</main>
 
   <footer class="footer-nav">
-    <a href="../lessons/0005-tarefa05-primos-openmp.html">&larr; Lição Prática 05</a>
-    <a href="05-primos-openmp.html">Referência Rápida &rarr;</a>
-  </footer>
+      <a href="../lessons/0005-tarefa05-primos-openmp.html">Lição</a></footer>
 
   <script>
     function toggleTheme() {
