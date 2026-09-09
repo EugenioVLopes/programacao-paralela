@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+import pandas as pd, matplotlib.pyplot as plt, os
+base=os.path.dirname(os.path.abspath(__file__))
+df=pd.read_csv(os.path.join(base,'results.csv'))
+plt.figure(figsize=(11,6))
+plt.plot(df['threads'],df['v1_shared_critical_s'],'r-o',markersize=3,label='v1 shared+critical')
+plt.plot(df['threads'],df['v2_shared_atomic_s'],'b-s',markersize=3,label='v2 shared+atomic')
+plt.plot(df['threads'],df['v3_private_critical_s'],'g-^',markersize=4,label='v3 private+critical-final')
+plt.plot(df['threads'],df['v4_vector_s'],'m-D',markersize=3,label='v4 vector+serial')
+plt.plot(df['threads'],df['v5_reduction_s'],'k-x',markersize=4,label='v5 reduction')
+plt.title('Tarefa10: tempo vs threads (rand_r)')
+plt.xlabel('threads');plt.ylabel('tempo (s)')
+plt.grid(True,linestyle='--',alpha=0.6);plt.legend(fontsize=8)
+plt.savefig(os.path.join(base,'tempo_execucao_plot.png'),dpi=200,bbox_inches='tight')
+plt.yscale('log');plt.ylabel('tempo (s, log)')
+plt.savefig(os.path.join(base,'tempo_execucao_log_plot.png'),dpi=200,bbox_inches='tight')
+print('plots ok')
