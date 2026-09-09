@@ -1,0 +1,89 @@
+\documentclass[11pt,letterpaper]{article}
+\usepackage{../assets/scientific_report}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{geometry}
+\geometry{headheight=23pt, top=2cm, bottom=2cm, left=2.5cm, right=2.5cm}
+\setlength{\parskip}{0.5em}
+\setlength{\parindent}{0pt}
+\lstset{
+  language=C,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{green!60!black}\itshape,
+  stringstyle=\color{red!80!black},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  numbersep=8pt,
+  frame=single,
+  breaklines=true,
+  captionpos=b,
+  tabsize=4,
+  showstringspaces=false
+}
+\begin{document}
+\pagestyle{plain}
+\begin{center}
+{\LARGE\bfseries Regioes Criticas Nomeadas e Locks Explicitos}\\[0.4em]
+{\normalsize Eugenio Vitor Lopes dos Santos}\\[0.3em]
+{\small DCA3703, Programacao Paralela, UFRN}\\[0.3em]
+\end{center}
+\section{Enunciado}
+Escrever um programa que cria tarefas para realizar N insercoes em duas listas encadeadas. Cada tarefa escolhe aleatoriamente em qual lista inserir. Garantir integridade evitando condicao de corrida e, sempre que possivel, usar regioes criticas nomeadas para que a insercao em uma lista nao bloqueie a outra. Generalizar para numero de listas definido pelo usuario. Explicar por que regioes criticas nomeadas nao bastam e por que locks explicitos se tornam necessarios.
+\section{Fundamentacao}
+Inserir no inicio custa dois stores: \texttt{novo->prox = head; head = novo}. Duas threads lendo o mesmo \texttt{head} perdem uma insercao (\textit{lost update}).
+
+\texttt{critical} sem nome trava tudo num lock global unico, inclusive listas independentes. \texttt{critical(name)} separa um lock por nome: mesmo nome espera junto, nome diferente anda junto.
+
+O nome sai resolvido em compilacao e nao aceita variavel como \texttt{critical(locks[i])}. Para N definido em execucao foi alocado \texttt{omp\_lock\_t locks[N]}: \texttt{omp\_init\_lock} antes do paralelo, \texttt{omp\_set\_lock}/\texttt{omp\_unset\_lock} por insercao, \texttt{omp\_destroy\_lock} depois. Foram criadas \texttt{tasks} com \texttt{parallel+single+task} e foi sorteado com \texttt{rand\_r(\&seed)} privada por tarefa; \texttt{rand()} divide estado global e corre com concorrencia.
+\section{Implementacao}
+Foram escritos dois arquivos no padrao v1/v2 da tarefa08 e compilados com GCC 13.3, \texttt{-std=c11 -O2 -Wall -fopenmp -lm}. Foi medido com \texttt{agora()}, sobre \texttt{clock\_gettime(CLOCK\_MONOTONIC)}: resolucao de nanossegundos, imune a ajustes do relogio.
+
+Cada cronometro cobre so a regiao paralela de insercoes (\texttt{parallel+single+tasks}). Alocacao, \texttt{omp\_init\_lock} e \texttt{omp\_destroy\_lock} ficam de fora. Foi fixado o escopo com \texttt{default(none)}. v1 guarda duas cabecas com \texttt{critical(lista0)}/\texttt{critical(lista1)}; v2 guarda \texttt{heads[nlistas]} com \texttt{locks[nlistas]}. Foram contados os nos no fim e conferido \texttt{total==N}.
+\begin{lstlisting}[language=bash,caption={Compilacao e execucao}]
+gcc -std=c11 -O2 -Wall -fopenmp v1_critical_nomeado.c -o v1_critical -lm
+gcc -std=c11 -O2 -Wall -fopenmp v2_locks.c -o v2_locks -lm
+./v1_critical 50000
+./v2_locks 50000 8
+OMP_NUM_THREADS=4 ./v2_locks 100000 8
+\end{lstlisting}
+\section{Resultados}
+Foram executados testes num i7-14700HX sob WSL2 (14 nucleos fisicos, 28 threads logicas). Foi varrido 1 a 28 threads com N = 50000 e 8 listas na v2. Cada ponto vale a mediana de 3 repeticoes. CSV completo em anexo.
+\begin{lstlisting}[language=bash,caption={Saidas reais de integridade}]
+[v1 critical nomeado] N=50000 c0=24998 c1=25002 total=50000 OK tempo=0.3221 s
+[v2 locks] N=50000 nlistas=8 total=50000 OK tempo=0.3807 s
+[v2 locks] N=50000 nlistas=2 total=50000 OK tempo=0.3531 s
+\end{lstlisting}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{tempo_execucao_plot.png}
+\caption{Tempo contra threads em escala linear.}
+\end{figure}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.6\textwidth]{comparacao_versoes.png}
+\caption{Comparacao v1 x v2.}
+\end{figure}
+\section{Discussao}
+\subsection{Sem bloqueio cruzado na v1}
+\texttt{critical} sem nome trava tudo num lock global: a lista 0 bloqueia a 1 sem dividir dado. Foram separados \texttt{critical(lista0)} e \texttt{critical(lista1)} em dois \texttt{locks} independentes. Mesma lista espera junto; listas diferentes andam juntas. Sobra so a espera inevitavel: duas tarefas na mesma lista.
+\subsection{Por que o nomeado nao generaliza}
+O nome do critical e literal de compilacao e nao aceita variavel:
+\begin{lstlisting}[language=C,caption={Nao indexavel: nome precisa ser literal}]
+// invalido: nao compila / nao indexa por i
+#pragma omp critical(locks[i])
+  inserir(&heads[i], v);
+\end{lstlisting}
+1000 listas pediriam 1000 nomes escritos a mao, e N so chega em execucao via \texttt{argv[2]}. Um nome unico para tudo volta a serializar o que e independente. Foi alocado \texttt{malloc + omp\_init\_lock} antes do paralelo, foi travado \texttt{omp\_set\_lock}/\texttt{omp\_unset\_lock} por \texttt{qual} a cada insercao e liberado com \texttt{omp\_destroy\_lock} depois. Indices distintos andam juntos; mesmo indice espera. Vale a regra curta: pouco e fixo usa \texttt{critical(name)}; N variavel usa vetor de \texttt{locks} (\texttt{omp\_lock\_t}).
+\subsection{Sobre o tempo: por que sobe com threads}
+Cada insercao paga uma entrada em \texttt{critical}/\texttt{lock} mais a criacao de N \texttt{tasks}. Com N = 20000--50000 esse custo engole o trabalho util (um \texttt{malloc} + dois stores). Mais threads somam contencao e gerenciamento sem abrir paralelismo novo: as curvas sobem. Nome e \texttt{locks} removem o bloqueio cruzado. A fila na mesma lista fica — custo do dado compartilhado.
+\section{Conclusao}
+Foram geradas N \texttt{tasks} com \texttt{parallel+single}: \texttt{total==N} OK nas duas versoes. Foi sorteado com \texttt{rand\_r(\&seed)} privada: 24998/25002, $\approx$ N/2 por lista, sem a corrida do \texttt{rand()} global. Dois nomes isolam as listas na v1. \texttt{argv[2]} fixa N listas na v2, um \texttt{omp\_lock\_t} por lista. Nome nao escala porque sai resolvido em compilacao; \texttt{locks} indexaveis cobrem o N de execucao. Cada insercao paga uma entrada em \texttt{critical}/\texttt{lock}; privatizar nao cabe porque a lista e compartilhada.
+\appendix
+\newpage
+\section{Codigo-fonte}
+\lstinputlisting[caption={v1\_critical\_nomeado.c}]{v1_critical_nomeado.c}
+\lstinputlisting[caption={v2\_locks.c}]{v2_locks.c}
+\end{document}
