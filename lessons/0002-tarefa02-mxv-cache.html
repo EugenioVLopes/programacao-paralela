@@ -47,9 +47,17 @@
 
   <main>
 
-    <!-- Seção 1: Poder computacional -->
-    <section id="poder-computacional">
-      <h2>1. Por que precisamos de poder computacional?</h2>
+    <!-- Secao 1: Contexto -->
+    <section>
+      <h2>1. Contexto e ponto de partida</h2>
+      <div class="callout">
+        <div class="callout-title">Base teórica na Teoria 02</div>
+        <p>
+          Poder computacional, Power Wall, Memory Wall e núcleos lógicos estão em
+          <a href="../reference/02-teoria-hierarquia-memoria-cache.html">Teoria 02</a>.
+          Esta lição foca na prática: dissecção dos dois padrões de acesso e medição.
+        </p>
+      </div>
       <p>
         Muitos problemas reais exigem uma quantidade de c&aacute;lculos impratic&aacute;vel para um &uacute;nico processador sequencial. Alguns exemplos:
       </p>
@@ -62,42 +70,17 @@
       <p>
         A <strong>multiplica&ccedil;&atilde;o matriz-vetor (MxV)</strong> &eacute; o bloco fundamental de todos esses c&aacute;lculos. Redes neurais s&atilde;o compostas de centenas de camadas lineares (cada uma &eacute; uma MxV) seguidas de ativa&ccedil;&otilde;es. Solucionadores de equa&ccedil;&otilde;es diferenciais iterativos (m&eacute;todo de gradiente conjugado, GMRES) fazem uma MxV por itera&ccedil;&atilde;o.
       </p>
-    </section>
-
-    <!-- Seção 2: Limitações do processador sequencial -->
-    <section id="limites-hardware">
-      <h2>2. Por que um processador sequencial n&atilde;o basta?</h2>
-      <p>
-        Durante as d&eacute;cadas de 1970 a 2004, a Lei de Moore e a Escala de Dennard garantiam um aumento de frequência de ~52% ao ano. Um programa sequencial ficava automaticamente duas vezes mais r&aacute;pido a cada 18 meses sem nenhuma modifica&ccedil;&atilde;o no c&oacute;digo.
-      </p>
-      <p>
-        Dois muros f&iacute;sicos quebraram essa traje&oacute;ria:
-      </p>
-      <ul>
-        <li>
-          <strong>Power Wall (barreira t&eacute;rmica)</strong>: a pot&ecirc;ncia din&acirc;mica de um transistor &eacute; $P = C \cdot V^2 \cdot f$. Com transistores em escala nanom&eacute;trica, a corrente de fuga impediu a redu&ccedil;&atilde;o da tens&atilde;o $V$. Aumentar $f$ causou picos de calor insuport&aacute;veis — o clock ficou travado entre 3 e 5 GHz a partir de 2005.
-        </li>
-        <li>
-          <strong>Memory Wall</strong>: a velocidade da CPU cresceu mais r&aacute;pido que a velocidade da RAM. Um acesso &agrave; mem&oacute;ria principal que demora ~80 ns representa 240 ciclos de CPU parada esperando dados. A MxV acessa $N^2$ elementos da matriz; sem cache eficiente, o barramento satura.
-        </li>
-      </ul>
-
-      <div class="math-block">
-        $$P_{\text{din}} = C \cdot V^2 \cdot f \quad\Rightarrow\quad \text{dobrar } f \text{ quadruplica a pot&ecirc;ncia dissipada}$$
-      </div>
-
-      <h3>N&uacute;cleos l&oacute;gicos como sa&iacute;da</h3>
-      <p>
-        A solu&ccedil;&atilde;o da ind&uacute;stria foi manter a frequência est&aacute;vel e multiplicar o n&uacute;mero de n&uacute;cleos no mesmo chip. Processadores modernos possuem 8 a 192 n&uacute;cleos f&iacute;sicos. Cada n&uacute;cleo pode executar um fluxo independente de instru&ccedil;&otilde;es — mas somente se o programa for <strong>escrito para isso</strong>. C&oacute;digo sequencial usa apenas um n&uacute;cleo; os outros ficam ociosos.
-      </p>
-      <p>
+            <p>
         Antes de paralelizar, por&eacute;m, &eacute; essencial entender <em>onde o tempo vai</em> na vers&atilde;o sequencial. A Tarefa 02 faz exatamente isso: mede a diferen&ccedil;a entre dois padr&otilde;es de acesso &agrave; mem&oacute;ria que realizam a mesma computa&ccedil;&atilde;o — e revela que o gargalo &eacute; o barramento, n&atilde;o a CPU.
       </p>
     </section>
 
-    <!-- Seção 3: Análise de row_major.c -->
+    
+    
+
+    <!-- Secao 2: row_major.c -->
     <section id="row-major">
-      <h2>3. Dissec&ccedil;&atilde;o de <code>row_major.c</code></h2>
+      <h2>2. Dissec&ccedil;&atilde;o de <code>row_major.c</code></h2>
 
       <h3>Cabe&ccedil;alho e macros</h3>
       <pre><code><span class="hl-prep">#include</span> <span class="hl-str">&lt;stdio.h&gt;</span>   <span class="hl-com">// printf</span>
@@ -159,9 +142,9 @@
       </div>
     </section>
 
-    <!-- Seção 4: Análise de collum_major.c -->
+    <!-- Secao 3: column_major.c -->
     <section id="col-major">
-      <h2>4. Dissec&ccedil;&atilde;o de <code>collum_major.c</code></h2>
+      <h2>3. Dissec&ccedil;&atilde;o de <code>collum_major.c</code></h2>
 
       <h3>O la&ccedil;o transposto</h3>
       <pre><code><span class="hl-type">clock_t</span> inicio = <span class="hl-fn">clock</span>();
@@ -202,9 +185,9 @@ A[(N-1)*N+j] →  base + ((N-1)N+j)*8  <span class="hl-com">// salto de N×8 byt
       </p>
     </section>
 
-    <!-- Seção 5: Comparação de desempenho -->
+    <!-- Secao 4: desempenho -->
     <section id="desempenho">
-      <h2>5. Comparativo de desempenho e interpreta&ccedil;&atilde;o</h2>
+      <h2>4. Comparativo de desempenho e interpreta&ccedil;&atilde;o</h2>
 
       <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; font-family: 'Inter', sans-serif; font-size: 0.9rem;">
         <thead>
@@ -248,9 +231,9 @@ A[(N-1)*N+j] →  base + ((N-1)N+j)*8  <span class="hl-com">// salto de N×8 byt
       </p>
     </section>
 
-    <!-- Seção 6: Quizzes -->
+    <!-- Secao 5: quizzes -->
     <section id="quizzes">
-      <h2>6. Quizzes</h2>
+      <h2>5. Quizzes</h2>
 
       <!-- Quiz 1 -->
       <div class="quiz-container" id="quiz1">
@@ -337,9 +320,9 @@ A[(N-1)*N+j] →  base + ((N-1)N+j)*8  <span class="hl-com">// salto de N×8 byt
       </div>
     </section>
 
-    <!-- Seção 7: Navegação -->
+    <!-- Secao 6: navegacao -->
     <section id="navegacao">
-      <h2>7. Pr&oacute;ximos passos</h2>
+      <h2>6. Pr&oacute;ximos passos</h2>
       <div class="source-card">
         <ul style="margin: 0; padding-left: 1.2em;">
           <li><a href="../reference/02-teoria-hierarquia-memoria-cache.html">Teoria 02</a> — gargalo de von Neumann, Memory Wall, modelo Roofline e NUMA</li>

@@ -246,17 +246,13 @@ Arquivo: documento5.txt | Thread ID: 0</code></pre>
 
     <!-- ===================== SEÇÃO 9: PODER COMPUTACIONAL ===================== -->
     <section id="poder-computacional">
-      <h2>9. Poder computacional e paralelismo de tarefas</h2>
+      <h2>9. Paralelismo de laço vs. paralelismo de tarefas</h2>
 
-      <h3>Limitações físicas de processadores sequenciais</h3>
-      <p>
-        Historicamente, o ganho de desempenho em núcleo único ocorreu pelo aumento de frequência de clock e pela ampliação da profundidade de pipeline. Limites físicos de dissipação térmica e fuga de corrente elétrica resultaram na estagnação da frequência de clock, fenômeno conhecido como barreira térmica (*Power Wall*).
-      </p>
-
-      <h3>Transição para múltiplos núcleos lógicos</h3>
-      <p>
-        A continuidade no aumento de capacidade computacional passou a exigir múltiplos núcleos em um mesmo encapsulamento. Para acelerar o processamento, aplicações decompõem o trabalho em unidades executáveis paralelamente.
-      </p>
+      <div class="callout">
+        <div class="callout-title">Base teórica na Teoria 07</div>
+        <p>Barreira térmica e multicore estão em
+        <a href="../reference/06-teoria-task-openmp.html">Teoria 07</a>. Aqui: por que lista encadeada pede tasks.</p>
+      </div>
 
       <h3>Diferença entre paralelismo de laço e paralelismo de tarefas</h3>
       <p>

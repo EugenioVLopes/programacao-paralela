@@ -10,7 +10,7 @@ Para cada tarefa da disciplina (Tarefas 01 a 13), o agente deve gerar **dois doc
 
 Documento teórico dedicado à tarefa, cobrindo em um único arquivo:
 
-1. **Fundamentos de hardware**: Explicação física dos gargalos da tarefa (Memory Wall, Power Wall, hierarquia de cache, linhas de 64 bytes, dependências RAW, falso compartilhamento, NUMA).
+1. **Fundamentos de hardware**: Explicação física dos gargalos da tarefa (Memory Wall, Power Wall, gargalo de von Neumann, hierarquia de cache, linhas de 64 bytes, write-through vs write-back, dirty/invalid bits, snooping vs diretório, dependências RAW, falso compartilhamento, NUMA). Usar `assets/index.md` (slides do professor) como fonte primária do vocabulário e dos objetivos do tópico.
 2. **Modelagem matemática**: Fórmulas de convergência, erro de truncamento, representação numérica (IEEE 754), speedup, leis de Amdahl e Gustafson.
 3. **Contexto em HPC**: Motivação do problema e limites de hardware testados.
 4. **Apêndice de referência rápida** (seção final obrigatória no mesmo arquivo):
@@ -22,15 +22,13 @@ Não criar arquivo separado de referência rápida (`reference/01-ponto-flutuant
 
 ### B. Lição prática em ./lessons/ (ex: `lessons/0001-tarefa01-leibniz-pi.html`)
 
-Arquivo HTML autocontido focado na prática e na teoria aplicada, contendo:
+Arquivo HTML enxuto focado só na prática (sem repetir teoria), contendo:
 
-1. **Análise do código C**: Explicação linha a linha de tipos, ponteiros, laços e chamadas de sistema.
-2. **Conceitos de programação paralela**:
-   - **Poder computacional**: Definição e aplicações reais que demandam maior capacidade (simulações científicas, previsão do tempo, IA, modelos de linguagem).
-   - **Limitação de processadores sequenciais**: Limites físicos espaciais e energéticos, estagnação de frequência e barreira térmica (Power Wall).
-   - **Cores lógicos**: Transição do aumento de frequência em núcleo único para o uso de múltiplos núcleos lógicos operando paralelamente.
-3. **Quizzes simétricos**: Questões de múltipla escolha com opções de tamanho e contagem de palavras idênticos.
-4. **Navegação**: Links relativos apenas para o documento único de teoria da tarefa e para o documento geral `reference/00-fundamentos-programacao-paralela.html`. Não linkar arquivo separado de referência rápida.
+1. **Contexto curto (máx. 1 seção)**: gancho específico da tarefa + callout `Base teórica na Teoria XX` com link. Poder computacional, Power Wall e núcleos lógicos ficam na teoria — proibido repetir essas seções na lição.
+2. **Análise do código C**: explicação linha a linha de tipos, ponteiros, laços e chamadas de sistema.
+3. **Medição**: o que foi medido de verdade (flags, threads, N) e como interpretar as curvas.
+4. **Quizzes simétricos**: questões de múltipla escolha com opções de tamanho e contagem de palavras idênticos.
+5. **Navegação**: links relativos apenas para o documento único de teoria da tarefa e para o documento geral `reference/00-fundamentos-programacao-paralela.html`. Não linkar arquivo separado de referência rápida.
 
 ## 2. Portabilidade, GitHub Pages e links
 

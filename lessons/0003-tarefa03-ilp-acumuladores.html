@@ -47,9 +47,17 @@
 
   <main>
 
-    <!-- Seção 1: Poder computacional -->
-    <section id="poder-computacional">
-      <h2>1. Por que precisamos de poder computacional?</h2>
+    <!-- Secao 1: Contexto -->
+    <section>
+      <h2>1. Contexto e ponto de partida</h2>
+      <div class="callout">
+        <div class="callout-title">Base teórica na Teoria 03</div>
+        <p>
+          Poder computacional, Power Wall e o papel do ILP estão em
+          <a href="../reference/03-teoria-ilp-pipeline-superscalar.html">Teoria 03</a>.
+          Abaixo: dissecção de <code>tarefa03.c</code> e medição por nível de otimização.
+        </p>
+      </div>
       <p>
         Operações de <strong>redução vetorial</strong> (como somar todos os elementos de um vetor com centenas de milhões de números) constituem a base computacional de inúmeras aplicações de alto impacto:
       </p>
@@ -64,42 +72,12 @@
       </p>
     </section>
 
-    <!-- Seção 2: Limitações do processador sequencial -->
-    <section id="limites-hardware">
-      <h2>2. Limitações de processadores sequenciais e o papel do ILP</h2>
-      <p>
-        Historicamente, os processadores aumentavam o desempenho simplesmente elevando a frequência de clock. Esse avanço estagnou na faixa de 3 a 5 GHz devido a dois limites físicos fundamentais:
-      </p>
-      <ul>
-        <li>
-          <strong>Power Wall (Barreira Térmica)</strong>: a potência dinâmica $P = C \cdot V^2 \cdot f$ escala linearmente com a frequência e quadraticamente com a tensão. Aumentar ainda mais o clock derreteria os circuitos de silício.
-        </li>
-        <li>
-          <strong>Limites Espaciais e Escala de Dennard</strong>: a miniaturização dos transistores atingiu dimensões atômicas, onde efeitos quânticos (corrente de fuga) impedem a redução da tensão $V$.
-        </li>
-      </ul>
+    
+    
 
-      <div class="math-block">
-        $$P_{\text{din}} \approx C \cdot V^2 \cdot f \quad \xrightarrow{\text{Fim de Dennard}} \quad f \text{ estagnou em } \sim 3\text{--}5\text{ GHz}$$
-      </div>
-
-      <h3>A resposta da arquitetura: ILP dentro do núcleo e múltiplos núcleos lógicos</h3>
-      <p>
-        Para continuar extraindo desempenho de cada ciclo de clock, os projetistas equiparam os núcleos de CPU com <strong>paralelismo em nível de instrução (ILP)</strong>:
-      </p>
-      <ul>
-        <li><strong>Pipelines profundos</strong>: instruções divididas em estágios independentes operando como esteiras de produção.</li>
-        <li><strong>Arquiteturas Superescalares</strong>: múltiplos canais de despacho que permitem iniciar 4 a 6 instruções por ciclo no mesmo núcleo.</li>
-        <li><strong>Execução Fora de Ordem (OoO)</strong>: o processador rearranja instruções na janela de execução para manter as unidades aritméticas ocupadas.</li>
-      </ul>
-      <p>
-        No entanto, o hardware só consegue disparar instruções em paralelo se elas forem <strong>independentes</strong>. Se uma instrução precisa do resultado da anterior, o pipeline é forçado a esperar — gerando bolhas de ociosidade.
-      </p>
-    </section>
-
-    <!-- Seção 3: Dissecção linha a linha de tarefa03.c -->
+    <!-- Secao 2: disseccao -->
     <section id="disseccao-codigo">
-      <h2>3. Dissecção linha a linha de <code>tarefa03.c</code></h2>
+      <h2>2. Dissecção linha a linha de <code>tarefa03.c</code></h2>
 
       <h3>1. Macros e cabeçalhos de sistema</h3>
       <pre><code><span class="hl-prep">#define</span> _POSIX_C_SOURCE <span class="hl-num">199309L</span>
@@ -210,9 +188,9 @@
       </ul>
     </section>
 
-    <!-- Seção 4: Análise comparativa e níveis de otimização -->
+    <!-- Secao 3: O0/O2/O3 -->
     <section id="comparativo-otimizacao">
-      <h2>4. Análise de desempenho por nível de otimização (-O0, -O2, -O3)</h2>
+      <h2>3. Análise de desempenho por nível de otimização (-O0, -O2, -O3)</h2>
       <p>
         Abaixo estão os dados empíricos medidos no ambiente de teste para $N = 100.000.000$ inteiros:
       </p>
@@ -266,9 +244,9 @@
       </ol>
     </section>
 
-    <!-- Seção 5: Quizzes simétricos -->
+    <!-- Secao 4: quizzes -->
     <section id="quizzes">
-      <h2>5. Quizzes interativos</h2>
+      <h2>4. Quizzes interativos</h2>
 
       <!-- Quiz 1 -->
       <div class="quiz-container" id="quiz1">
@@ -355,9 +333,9 @@
       </div>
     </section>
 
-    <!-- Seção 6: Navegação -->
+    <!-- Secao 5: navegacao -->
     <section id="navegacao">
-      <h2>6. Próximos passos</h2>
+      <h2>5. Próximos passos</h2>
       <div class="source-card">
         <ul style="margin: 0; padding-left: 1.2em;">
           <li><a href="../reference/03-teoria-ilp-pipeline-superscalar.html">Teoria 03</a> — Pipeline, execução superescalar, dependências de dados RAW/WAR/WAW, Out-of-Order e registradores físicos.</li>

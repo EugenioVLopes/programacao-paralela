@@ -120,41 +120,14 @@ pi *= <span class="hl-num">4.0</span>;</code></pre>
 
     <!-- Seção 3: Conceitos Teóricos de Programação Paralela -->
     <section>
-      <h2>3. Conceitos de programação paralela e evolução de hardware</h2>
+      <h2>3. Por que Leibniz pede paralelismo</h2>
 
-      <h3>A. Poder computacional</h3>
-      <p>
-        <strong>Poder computacional</strong> é a capacidade total de processamento que um sistema computacional oferece para executar tarefas em um determinado tempo. Quanto mais complexo é um problema, maior é a exigência por poder computacional.
-      </p>
-      <p>
-        Aplicações reais demandam resultados cada vez mais precisos e em menor tempo:
-      </p>
-      <ul>
-        <li><strong>Simulações científicas para descoberta de novas drogas</strong>: Modelagem de acoplamento molecular (*in silico*) para testar compostos farmacológicos contra parasitas e vírus antes de testes em laboratório.</li>
-        <li><strong>Modelagem de sistemas para previsão do tempo</strong>: Resolução de equações diferenciais atmosféricas e climatológicas em malhas tridimensionais globais.</li>
-        <li><strong>Treinamento de modelos de Inteligência Artificial</strong>: Processamento de bilhões de parâmetros em grandes modelos de linguagem (como ChatGPT e LLMs).</li>
-      </ul>
-
-      <h3>B. Limitação dos processadores sequenciais</h3>
-      <p>
-        Historicamente, o ganho de desempenho em processadores sequenciais dependia de adicionar mais transistores ao chip e elevar sua frequência de operação. No entanto, o crescimento puramente sequencial encontrou <strong>limites físicos inevitáveis</strong>:
-      </p>
-      <ul>
-        <li><strong>Limite espacial</strong>: A miniaturização dos transistores atingiu dimensões atômicas, onde efeitos quânticos e correntes de fuga dificultam o controle da passagem de elétrons.</li>
-        <li><strong>Limite energético e térmico (Power Wall)</strong>: A potência dinâmica dissipada varia com o quadrado da tensão e linearmente com a frequência ($P \approx C \cdot V^2 \cdot f$). Como não foi mais possível reduzir a tensão $V$ sem gerar instabilidade, elevar a frequência $f$ além de 3 a 5 GHz passou a superaquecer os chips de forma insustentável.</li>
-      </ul>
-      <p>
-        Essas barreiras físicas estagnaram a evolução do desempenho de núcleos individuais operando em modo sequencial.
-      </p>
-
-      <h3>C. Cores lógicos e a transição para o paralelismo</h3>
-      <p>
-        Diante da impossibilidade de aumentar indefinidamente a frequência de um único núcleo, a indústria de semicondutores mudou a arquitetura dos processadores:
-      </p>
       <div class="callout">
-        <div class="callout-title">A mudança para multicore</div>
+        <div class="callout-title">Contexto teórico na Teoria 01</div>
         <p>
-          Em vez de buscar aumentar a eficiência de um único núcleo sequencial, a solução foi **multiplicar a quantidade de cores lógicos** em um mesmo chip. Dessa forma, procura-se utilizar mais núcleos trabalhando em conjunto para executar instruções simultaneamente em paralelo.
+          Poder computacional, limites físicos (Power Wall) e a transição para multicore estão em
+          <a href="../reference/01-teoria-ponto-flutuante-hardware.html">Teoria 01</a>.
+          Aqui vai direto ao ponto: por que a série de Leibniz pede paralelismo.
         </p>
       </div>
 
