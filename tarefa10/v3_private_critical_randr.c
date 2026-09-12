@@ -11,12 +11,8 @@ static double agora(void) {
     return t.tv_sec + t.tv_nsec / 1e9;
 }
 
-int main(int argc, char *argv[]) {
-    long N = (argc > 1) ? atol(argv[1]) : 5000000L;
-    if (N <= 0) {
-        fprintf(stderr, "Uso: %s [Npontos]\n", argv[0]);
-        return 1;
-    }
+int main(void) {
+    const long N = 2000000L;
 
     long total = 0;
     double tempo = agora();
