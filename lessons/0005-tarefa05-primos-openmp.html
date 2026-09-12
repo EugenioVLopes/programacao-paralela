@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Lição prática 05: dissecção de tarefa05.c. Race conditions ao paralelizar um laço com OpenMP.">
-  <title>Lição 05: Race Conditions ao Paralelizar Laços</title>
+  <title>Material 05: Race Conditions ao Paralelizar Laços</title>
   <link rel="stylesheet" href="../assets/style.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
@@ -30,15 +30,15 @@
 <body>
   <nav class="top-nav">
     <div style="display: flex; gap: 16px;">
-      <a href="../reference/05-teoria-primos-openmp.html">&larr; Teoria 05</a>
-      
+      <a href="#teoria">&larr; Teoria 05</a>
+
       <a href="../reference/00-fundamentos-programacao-paralela.html">Índice geral</a>
     </div>
-    <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+    <a href="../index.html">Início</a><button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
   </nav>
 
   <header>
-    <div class="lesson-badge">Lição 05 &bull; DCA3703</div>
+    <div class="lesson-badge">Material 05 &bull; DCA3703</div>
     <h1>Lição 05: Race Conditions ao Paralelizar Laços</h1>
     <div class="metadata">
       Tarefa 05 &bull; Dissecção de <code>tarefa05.c</code> &bull; Observação de estado compartilhado
@@ -139,12 +139,137 @@
       </div>
     </section>
 
-  </main>
+  <section id="teoria"><h2>Fundamentação teórica</h2><p>Teoria, modelagem matemática e contexto de HPC integrados à prática desta tarefa.</p></section>
+<section>
+      <h2>1. Paralelismo de laços</h2>
+      <p>
+        A maioria dos programas numéricos gasta tempo em laços.
+        O OpenMP distribui as iterações de um laço entre as threads disponíveis.
+      </p>
+      <p>
+        A diretiva <code>#pragma omp parallel for</code> cria as threads e divide os índices.
+        Com 1000 iterações e 4 threads, o escalonamento estático atribui 250 iterações a cada thread.
+      </p>
+    </section>
+
+    <section>
+      <h2>2. Race conditions</h2>
+      <p>
+        Uma <strong>race condition</strong> ocorre quando threads escrevem na mesma variável sem sincronização.
+        O hardware sobrepõe as operações e corrompe o resultado.
+      </p>
+      <p>
+        A CPU executa <code>total_primos_paralelo++</code> em três passos:
+      </p>
+      <ol>
+        <li><strong>LOAD:</strong> A CPU lê o valor da memória para o registrador.</li>
+        <li><strong>ADD:</strong> A CPU soma 1 no registrador.</li>
+        <li><strong>STORE:</strong> A CPU grava o resultado na memória.</li>
+      </ol>
+      <p>
+        Duas threads executam o LOAD ao mesmo tempo.
+        Ambas leem o valor 10.
+        Ambas somam 1 e gravam 11.
+        O programa perde um incremento.
+        O erro não gera aviso nem segfault.
+      </p>
+    </section>
+
+    <section>
+      <h2>3. Balanceamento de carga</h2>
+      <p>
+        Testar se 4 é primo custa poucos ciclos.
+        Testar se 4.999.999 é primo custa muitos ciclos.
+        A carga de trabalho varia entre iterações.
+      </p>
+      <p>
+        O escalonamento <strong>static</strong> divide os índices em blocos contíguos iguais:
+      </p>
+      <ul>
+        <li>Thread 0: testa de 2 até 2.500.000.</li>
+        <li>Thread 1: testa de 2.500.001 até 5.000.000.</li>
+      </ul>
+      <p>
+        A Thread 1 processa números maiores e gasta mais ciclos.
+        A Thread 0 termina antes e fica ociosa.
+        Esse desequilíbrio reduz o speedup abaixo do ideal.
+      </p>
+    </section>
+
+
+    <section id="questoes-adicionais"><h2>Questões adicionais</h2><div class="quiz-container">
+        <div class="quiz-header"><span>Questão adicional 1 de 2</span></div>
+        <div class="quiz-question">Por que a contagem compartilhada produz race condition?</div>
+        <ol class="quiz-options"><li>A) Incrementos concorrentes podem perder atualizações entre threads</li><li>B) Divisões inteiras sempre retornam resultados não determinísticos</li><li>C) Laços paralelos ignoram automaticamente números primos pequenos</li><li>D) Cada thread executa uma quantidade fixa diferente</li></ol>
+        <details><summary>Conferir resposta</summary><p><strong>Resposta: A.</strong> Incrementos concorrentes podem perder atualizações entre threads.</p></details>
+      </div><div class="quiz-container">
+        <div class="quiz-header"><span>Questão adicional 2 de 2</span></div>
+        <div class="quiz-question">Qual recurso combina contagens locais com baixo custo?</div>
+        <ol class="quiz-options"><li>A) Uma cláusula reduction aplicada ao contador compartilhado</li><li>B) Uma região critical aplicada em toda divisão</li><li>C) Uma barreira explícita depois de cada candidato</li><li>D) Um lock diferente para cada possível divisor</li></ol>
+        <details><summary>Conferir resposta</summary><p><strong>Resposta: A.</strong> Uma cláusula reduction aplicada ao contador compartilhado.</p></details>
+      </div></section><section id="referencia-rapida">
+      <h2>Apêndice: Referência rápida</h2>
+      <p><em>Conteúdo consolidado do antigo arquivo de referência rápida. Mantido aqui para consulta rápida sem trocar de página.</em></p>
+<section>
+      <h2>1. Compilação e execução</h2>
+      <pre><code><span class="hl-com"># Compilação com OpenMP</span>
+$ gcc -std=c11 -Wall -Wextra -fopenmp tarefa05.c -o tarefa05 -lm
+
+<span class="hl-com"># Executa com o padrão de threads do sistema</span>
+$ ./tarefa05 5000000
+
+<span class="hl-com"># Define 4 threads e executa</span>
+$ <span class="hl-kw">export</span> OMP_NUM_THREADS=4
+$ ./tarefa05 5000000
+
+<span class="hl-com"># Executa definindo a variável inline</span>
+$ OMP_NUM_THREADS=2 ./tarefa05 5000000
+</code></pre>
+      <ul>
+        <li>O argumento é o limite superior $N$ para contagem de primos.</li>
+        <li>A saída mostra <code>seq_time</code>, <code>par_time</code>, <code>seq_count</code> e <code>par_count</code>.</li>
+        <li>Use <code>./execute.sh</code> para rodar o experimento completo com todas as thread counts e gerar os gráficos.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>2. Sintaxe básica</h2>
+      <pre><code><span class="hl-prep">#pragma</span> omp parallel for
+<span class="hl-kw">for</span> (<span class="hl-type">long</span> numero_atual = <span class="hl-num">0</span>; numero_atual &lt; limite_superior; numero_atual++) {
+    <span class="hl-comment">// Operações independentes sobre o número atual</span>
+}</code></pre>
+      <ul>
+        <li>O laço precisa de limites fixos. O OpenMP calcula a divisão antes de executar.</li>
+        <li>Variáveis declaradas dentro do laço são privadas por padrão.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>3. Escalonamento (schedule)</h2>
+      <p>A cláusula <code>schedule(tipo, tamanho_bloco)</code> controla a divisão das iterações.</p>
+      <ul>
+        <li><code>schedule(static)</code> — Divide as iterações em blocos iguais no início. Custo mínimo. Ideal para carga uniforme.</li>
+        <li><code>schedule(dynamic, tamanho_bloco)</code> — Cada thread requisita um bloco sob demanda. Mais overhead, mas equilibra carga desigual.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>4. Race condition com variável compartilhada</h2>
+      <pre><code><span class="hl-type">long</span> total_primos = <span class="hl-num">0</span>;
+<span class="hl-prep">#pragma</span> omp parallel for
+<span class="hl-kw">for</span> (<span class="hl-type">long</span> numero_atual = <span class="hl-num">0</span>; numero_atual &lt; limite_superior; numero_atual++) {
+    <span class="hl-kw">if</span> (<span class="hl-fn">eh_primo</span>(numero_atual)) total_primos++;  <span class="hl-comment">// Race condition: resultado incorreto</span>
+}</code></pre>
+      <p>Múltiplas threads leem e escrevem <code>total_primos</code> ao mesmo tempo. O resultado fica corrompido.</p>
+    </section>
+    </section>
+
+</main>
 
   <footer class="footer-nav">
-    <a href="../reference/05-teoria-primos-openmp.html">&larr; Teoria 05</a>
-    
-  </footer>
+    <a href="#teoria">&larr; Teoria 05</a>
+
+  <a href="../index.html">Início</a></footer>
 
   <script>
     /* -------- Theme toggle -------- */

@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Lição prática 11: validação e particionamento da difusão viscosa 2D com OpenMP.">
+  <title>Material 11: Validar e particionar a difusão</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script defer src="../assets/lesson.js"></script>
+  <script defer src="../assets/difusao3d.js"></script>
+</head>
+<body>
+  <nav class="top-nav">
+    <div style="display: flex; gap: 16px;">
+      <a href="#teoria">&larr; Teoria 11</a>
+      <a href="../reference/00-fundamentos-programacao-paralela.html">Índice geral</a>
+    </div>
+    <a href="../index.html">Início</a><button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+  </nav>
+
+  <header>
+    <div class="lesson-badge">Material 11 &bull; DCA3703</div>
+    <h1>Primeiro preserve o campo; depois distribua o trabalho</h1>
+    <div class="metadata">
+      Tarefa 11 &bull; Difusão viscosa 2D &bull; Validação, <code>schedule</code> e <code>collapse</code>
+    </div>
+  </header>
+
+  <main>
+    <section id="entrega">
+      <h2>1. Sua entrega</h2>
+      <p>
+        O código implementa uma simplificação viscosa de Navier–Stokes: simula uma componente da velocidade por
+        difusão, omitindo advecção, pressão e forças externas. Você vai comparar sete variantes: sequencial e
+        <code>static</code>, <code>dynamic</code>, <code>guided</code>, cada política com e sem <code>collapse</code>.
+        Cada arquivo <code>tarefa11/v*.c</code> contém o programa completo, duplicado intencionalmente para comparar
+        as mudanças diretamente.
+      </p>
+
+      <div class="callout" style="border-left: 1px solid var(--border);">
+        <p>
+          <strong>Base teórica na Teoria 11:</strong>
+          <a href="#teoria">modelo, estabilidade, contornos e hardware</a>.
+          Fonte primária recomendada: slides 33–36 do professor, identificados na teoria.
+        </p>
+      </div>
+    </section>
+
+    <section id="caminho-passo">
+      <h2>2. Leia o caminho de um passo</h2>
+
+      <pre><code>// Compare os arquivos completos:
+// v1_static.c
+#pragma omp for schedule(static)
+// v2_static_collapse.c
+#pragma omp for collapse(2) schedule(static)
+// v3_dynamic.c
+#pragma omp for schedule(dynamic,16)
+// v4_dynamic_collapse.c
+#pragma omp for collapse(2) schedule(dynamic,16)
+// v5_guided_collapse.c
+#pragma omp for collapse(2) schedule(guided,16)
+// v6_guided.c
+#pragma omp for schedule(guided,16)</code></pre>
+
+      <p>
+        Compile v0 sem OpenMP, e v1–v6 com <code>-fopenmp</code>. Compare, por exemplo,
+        <code>diff -u v1_static.c v2_static_collapse.c</code>: além da identificação da versão, muda apenas o
+        pragma de distribuição.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Linha/bloco de cada v*.c</th>
+            <th>O que verificar</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>_POSIX_C_SOURCE; includes</td>
+            <td>Disponibilizam temporização POSIX, alocação, conversão, matemática e OpenMP.</td>
+          </tr>
+          <tr>
+            <td>integer(...), strtol(..., &amp;end, 10)</td>
+            <td>O ponteiro end recebe onde a conversão terminou. errno, limites e sufixos inválidos são verificados; *out recebe o inteiro validado.</td>
+          </tr>
+          <tr>
+            <td>tamanho_grid; num_passos_tempo</td>
+            <td>Fixam uma malha 512×512 e 500 atualizações temporais. A linha de comando recebe apenas modo e saída opcional.</td>
+          </tr>
+          <tr>
+            <td>malloc(count * sizeof(*u))</td>
+            <td>u e v apontam para buffers independentes; verificar NULL e liberar ambos em caso de falha.</td>
+          </tr>
+          <tr>
+            <td>nu, dt, dx, r</td>
+            <td>Constantes fixas que resultam em r=0.02. O usuário não altera r pela linha de comando.</td>
+          </tr>
+          <tr>
+            <td>laços de inicialização</td>
+            <td>Calculam x, y e sigma=N/10; impõem bordas coerentes desde o início. Gaussiana tem amplitude 0.1.</td>
+          </tr>
+          <tr>
+            <td>memcpy(v, u, ...)</td>
+            <td>Copia também as bordas, que não serão escritas durante os passos.</td>
+          </tr>
+          <tr>
+            <td>agora(), clock_gettime(..., &amp;t)</td>
+            <td>Passa o endereço de timespec à função; converte tv_sec e tv_nsec em segundos. Falha encerra a execução.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <pre><code>#pragma omp parallel default(none) shared(u,v,tamanho_grid,num_passos_tempo,r,threads)
+{
+  #pragma omp single
+  threads = omp_get_num_threads();
+  for (int t = 0; t &lt; num_passos_tempo; ++t) {
+    #pragma omp for schedule(static)
+    for (int i = 1; i &lt; tamanho_grid-1; ++i) {
+      for (int j = 1; j &lt; tamanho_grid-1; ++j) {
+        size_t c = (size_t)i*tamanho_grid+j;
+        v[c] = u[c] + r*(u[c-1]+u[c+1]+u[c-tamanho_grid]+u[c+tamanho_grid]-4*u[c]);
+      }
+    } // barreira implícita: campo novo pronto
+    #pragma omp single
+    { double *tmp = u; u = v; v = tmp; }
+    // barreira implícita: ponteiros trocados para todas as threads
+  }
+}</code></pre>
+
+      <p>
+        Esse trecho mostra a região paralela escrita diretamente em v1. <code>t</code>, <code>i</code>,
+        <code>j</code>, <code>c</code> e <code>tmp</code> são locais às threads. Cada thread percorre os passos t;
+        o <code>for</code> OpenMP reparte apenas o trabalho espacial. Não adicione <code>nowait</code>: a próxima
+        leitura depende dessas barreiras.
+      </p>
+      <p>
+        <code>c±1</code> são vizinhos na linha; <code>c±tamanho_grid</code>, nas linhas adjacentes. A troca muda endereços,
+        não copia matrizes. Depois do cronômetro, um laço calcula mínimo, pico e soma; <code>fprintf</code> exporta
+        o campo opcional com 17 dígitos, <code>fclose</code> verifica escrita e <code>free</code> libera os buffers.
+      </p>
+    </section>
+
+    <section id="validacao">
+      <h2>3. Valide antes de medir</h2>
+
+      <pre><code>bash tarefa11/test.sh
+cd tarefa11
+gcc -std=c11 -O2 -Wall -Wextra v0_seq.c -lm -o ns_v0
+./ns_v0 1 zero.txt
+./ns_v0 2 constante.txt
+./ns_v0 0 perturbacao.txt</code></pre>
+
+      <p>
+        Parado deve continuar zero. Constante deve continuar um em cada célula: soma 262144 para a grade 512×512.
+        Na gaussiana, o pico final deve ser menor que 0,1 e os valores devem permanecer não negativos. O gráfico
+        de difusão compara o campo inicial calculado com o campo após 500 passos.
+      </p>
+      <p>
+        <code>test.sh</code> compila com avisos tratados como erros e realiza 30 comparações de campos completos de
+        512×512. Verifica os três modos e executa a perturbação com 1, 2 e 4 threads, além de rejeitar entradas inválidas. Igualdade apenas de pico e soma não garante igualdade espacial.
+      </p>
+    </section>
+
+    <section id="visualizacao-3d">
+      <h2>Explore o campo em 3D</h2>
+      <p>
+        A altura e a cor representam <code>u(x,y)</code>, a componente de velocidade simulada sobre o plano
+        x–y. O terceiro eixo representa o valor do campo, não uma terceira dimensão espacial do fluido.
+        Arraste a superfície para girar ou use os controles de rotação e inclinação com o teclado.
+      </p>
+      <div class="diffusion-view" data-diffusion data-frames="../tarefa11/quadros_difusao.bin">
+        <figure data-fallback>
+          <img src="../tarefa11/visualizacao_animacao.png" width="1600" height="640"
+               alt="Comparação da gaussiana inicial e após 2.100.000 passos: o pico cai cerca de 99,04% e o perfil se alarga."
+               style="width: 100%; height: auto;">
+          <figcaption>A visualização interativa requer JavaScript e Canvas 2D. A figura mostra os campos inicial e final.</figcaption>
+        </figure>
+        <canvas hidden role="img" aria-label="Superfície do campo de difusão" aria-describedby="diffusion-help"></canvas>
+        <div class="diffusion-legend" aria-label="Escala de cores de u">
+          <span>u = 0</span><span class="diffusion-gradient" aria-hidden="true"></span><span data-maximum>0,1</span>
+        </div>
+        <p class="diffusion-metrics" data-metrics>Malha 512×512 · 2.100.000 passos · 201 quadros · r = 0,02</p>
+        <fieldset disabled>
+          <legend>Controles da superfície</legend>
+          <div class="diffusion-controls">
+            <label>Campo inicial
+              <select data-mode>
+                <option value="0">Gaussiana (modo 0)</option>
+                <option value="1">Zero (modo 1)</option>
+                <option value="2">Constante unitária (modo 2)</option>
+              </select>
+            </label>
+            <button type="button" data-play>Reproduzir</button>
+            <button type="button" data-reset>Reiniciar</button>
+          </div>
+          <label class="diffusion-timeline">Passo desejado: <span data-step-label>0</span> / 2.100.000
+            <input data-time type="range" min="0" max="200" step="1" value="0">
+          </label>
+          <div class="diffusion-controls">
+            <label>Rotação (graus)
+              <input data-yaw type="range" min="0" max="360" value="35">
+            </label>
+            <label>Inclinação (graus)
+              <input data-pitch type="range" min="20" max="75" value="40">
+            </label>
+          </div>
+        </fieldset>
+        <p role="status" data-status>Preparando visualização…</p>
+      </div>
+      <p id="diffusion-help">
+        A demonstração usa 201 quadros calculados previamente em C, do passo 0 ao 2.100.000, com mais quadros no início e intervalos maiores no final.
+        A malha completa usa o mesmo stencil, buffers alternados, parâmetros e bordas fixas
+        de <code>v0_seq.c</code>: ν = 0,1, Δt = 0,2, Δx = 1 e σ = 51,2. O navegador desenha amostras de 65×65
+        vértices; o pico foi calculado sobre todas as 512×512 células. Os valores exibidos têm a precisão
+        reduzida para float32 após o cálculo em double. A escala vertical e de cores fica fixa durante
+        a evolução (0–0,1 na gaussiana; 0–1 no campo unitário).
+      </p>
+      <p>
+        Compare os passos 0 e 2.100.000: o pico cai aproximadamente 99,04%, deixando menos de 1% da altura inicial. O campo se aproxima de zero, sem zerar exatamente.
+        O tempo simulado avança de forma não uniforme entre os quadros. A reprodução avança a 30 quadros por segundo e dura cerca de 6,7 segundos; em dispositivos lentos,
+        pode pular quadros para acompanhar o relógio. Os campos zero e unitário permanecem invariantes.
+        O benchmark e a figura do relatório continuam com 500 passos (queda inferior a 1%).
+        Esta demonstração prolongada não mede desempenho OpenMP.
+      </p>
+    </section>
+
+    <section id="medicao">
+      <h2>4. Meça uma variável por vez</h2>
+
+      <pre><code>bash tarefa11/execute.sh
+# O script percorre de 1 até nproc threads.
+python3 tarefa11/plot_results.py tarefa11/runs/EXECUCAO/raw.csv
+bash tarefa11/execute_chunks.sh
+python3 tarefa11/plot_chunks.py tarefa11/runs/CHUNKS/raw_chunks.csv</code></pre>
+
+      <p>
+        Flags: <code>-std=c11 -O2 -Wall -Wextra</code>, <code>-lm</code> e <code>-fopenmp</code> apenas nas
+        paralelas. O script faz aquecimento, mede o sequencial e guarda cada repetição. Registra compilador, CPU,
+        afinidade, hashes dos fontes e threads reais. A região medida inclui equipe paralela, stencil,
+        barreiras e troca; exclui alocação, inicialização, diagnósticos e exportação.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Versão</th>
+            <th>Distribuição</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>v1 / v2</td>
+            <td>static por linhas / por células</td>
+          </tr>
+          <tr>
+            <td>v3 / v4</td>
+            <td>dynamic,16 por linhas / por células</td>
+          </tr>
+          <tr>
+            <td>v6 / v5</td>
+            <td>guided,16 por linhas / por células</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>
+        Compare pares, não apenas o melhor ponto. Use a mediana das cinco repetições; os pontos de 26 a 28 threads foram confirmados com dez repetições porque a primeira varredura apresentou picos abruptos. Chunk 16 significa 16 linhas
+        sem collapse e 16 células com collapse. O experimento adicional usa chunks equivalentes a 1, 4, 16 e 64
+        linhas; com collapse, multiplica cada valor pelas 510 células internas de uma linha.
+      </p>
+      <p>
+        Na varredura de 1 a 28 threads, static sem collapse obteve o menor tempo global com 16 threads e manteve tempo semelhante com 28. Os picos iniciais em 26–28 threads não se repetiram sistematicamente no ensaio de confirmação. Dynamic com collapse e chunk 16 foi prejudicado pela granularidade de apenas
+        16 células; o estudo de chunks equivalentes separa esse custo do efeito de collapse.
+      </p>
+    </section>
+
+    <section id="recuperacao">
+      <h2>5. Recuperação ativa</h2>
+
+      <div class="quiz-container" data-quiz data-explanation="Sem collapse, omp for está associado ao laço externo i: a unidade distribuída é uma linha.">
+        <p>Em v1, o que omp for distribui?</p>
+        <div class="quiz-options">
+          <button class="quiz-option-btn" data-correct="true">Distribui linhas entre as threads.</button>
+          <button class="quiz-option-btn">Distribui passos entre as threads.</button>
+          <button class="quiz-option-btn">Distribui campos entre as threads.</button>
+          <button class="quiz-option-btn">Distribui bordas entre as threads.</button>
+        </div>
+        <p role="status" hidden></p>
+      </div>
+
+      <div class="quiz-container" data-quiz data-explanation="O Laplaciano discreto de um campo unitário é zero. Com bordas unitárias, cada célula permanece em 1.0.">
+        <p>Campo inicial unitário, bordas unitárias e r=0.02: após 100 passos, qual resultado é esperado?</p>
+        <div class="quiz-options">
+          <button class="quiz-option-btn">O campo permanece em 0.0.</button>
+          <button class="quiz-option-btn">O campo permanece em 0.5.</button>
+          <button class="quiz-option-btn" data-correct="true">O campo permanece em 1.0.</button>
+          <button class="quiz-option-btn">O campo permanece em 2.0.</button>
+        </div>
+        <p role="status" hidden></p>
+      </div>
+
+      <p>
+        Para ensaiar a defesa, abra v1 e v2 lado a lado e explique sem consultar a teoria: qual linha estabelece a
+        equipe, qual reparte o trabalho e quais variáveis são compartilhadas? Aponte as duas barreiras e descreva
+        uma falha possível se cada uma for retirada. Calcule quantas atualizações cabem em um chunk 16 nos dois
+        arquivos para N=512. Depois justifique por que sections não foi usado e onde você experimentaria simd, sem
+        afirmar que essa variante já foi medida. Revise as distinções na
+        <a href="#teoria">Fundamentação teórica</a> e traga suas respostas
+        ao agente para praticar a defesa.
+      </p>
+    </section>
+  <section id="teoria"><h2>Fundamentação teórica</h2><p>Teoria, modelagem matemática e contexto de HPC integrados à prática desta tarefa.</p></section>
+<section><h2>1. O modelo e seus limites</h2>
+<p>O roteiro do professor, em <a href="../assets/index.md">assets/index.md, slides 33–36</a>, pede diferenças finitas, validação e comparação de <code>schedule</code>, <code>chunksize</code> e <code>collapse</code>. O problema liga a computação de fluidos ao particionamento de matrizes.</p>
+<p>Para viscosidade cinemática constante, Navier–Stokes inclui advecção, pressão, difusão viscosa e forças externas:</p>
+<p>$$\partial_t\mathbf{u}+(\mathbf{u}\cdot\nabla)\mathbf{u}=-\rho^{-1}\nabla p+\nu\nabla^2\mathbf{u}+\mathbf{f}.$$</p>
+<p>Se fossem removidas apenas a pressão e as forças externas, o termo de advecção ainda permaneceria. Nesta tarefa, adotamos a leitura de “apenas efeitos da viscosidade” que também omite a advecção. Resta $\partial_t u=\nu\nabla^2u$, resolvida para uma componente escalar da velocidade. Esta é uma simplificação de Navier–Stokes, não um solver completo de escoamento incompressível: não há advecção, projeção de pressão nem imposição de divergência nula.</p>
+<p>Esse operador aparece em solvers de fluidos e também na condução térmica. Estudar seu stencil isoladamente permite separar custo de memória, sincronização e distribuição de trabalho.</p></section>
+<section><h2>2. Do Laplaciano ao stencil</h2>
+<p>Expandir $u(x+h)$ e $u(x-h)$ em Taylor e somar cancela os termos ímpares. Assim, $\partial_{xx}u\approx(u_{i+1,j}-2u_{i,j}+u_{i-1,j})/\Delta x^2$. Repetimos em $y$ e usamos Euler explícito no tempo:</p>
+<p>$$u^{n+1}_{i,j}=u^n_{i,j}+r_x(u^n_{i-1,j}-2u^n_{i,j}+u^n_{i+1,j})+r_y(u^n_{i,j-1}-2u^n_{i,j}+u^n_{i,j+1}),$$
+$$r_x=\nu\Delta t/\Delta x^2,\qquad r_y=\nu\Delta t/\Delta y^2.$$</p>
+<p>Para solução suave, o erro global é $O(\Delta t+\Delta x^2+\Delta y^2)$, sob estabilidade. Para comparar refinamentos do mesmo problema físico, mantenha o domínio fixo e ajuste $\Delta t$ proporcionalmente a $h^2$. No benchmark, $\Delta x=1$ fica fixo: aumentar N aumenta o domínio, não refina o mesmo domínio.</p>
+<p>O fator de amplificação de Fourier é $G=1-4r_x\sin^2(k_x\Delta x/2)-4r_y\sin^2(k_y\Delta y/2)$. A condição $|G|\le1$ dá $r_x+r_y\le1/2$. Para espaçamento igual: $0\le r\le1/4$. No código, $\nu=0.1$, $\Delta t=0.2$, $\Delta x=\Delta y=1$: $r=0.02$.</p>
+<p>Também podemos escrever o passo como média ponderada: peso $1-4r$ no centro e $r$ em cada vizinho. Pesos não negativos somam um; não surgem novos extremos. Isso fundamenta os testes de mínimo, máximo e ausência de oscilações.</p>
+<p><code>double</code> usa IEEE 754 binary64 no ambiente x86_64: 53 bits de precisão e epsilon $2^{-52}$. Erro de arredondamento não é erro de discretização. Não use <code>-ffast-math</code> ao exigir comparação exata entre variantes; somas de diagnóstico podem depender da ordem das operações.</p></section>
+<section><h2>3. Condições de contorno são parte do teste</h2>
+<p>O campo parado usa zero em toda a grade e nas bordas. O campo constante usa um em toda a grade <strong>inclusive nas bordas</strong>. Ambos devem permanecer exatamente iguais. Zerar as bordas de um campo inicialmente unitário muda o problema: ele passa a difundir em direção às paredes, e não testa preservação de constantes.</p>
+<p>A perturbação é uma gaussiana de amplitude 0.1 e largura $\sigma=N/10$, centrada em $(N-1)/2$. As bordas são zero desde o instante inicial. Seu pico cai, a região perturbada se alarga e a solução permanece não negativa. A soma pode diminuir: bordas Dirichlet permitem saída de quantidade difundida, logo conservação da soma não é exigida.</p>
+<p>Dois buffers guardam instantes distintos. Cada célula nova lê somente o campo antigo. As bordas ficam fixas nos dois buffers; não precisamos atualizá-las nem escrever concorrentemente nos cantos.</p></section>
+<section><h2>4. Hardware: o custo de transportar os dados</h2>
+<p>O gargalo de von Neumann limita o transporte entre memória e processador. A Memory Wall descreve a diferença de evolução entre processamento e acesso à memória. A Power Wall limita frequência e potência, motivando vários núcleos. A hierarquia de registradores, L1, L2, LLC e RAM tenta reduzir esse custo.</p>
+<p>Em C, a matriz linearizada usa <code>i*N+j</code>. Variar j acessa posições contíguas. Uma linha de cache de 64 bytes, comum em x86_64, comporta oito doubles. O stencil reutiliza vizinhos entre células e linhas: contar cinco leituras em C não significa cinco acessos à RAM.</p>
+<p>Write-through propaga cada escrita ao nível seguinte; write-back mantém linhas modificadas (dirty) e as escreve quando necessário. Estados valid/invalid dizem se uma cópia pode ser usada. Snooping observa requisições de coerência; protocolos de diretório rastreiam quais caches possuem cópias, sem exigir um servidor central único.</p>
+<p>Falso compartilhamento ocorre quando threads escrevem células distintas na mesma linha de cache. A coerência transfere a linha mesmo sem disputa pela mesma variável. Escrever o mesmo canto simultaneamente seria uma corrida verdadeira, mesmo armazenando zero. Partições estáticas contíguas reduzem as fronteiras entre threads, mas não garantem alinhamento.</p>
+<p>Há dependência RAW entre passos temporais: o passo seguinte precisa ler os resultados anteriores. Não há dependência entre células atualizadas no mesmo passo com duplo buffer. A barreira de <code>omp for</code> precede a troca; a de <code>single</code> publica os ponteiros para todas as threads.</p>
+<p>Em NUMA, first-touch pode colocar páginas perto de quem as inicializa. A inicialização serial deste código pode concentrar páginas em um nó. Fixar <code>OMP_PLACES=cores</code> e <code>OMP_PROC_BIND=close</code> não redistribui páginas. No NPAD, registre sockets, alocação do job e política de memória antes de atribuir uma curva a NUMA.</p></section>
+<section><h2>5. Particionamento e interpretação de desempenho</h2>
+<p><code>static</code> sem chunk entrega blocos aproximadamente iguais com baixo custo de distribuição. <code>dynamic,16</code> entrega blocos de 16 iterações sob demanda. <code>guided,16</code> começa com blocos maiores e os reduz, com mínimo 16 salvo o último bloco. O stencil tem trabalho uniforme por célula; static é uma hipótese inicial, não uma vitória garantida.</p>
+<p>Sem collapse, uma iteração distribuída é uma linha. Com <code>collapse(2)</code>, é uma célula: o espaço passa de $N-2$ para $(N-2)^2$ iterações. Para N=512, dynamic,16 passa de 32 para 16.257 blocos por passo. O mesmo chunk numérico não representa o mesmo volume de trabalho. Teste também chunks equivalentes em células para separar granularidade e collapse.</p>
+<p>Collapse pode expor paralelismo quando há poucas linhas. Não implica perda obrigatória de localidade nem divisão inteira por célula: isso depende do particionamento e do compilador. Mais despachos podem aumentar overhead; tempo elevado sozinho não comprova uma fila central específica.</p>
+<p>Uma região paralela persistente envolve todos os passos. Evita reentrada na região a cada passo, mas mantém duas barreiras por passo. Runtimes podem reutilizar threads; fork/join não significa necessariamente criar threads do sistema operacional.</p>
+<p>Dois campos N=512 ocupam 4 MiB. Se couberem na LLC, o limite pode ser cache ou sincronização, não RAM. Para distinguir, varie N e meça banda/cache misses. SMT, núcleos heterogêneos, afinidade e ruído são hipóteses a investigar, não conclusões automáticas.</p>
+<p>$$S(p)=T_{seq}/T_p,\qquad E(p)=S(p)/p,$$
+$$S_{Amdahl}(p)=\frac{1}{s+(1-s)/p},\qquad S_{Gustafson}(p)=p-\alpha(p-1).$$</p>
+<p>Amdahl usa a fração serial s do trabalho fixo, sem overhead no modelo ideal. Gustafson usa a fração serial $\alpha$ do tempo paralelo com problema escalado. Reporte também $T_{omp,1}/T_{omp,p}$, mas não confunda essa referência com o sequencial sem OpenMP.</p>
+<p>A medição corrigida percorre de 1 até 28 threads com grade 512×512 e 500 passos. Um ensaio separado varia chunks equivalentes a 1, 4, 16 e 64 linhas para distinguir granularidade do efeito de collapse. As amostras e os metadados ficam em <code>tarefa11/runs/</code>.</p></section>
+<section><h2>6. Sections, schedule e SIMD: três decisões distintas</h2>
+<p>Os slides 33–34 incluem <code>sections</code>, <code>schedule</code>, <code>chunksize</code>, <code>collapse</code> e <code>simd</code>. Para a defesa, diferencie a divisão por blocos de operações, a distribuição de iterações entre threads e a execução vetorial dentro de um núcleo.</p>
+<h3>Sections distribui blocos, não iterações</h3>
+<p><code>omp sections</code> distribui blocos marcados por <code>omp section</code> à equipe existente. Cada bloco executa uma vez por uma thread; uma thread pode receber vários blocos. A atribuição depende da implementação. Duas seções permitem no máximo duas threads executando esses blocos simultaneamente, mesmo com uma equipe maior. Há barreira final, salvo <code>nowait</code>, e não existe cláusula schedule para sections.</p>
+<p>Uma aplicação possível seria calcular dois diagnósticos independentes sobre um campo já pronto, escrevendo resultados distintos. Para o stencil, usar for evita escrever manualmente uma seção por região e permite ajustar a distribuição ao tamanho da equipe. Nenhuma das sete versões usa sections.</p>
+<h3>Detalhes de schedule que mudam a resposta</h3>
+<p><code>static</code> sem chunk entrega no máximo um bloco aproximadamente equilibrado por thread. <code>static,k</code> entrega blocos ciclicamente: com quatro threads, 16 iterações e k=2, a thread 0 recebe 0–1 e 8–9. Não confunda os dois casos. <code>dynamic</code> sem chunk usa 1; <code>guided</code> sem chunk usa mínimo 1. Guided não garante blocos de tamanho fixo nem uma sequência universal de tamanhos.</p>
+<p>Schedule não controla afinidade, não cria threads e não corrige corridas. <code>OMP_SCHEDULE</code> controla laços com <code>schedule(runtime)</code>, não substitui as políticas explícitas destes arquivos. Chunk conta iterações lógicas: não mede bytes, núcleos ou threads.</p>
+<h3>SIMD não é uma equipe de threads</h3>
+<p><code>omp simd</code> permite executar iterações por instruções vetoriais: múltiplos elementos sob a mesma instrução. Não cria threads. É possível distribuir linhas com <code>omp for</code> e vetorizar o laço interno j com <code>omp simd</code>. <code>omp for simd</code> é outra construção disponível para combinar os dois níveis.</p>
+<p>O stencil com buffers separados favorece a independência espacial; a leitura de vizinhos não impede SIMD quando todas essas leituras usam o campo antigo. Não declare alinhamento de 64 bytes sem garanti-lo. As versões atuais não usam simd explícito, mas o compilador pode autovetorizar. Para confirmar, consulte relatórios do GCC com <code>-fopt-info-vec-optimized</code> e <code>-fopt-info-vec-missed</code>; não deduza vetorização apenas do tempo.</p>
+<h3>Escopos e sincronização no código</h3>
+<p><code>parallel</code> estabelece a equipe; <code>for</code> reparte o trabalho dessa equipe. Um laço C comum dentro de parallel é percorrido por cada thread. Por isso t é local e percorre todos os passos, enquanto o for OpenMP reparte i ou (i,j). Os ponteiros u e v são compartilhados; torná-los private não cria matrizes privadas inicializadas. <code>single</code> escolhe uma thread, não necessariamente a principal.</p>
+<p>Antes de escolher a política, explique por que cada célula tem um único escritor e por que as barreiras protegem a troca. Isso fundamenta a correção; schedule determina quem faz o trabalho. A semântica normativa desses recursos está nas fontes oficiais detalhadas em <a href="../RESOURCES.md">RESOURCES.md</a>.</p>
+</section>
+<section id="questoes-adicionais"><h2>Questões adicionais</h2><div class="quiz-container">
+        <div class="quiz-header"><span>Questão adicional 1 de 2</span></div>
+        <div class="quiz-question">Quando collapse distribui mais trabalho entre threads?</div>
+        <ol class="quiz-options"><li>A) Quando combina laços aninhados realmente independentes entre si</li><li>B) Quando serializa todas as dimensões antes do cálculo</li><li>C) Quando remove a condição de contorno da simulação</li><li>D) Quando troca valores double por inteiros menores agora</li></ol>
+        <details><summary>Conferir resposta</summary><p><strong>Resposta: A.</strong> Quando combina laços aninhados realmente independentes entre si.</p></details>
+      </div><div class="quiz-container">
+        <div class="quiz-header"><span>Questão adicional 2 de 2</span></div>
+        <div class="quiz-question">Qual medição torna variantes comparáveis entre execuções?</div>
+        <ol class="quiz-options"><li>A) Mesma malha passos threads afinidade e compilação</li><li>B) Malhas diferentes escolhidas para cada versão testada</li><li>C) Número aleatório de passos em toda repetição</li><li>D) Compiladores distintos sem registrar opções utilizadas juntas</li></ol>
+        <details><summary>Conferir resposta</summary><p><strong>Resposta: A.</strong> Mesma malha passos threads afinidade e compilação.</p></details>
+      </div></section><section id="referencia-rapida"><h2>Apêndice: Referência rápida</h2>
+<table><thead><tr><th>Tipo / função / flag</th><th>Uso e cuidado</th></tr></thead><tbody>
+<tr><td>int / size_t</td><td>Contadores / índices e tamanhos. size_t também transborda: verificar antes de multiplicar.</td></tr>
+<tr><td>double / double *</td><td>Valor de velocidade / endereço do buffer.</td></tr>
+<tr><td>strtol, errno</td><td>Validar texto, intervalo e fim da conversão; rejeitar entradas inválidas.</td></tr>
+<tr><td>malloc, free, memcpy</td><td>Alocar, liberar e copiar bordas/inicialização para o segundo buffer.</td></tr>
+<tr><td>exp, fmin, fmax</td><td>Gaussiana e diagnósticos; ligar libm com -lm.</td></tr>
+<tr><td>clock_gettime, struct timespec</td><td>POSIX: CLOCK_MONOTONIC; segundos + nanossegundos/1e9; verificar retorno.</td></tr>
+<tr><td>fopen, fprintf, fclose</td><td>Exportar campo após o trecho cronometrado; verificar erros de escrita.</td></tr>
+<tr><td>-std=c11 -O2 -Wall -Wextra</td><td>Padrão, otimização e avisos usados nos testes.</td></tr>
+<tr><td>-fopenmp / -lm</td><td>OpenMP somente nas variantes paralelas / biblioteca matemática.</td></tr>
+<tr><td>_POSIX_C_SOURCE 199309L</td><td>Definir antes dos includes para disponibilizar clock_gettime.</td></tr>
+</tbody></table>
+<table><thead><tr><th>Pragma</th><th>Regra</th></tr></thead><tbody>
+<tr><td>omp parallel default(none) shared(...)</td><td>Equipe persistente; escopos explícitos não garantem ausência de corridas.</td></tr>
+<tr><td>omp for schedule(static)</td><td>Divide linhas; blocos estáticos sem chunk explícito.</td></tr>
+<tr><td>omp for schedule(dynamic,16)</td><td>Blocos fixos distribuídos sob demanda.</td></tr>
+<tr><td>omp for schedule(guided,16)</td><td>Blocos decrescentes; mínimo 16 salvo resto final.</td></tr>
+<tr><td>omp for collapse(2) schedule(static)</td><td>Distribui pares (i,j) de laços canônicos.</td></tr>
+<tr><td>omp single</td><td>Uma thread troca ponteiros; barreira implícita ao final.</td></tr>
+<tr><td>omp sections / omp simd</td><td>Seções distintas / paralelismo vetorial; não são substitutos de schedule.</td></tr>
+</tbody></table>
+<h3>Resumo executivo</h3><p>$r=0.02\le1/4$; erro $O(\Delta t+h^2)$; dois buffers custam $16N^2$ bytes. Constante exige borda constante. Barreira antes e depois da troca. Comece com static; compare todas as políticas com e sem collapse. Meça repetições, threads reais e referência sequencial; não deduza gargalo só do speedup.</p>
+<p>Fonte primária da tarefa: <a href="../assets/index.md">slides 33–36 do professor</a>. Referências adicionais e documentação oficial estão em <a href="../RESOURCES.md">RESOURCES.md</a>.</p>
+</section>
+
+</main>
+
+  <footer class="footer-nav">
+    <a href="#teoria">Apêndice da Teoria 11</a>
+    <a href="../reference/00-fundamentos-programacao-paralela.html">Fundamentos</a>
+  <a href="../index.html">Início</a></footer>
+
+  <script>
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('theme', target);
+    }
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
+  </script>
+</body>
+</html>

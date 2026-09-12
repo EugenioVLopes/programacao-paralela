@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Material 10: atomic, critical e reduction</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+</head>
+<body>
+  <nav class="top-nav"><a href="../reference/00-fundamentos-programacao-paralela.html">&larr; Fundamentos gerais</a><a href="../index.html">Início</a><button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button></nav>
+  <header><div class="lesson-badge">Material 10 &bull; DCA3703</div><h1>Atomic, critical e reduction</h1><div class="metadata">Teoria, código, medição e exercícios da Tarefa 10</div></header>
+  <main>
+    <section><h2>1. Problema</h2><p>As cinco versões estimam $\pi$ pelo mesmo método de Monte Carlo e diferem apenas na forma de combinar os acertos das threads. Isso isola o custo de sincronização.</p><div class="math-block">$$\hat\pi=4\frac{N_{in}}{N},\qquad \sigma_{\hat\pi}=\mathcal O(N^{-1/2})$$</div></section>
+    <section><h2>2. Hardware e modelo de desempenho</h2><p><code>critical</code> concede exclusão mútua para um bloco; <code>atomic</code> protege somente a atualização suportada; <code>reduction</code> mantém acumuladores privados e os combina no fim. Atualizar um contador compartilhado também faz sua linha de cache circular entre núcleos. Quanto mais atualizações globais, maior a coerência e a contenção.</p><div class="math-block">$$T_p\approx T_{sorteio}/p+N\,c_{sync}\quad\text{ou}\quad T_p\approx T_{sorteio}/p+p\,c_{merge}$$</div><p>A primeira forma descreve atualização global por amostra; a segunda, acumulação privada seguida de combinação. Pela lei de Amdahl, serializar cada acerto limita o speedup mesmo quando o sorteio é paralelo.</p></section>
+    <section><h2>3. As cinco versões</h2><table><thead><tr><th>Versão</th><th>Combinação</th><th>Custo esperado</th></tr></thead><tbody><tr><td>v1</td><td>contador compartilhado com <code>critical</code></td><td>bloqueio por acerto</td></tr><tr><td>v2</td><td>contador compartilhado com <code>atomic</code></td><td>atômica por acerto</td></tr><tr><td>v3</td><td>contador privado e <code>critical</code> final</td><td>bloqueio por thread</td></tr><tr><td>v4</td><td>contador privado e <code>atomic</code> final</td><td>atômica por thread</td></tr><tr><td>v5</td><td><code>reduction(+:acertos)</code></td><td>combinação pelo runtime</td></tr></tbody></table><pre><code><span class="hl-prep">#pragma</span> omp parallel for reduction(+:acertos)
+<span class="hl-kw">for</span> (<span class="hl-type">long long</span> i = 0; i &lt; amostras; ++i) {
+    <span class="hl-type">double</span> x = sorteio(&amp;seed);
+    <span class="hl-type">double</span> y = sorteio(&amp;seed);
+    acertos += x * x + y * y &lt;= 1.0;
+}</code></pre><p>A semente precisa ser privada por thread; compartilhar o estado do gerador introduziria outra disputa e invalidaria a comparação.</p></section>
+    <section><h2>4. Medição</h2><p>Compile todas as versões com as mesmas flags, por exemplo <code>gcc -O2 -Wall -fopenmp arquivo.c -o programa -lm</code>. Compare o mesmo $N$, conjunto de threads, afinidade e número de repetições. Use a mediana de <code>CLOCK_MONOTONIC</code> e valide se todas produzem uma aproximação estatisticamente compatível de $\pi$.</p></section>
+    <section id="quizzes"><h2>5. Questões</h2>
+      <div class="quiz-container"><div class="quiz-question">Qual versão tende a sincronizar menos vezes?</div><ol><li>A) Reduction combina acumuladores apenas no encerramento paralelo</li><li>B) Critical combina acumuladores durante cada amostra gerada</li><li>C) Atomic combina acumuladores durante cada coordenada gerada</li><li>D) Shared combina acumuladores antes do sorteio paralelo</li></ol><details><summary>Conferir resposta</summary><p><strong>A.</strong> A combinação ocorre ao final, não por amostra.</p></details></div>
+      <div class="quiz-container"><div class="quiz-question">Por que atomic costuma superar critical neste contador?</div><ol><li>A) Protege somente a atualização simples do contador</li><li>B) Protege todo o sorteio dentro do bloco</li><li>C) Duplica automaticamente a variável para cada núcleo</li><li>D) Remove completamente o tráfego entre linhas privadas</li></ol><details><summary>Conferir resposta</summary><p><strong>A.</strong> A operação protegida é menor, embora continue disputada.</p></details></div>
+      <div class="quiz-container"><div class="quiz-question">Qual variável precisa de estado separado por thread?</div><ol><li>A) A semente mutável do gerador pseudoaleatório local</li><li>B) O total constante de amostras da execução</li><li>C) O instante inicial comum da medição monotônica</li><li>D) A aproximação final impressa depois do paralelo</li></ol><details><summary>Conferir resposta</summary><p><strong>A.</strong> Cada fluxo aleatório atualiza sua própria semente.</p></details></div>
+      <div class="quiz-container"><div class="quiz-question">O que deve permanecer igual entre versões medidas?</div><ol><li>A) Amostras threads afinidade flags repetições e máquina</li><li>B) Amostras arquivos afinidade resultados e comentários apenas</li><li>C) Threads sementes compiladores entradas e saídas aleatórias</li><li>D) Tempos gráficos escalas títulos e cores somente</li></ol><details><summary>Conferir resposta</summary><p><strong>A.</strong> Esses controles tornam a comparação experimental justa.</p></details></div>
+    </section>
+    <section id="referencia-rapida"><h2>Apêndice: Referência rápida</h2><table><thead><tr><th>Recurso</th><th>Sintaxe</th><th>Uso</th></tr></thead><tbody><tr><td>critical</td><td><code>#pragma omp critical</code></td><td>bloco exclusivo</td></tr><tr><td>atomic</td><td><code>#pragma omp atomic update</code></td><td>atualização simples</td></tr><tr><td>reduction</td><td><code>reduction(+:acertos)</code></td><td>privatizar e combinar</td></tr><tr><td>tempo</td><td><code>clock_gettime(CLOCK_MONOTONIC,...)</code></td><td>tempo decorrido</td></tr></tbody></table><p><strong>Regra prática:</strong> prefira <code>reduction</code> para reduções reconhecidas; use <code>atomic</code> para uma atualização simples; reserve <code>critical</code> para blocos compostos.</p></section>
+  </main>
+  <footer class="footer-nav"><a href="../reference/00-fundamentos-programacao-paralela.html">&larr; Fundamentos gerais</a><a href="../index.html">Início</a></footer>
+  <script>function applyMath(){if(window.renderMathInElement)renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false})}document.addEventListener('DOMContentLoaded',applyMath);function toggleTheme(){const t=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',t);localStorage.setItem('theme',t)}const savedTheme=localStorage.getItem('theme');if(savedTheme)document.documentElement.setAttribute('data-theme',savedTheme);</script>
+</body>
+</html>

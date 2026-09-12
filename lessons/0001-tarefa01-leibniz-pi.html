@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lição 01: Série de Leibniz, poder computacional e limites de hardware</title>
+  <title>Material 01: Série de Leibniz, poder computacional e limites de hardware</title>
   <link rel="stylesheet" href="../assets/style.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
@@ -29,17 +29,17 @@
 <body>
   <nav class="top-nav">
     <div style="display: flex; gap: 16px;">
-      <a href="../reference/01-teoria-ponto-flutuante-hardware.html">&larr; Teoria 01</a>
-      
+      <a href="#teoria">&larr; Teoria 01</a>
+
       <a href="../reference/00-fundamentos-programacao-paralela.html">Conceitos gerais &rarr;</a>
     </div>
-    <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
+    <a href="../index.html">Início</a><button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
   </nav>
 
   <header>
-    <div class="lesson-badge">Lição 01 &bull; DCA3703</div>
+    <div class="lesson-badge">Material 01 &bull; DCA3703</div>
     <h1>Tarefa 01: Série de Leibniz, poder computacional e limites de hardware</h1>
-    
+
     <div class="metadata">
       Tempo estimado: 15 min &bull; Foco: Sintaxe C, precisão numérica, evolução dos processadores e transição para multicore
     </div>
@@ -126,7 +126,7 @@ pi *= <span class="hl-num">4.0</span>;</code></pre>
         <div class="callout-title">Contexto teórico na Teoria 01</div>
         <p>
           Poder computacional, limites físicos (Power Wall) e a transição para multicore estão em
-          <a href="../reference/01-teoria-ponto-flutuante-hardware.html">Teoria 01</a>.
+          <a href="#teoria">Fundamentação teórica</a>.
           Aqui vai direto ao ponto: por que a série de Leibniz pede paralelismo.
         </p>
       </div>
@@ -189,13 +189,181 @@ pi *= <span class="hl-num">4.0</span>;</code></pre>
         <strong>Fontes:</strong> <em>Computer Systems: A Programmer's Perspective (CS:APP)</em>, R. Bryant e D. O'Hallaron, Capítulo 2 (Ponto Flutuante IEEE 754); <em>An Introduction to Parallel Programming</em>, Peter S. Pacheco, Capítulo 1 (Necessidade de sistemas paralelos).
       </div>
     </section>
-  </main>
+  <section id="teoria"><h2>Fundamentação teórica</h2><p>Teoria, modelagem matemática e contexto de HPC integrados à prática desta tarefa.</p></section>
+<section>
+      <h2>1. Representação de ponto flutuante (IEEE 754)</h2>
+      <p>
+        O formato de precisão dupla (<code>double</code>) usa 64 bits alocados em três campos:
+      </p>
+
+      <pre><code>[ 1 bit de sinal (S) ] [ 11 bits de expoente (E) ] [ 52 bits de mantissa (M) ]</code></pre>
+
+      <p>O valor numérico representado corresponde a:</p>
+      <div class="math-block">
+        $$V = (-1)^S \times (1 + M) \times 2^{E - 1023}$$
+      </div>
+
+      <ul>
+        <li><strong>Sinal ($S$)</strong>: 0 para números positivos, 1 para negativos.</li>
+        <li><strong>Expoente ($E$)</strong>: 11 bits codificados com viés (bias) de 1023. O intervalo útil de $E$ vai de 1 a 2046, permitindo expoentes de $2^{-1022}$ a $2^{1023}$.</li>
+        <li><strong>Mantissa ($M$)</strong>: 52 bits fracionários. O bit 1 implícito antes da vírgula confere 53 bits de precisão efetiva, equivalente a 15 a 17 dígitos decimais.</li>
+      </ul>
+
+      <h3>Epsilon de máquina</h3>
+      <p>
+        O epsilon de máquina ($\epsilon_{\text{mach}}$) é a menor diferença entre 1,0 e o próximo valor representável em <code>double</code>:
+      </p>
+      <div class="math-block">
+        $$\epsilon_{\text{mach}} = 2^{-52} \approx 2{,}220446 \times 10^{-16}$$
+      </div>
+      <p>
+        Quando a magnitude dos termos adicionados em uma soma se torna menor que $\epsilon_{\text{mach}} \times \text{acumulador}$, a adição de ponto flutuante deixa de alterar o resultado.
+      </p>
+    </section>
+
+    <section>
+      <h2>2. Série de Leibniz e taxa de erro</h2>
+      <p>A expansão em série da função $\arctan(1)$ resulta em:</p>
+      <div class="math-block">
+        $$\pi = 4 \sum_{k=0}^{\infty} \frac{(-1)^k}{2k + 1} = 4 \left( 1 - \frac{1}{3} + \frac{1}{5} - \frac{1}{7} + \frac{1}{9} - \dots \right)$$
+      </div>
+
+      <p>
+        Por ser uma série alternada com termos decrescentes em módulo, o erro de truncamento $|E(N)|$ após somar $N$ termos satisfaz:
+      </p>
+      <div class="math-block">
+        $$|E(N)| = |\pi - \pi_N| \le \frac{4}{2N + 1} \approx \mathcal{O}\left(\frac{1}{N}\right)$$
+      </div>
+
+      <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; font-family: 'Inter', sans-serif; font-size: 0.9rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+            <th style="padding: 8px;">Iterações ($N$)</th>
+            <th style="padding: 8px;">Erro teórico ($|E(N)|$)</th>
+            <th style="padding: 8px;">Casas decimais exatas</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 8px;">$10^3$</td><td style="padding: 8px;">$\approx 2 \times 10^{-3}$</td><td style="padding: 8px;">3</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 8px;">$10^6$</td><td style="padding: 8px;">$\approx 2 \times 10^{-6}$</td><td style="padding: 8px;">6</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 8px;">$10^9$</td><td style="padding: 8px;">$\approx 2 \times 10^{-9}$</td><td style="padding: 8px;">9</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 8px;">$10^{15}$</td><td style="padding: 8px;">$\approx 2 \times 10^{-15}$</td><td style="padding: 8px;">15 (limite do <code>double</code>)</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>3. Limites de hardware e a barreira térmica (Power Wall)</h2>
+      <p>
+        A potência dinâmica consumida por uma CPU uniprocessada é proporcional à capacitância $C$, ao quadrado da tensão $V$ e à frequência $f$:
+      </p>
+      <div class="math-block">
+        $$P = C \cdot V^2 \cdot f$$
+      </div>
+
+      <p>
+        Até 2005, a redução do tamanho dos transistores permitia reduzir $V$ junto com as dimensões físicas (Escala de Dennard), mantendo a potência por unidade de área constante enquanto a frequência subia.
+      </p>
+      <p>
+        Com componentes em escala nanométrica, a corrente de fuga impediu a redução de $V$. Aumentar $f$ causou um pico no consumo elétrico e na dissipação de calor (Power Wall). Como o clock ficou travado entre 3 e 5 GHz, a alternativa para processar somas de $10^9$ ou $10^{12}$ iterações em tempo viável passou a ser a divisão de laços entre múltiplos núcleos.
+      </p>
+    </section>
+
+    <section id="questoes-adicionais"><h2>Questões adicionais</h2><div class="quiz-container">
+        <div class="quiz-header"><span>Questão adicional 1 de 2</span></div>
+        <div class="quiz-question">Qual limite descreve o erro após N termos?</div>
+        <ol class="quiz-options"><li>A) Quatro dividido por dois N mais um</li><li>B) Dois multiplicado por N menos um agora</li><li>C) N elevado ao quadrado sobre quatro sempre</li><li>D) Epsilon multiplicado por N mais dois sempre</li></ol>
+        <details><summary>Conferir resposta</summary><p><strong>Resposta: A.</strong> Quatro dividido por dois N mais um.</p></details>
+      </div><div class="quiz-container">
+        <div class="quiz-header"><span>Questão adicional 2 de 2</span></div>
+        <div class="quiz-question">O que ocorre quando um termo fica pequeno demais?</div>
+        <ol class="quiz-options"><li>A) A soma pode deixar de mudar numericamente</li><li>B) A divisão passa a retornar inteiro automaticamente</li><li>C) O processador troca double por float sozinho</li><li>D) A série converge exatamente naquele mesmo instante</li></ol>
+        <details><summary>Conferir resposta</summary><p><strong>Resposta: A.</strong> A soma pode deixar de mudar numericamente.</p></details>
+      </div></section><section id="referencia-rapida">
+      <h2>Apêndice: Referência rápida</h2>
+      <p><em>Conteúdo consolidado do antigo arquivo de referência rápida. Mantido aqui para consulta rápida sem trocar de página.</em></p>
+<section>
+      <h2>1. Tipos e funções em C</h2>
+
+      <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; font-family: 'Inter', sans-serif; font-size: 0.9rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+            <th style="padding: 10px 8px;">Construção</th>
+            <th style="padding: 10px 8px;">Tipo</th>
+            <th style="padding: 10px 8px;">Comportamento</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 10px 8px;"><code><span class="hl-type">long long</span></code></td>
+            <td style="padding: 10px 8px;">Inteiro sinalizado de 64 bits</td>
+            <td style="padding: 10px 8px;">Representa valores até $2^{63}-1 \approx 9{,}22 \times 10^{18}$.</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 10px 8px;"><code><span class="hl-fn">atoll</span>(argv[<span class="hl-num">1</span>])</code></td>
+            <td style="padding: 10px 8px;"><code><span class="hl-type">long long</span></code></td>
+            <td style="padding: 10px 8px;">Converte string da linha de comando em inteiro de 64 bits.</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 10px 8px;"><code><span class="hl-type">double</span></code></td>
+            <td style="padding: 10px 8px;">Ponto flutuante de 64 bits</td>
+            <td style="padding: 10px 8px;">Padrão IEEE 754 com 52 bits de mantissa (15 a 17 dígitos decimais).</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 10px 8px;"><code><span class="hl-fn">fabs</span>(x)</code></td>
+            <td style="padding: 10px 8px;"><code><span class="hl-type">double</span></code></td>
+            <td style="padding: 10px 8px;">Calcula o valor absoluto de ponto flutuante. Exige <code>&lt;math.h&gt;</code>.</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 10px 8px;"><code>M_PI</code></td>
+            <td style="padding: 10px 8px;"><code><span class="hl-type">double</span></code></td>
+            <td style="padding: 10px 8px;">Constante de $\pi$ em <code>&lt;math.h&gt;</code>. Exige a flag <code>-lm</code> no GCC.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>2. Formato IEEE 754 (precisão dupla)</h2>
+      <pre><code>[ 1 bit de sinal ] [ 11 bits de expoente com bias 1023 ] [ 52 bits de mantissa ]
+Tamanho: 64 bits (8 bytes)
+Precisão decimal: ~15 a 17 dígitos significativos
+Epsilon de máquina: 2.220446e-16</code></pre>
+    </section>
+
+    <section>
+      <h2>3. Série de Leibniz</h2>
+      <div class="math-block">
+        $$\pi = 4 \sum_{k=0}^{\infty} \frac{(-1)^k}{2k + 1} = 4 \left( 1 - \frac{1}{3} + \frac{1}{5} - \frac{1}{7} + \dots \right)$$
+      </div>
+
+      <div class="callout">
+        <div class="callout-title">Erro de truncamento</div>
+        <p>O erro cometido ao truncar a série em $N$ termos é limitado pelo primeiro termo omitido:</p>
+        <div style="text-align: center; margin: 10px 0;">
+          $$|E(N)| \le \frac{4}{2N + 1} \approx \mathcal{O}\left(\frac{1}{N}\right)$$
+        </div>
+        <p>Ganhar uma casa decimal de precisão exige multiplicar o número de iterações por 10.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>4. Limites de escala em processadores</h2>
+      <ul>
+        <li><strong>Fim da escala de Dennard (2005)</strong>: A densidade de potência parou de se manter constante com a redução dos transistores.</li>
+        <li><strong>Power Wall</strong>: O limite de dissipação térmica impediu que a frequência passasse de 3 a 5 GHz.</li>
+        <li><strong>Multicore</strong>: A alternativa da indústria foi colocar vários núcleos em um mesmo chip, tornando o paralelismo necessário para ganhos de tempo.</li>
+      </ul>
+    </section>
+    </section>
+
+</main>
 
   <footer class="footer-nav">
-    <a href="../reference/01-teoria-ponto-flutuante-hardware.html">&larr; Teoria 01</a>
-    
+    <a href="#teoria">&larr; Teoria 01</a>
+
     <a href="../reference/00-fundamentos-programacao-paralela.html">Conceitos gerais &rarr;</a>
-  </footer>
+  <a href="../index.html">Início</a></footer>
 
   <script>
     const explanations = {
@@ -213,7 +381,7 @@ pi *= <span class="hl-num">4.0</span>;</code></pre>
       const container = document.getElementById(`quiz-${qNum}`);
       const buttons = container.querySelectorAll('.quiz-option-btn');
       const exp = document.getElementById(`exp-${qNum}`);
-      
+
       buttons.forEach(btn => {
         btn.disabled = true;
       });
@@ -235,7 +403,7 @@ pi *= <span class="hl-num">4.0</span>;</code></pre>
       const container = document.getElementById(`quiz-${qNum}`);
       const buttons = container.querySelectorAll('.quiz-option-btn');
       const exp = document.getElementById(`exp-${qNum}`);
-      
+
       buttons.forEach(btn => {
         btn.disabled = false;
         btn.classList.remove('correct', 'wrong');
