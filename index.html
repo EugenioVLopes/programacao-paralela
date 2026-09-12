@@ -47,7 +47,7 @@
   <main>
     <section id="sobre">
       <p>
-        Materiais da disciplina DCA3703 (Programação Paralela) do curso de Engenharia de Computação da UFRN. Cada tarefa reúne lição prática com código dissecado, documento único de teoria de hardware (com apêndice de referência rápida) e relatório em LaTeX.
+        Materiais da disciplina DCA3703 (Programação Paralela) do curso de Engenharia de Computação da UFRN. Cada tarefa reúne teoria, prática, referência rápida e quizzes em um único material HTML e relatório em LaTeX.
       </p>
     </section>
 
@@ -66,8 +66,7 @@
             Aproximação de $\pi$, análise de erro de truncamento, padrão IEEE 754 (float vs. double) e limites de convergência.
           </p>
           <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;">
-            <a href="lessons/0001-tarefa01-leibniz-pi.html">Lição 01 &rarr;</a>
-            <a href="reference/01-teoria-ponto-flutuante-hardware.html">Teoria 01 &rarr;</a>
+            <a href="lessons/0001-tarefa01-leibniz-pi.html">Material 01 &rarr;</a>
             <a href="tarefa01/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a>
           </div>
         </div>
@@ -82,8 +81,7 @@
             Hierarquia de memória (L1, L2, L3), localidade espacial e temporal, linhas de 64 bytes e comparação entre acessos row-major e column-major.
           </p>
           <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;">
-            <a href="lessons/0002-tarefa02-mxv-cache.html">Lição 02 &rarr;</a>
-            <a href="reference/02-teoria-hierarquia-memoria-cache.html">Teoria 02 &rarr;</a>
+            <a href="lessons/0002-tarefa02-mxv-cache.html">Material 02 &rarr;</a>
             <a href="tarefa02/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a>
           </div>
         </div>
@@ -98,8 +96,7 @@
             Execução superescalar, quebra da cadeia de dependências RAW com múltiplos acumuladores e efeito das flags de otimização <code>-O0</code>, <code>-O2</code> e <code>-O3</code>.
           </p>
           <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;">
-            <a href="lessons/0003-tarefa03-ilp-acumuladores.html">Lição 03 &rarr;</a>
-            <a href="reference/03-teoria-ilp-pipeline-superscalar.html">Teoria 03 &rarr;</a>
+            <a href="lessons/0003-tarefa03-ilp-acumuladores.html">Material 03 &rarr;</a>
             <a href="tarefa03/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a>
           </div>
         </div>
@@ -114,8 +111,7 @@
             Gargalo de von Neumann, intensidade aritmética e impacto do multithreading em aplicações limitadas por memória e CPU.
           </p>
           <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;">
-            <a href="lessons/0004-tarefa04-memory-cpu-bound.html">Lição 04 &rarr;</a>
-            <a href="reference/04-teoria-memory-bound-cpu-bound.html">Teoria 04 &rarr;</a>
+            <a href="lessons/0004-tarefa04-memory-cpu-bound.html">Material 04 &rarr;</a>
             <a href="tarefa04/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a>
           </div>
         </div>
@@ -130,8 +126,7 @@
             Paralelismo de laços com OpenMP, observação de race conditions e desbalanceamento de carga.
           </p>
           <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;">
-            <a href="lessons/0005-tarefa05-primos-openmp.html">Lição 05 &rarr;</a>
-            <a href="reference/05-teoria-primos-openmp.html">Teoria 05 &rarr;</a>
+            <a href="lessons/0005-tarefa05-primos-openmp.html">Material 05 &rarr;</a>
             <a href="tarefa05/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a>
           </div>
         </div>
@@ -146,8 +141,7 @@
             Método de Monte Carlo, condições de corrida, sincronização com <code>critical</code> vs acumuladores locais e escopo de dados (<code>shared</code>, <code>private</code>, <code>firstprivate</code>, <code>lastprivate</code> e <code>default(none)</code>).
           </p>
           <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;">
-            <a href="lessons/0010-tarefa06-montecarlo-escopo.html">Lição 06 &rarr;</a>
-            <a href="reference/06-teoria-clausulas-escopo.html">Teoria 06 &rarr;</a>
+            <a href="lessons/0010-tarefa06-montecarlo-escopo.html">Material 06 &rarr;</a>
             <a href="tarefa06/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a>
           </div>
         </div>
@@ -161,18 +155,75 @@
             Lista encadeada com <code>task</code>, <code>single</code>, <code>taskwait</code> e work-stealing.
           </p>
           <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;">
-            <a href="lessons/0006-tarefa07-lista-task.html">Lição 07 &rarr;</a>
-            <a href="lessons/0007-tarefa07-taskwork-stealing.html">Lição 07 (aprof.) &rarr;</a>
-            <a href="reference/06-teoria-task-openmp.html">Teoria 07 &rarr;</a>
+            <a href="lessons/0006-tarefa07-lista-task.html">Material 07 &rarr;</a>
             <a href="tarefa07/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a>
+          </div>
+        </div>
+
+        <!-- Tarefa 08 -->
+        <div class="source-card" style="margin: 0;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h3 style="margin: 0; font-size: 1.2rem;">Tarefa 08: pi estocástico, rand/rand_r e false sharing</h3>
+            <span class="lesson-badge" style="margin: 0; background-color: var(--success-bg); color: var(--success);">Concluída</span>
+          </div>
+          <p style="margin-bottom: 12px; font-size: 0.95rem; color: var(--text-muted);">
+            Monte Carlo com <code>rand()</code> vs <code>rand_r()</code>, redução via <code>critical</code> vs vetor <code>hits[tid]</code>, protocolo MESI e padding de 64 bytes.
+          </p>
+          <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;">
+            <a href="lessons/0008-tarefa08-pi-rand-false-sharing.html">Material 08 &rarr;</a>
+            <a href="tarefa08/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a>
+          </div>
+        </div>
+
+        <!-- Tarefa 09 -->
+        <div class="source-card" style="margin: 0;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h3 style="margin: 0; font-size: 1.2rem;">Tarefa 09: listas, critical nomeado e locks</h3>
+            <span class="lesson-badge" style="margin: 0; background-color: var(--success-bg); color: var(--success);">Concluída</span>
+          </div>
+          <p style="margin-bottom: 12px; font-size: 0.95rem; color: var(--text-muted);">
+            Tasks com <code>rand_r()</code>, <code>critical(lista0)</code> vs <code>critical(lista1)</code> e vetor <code>locks[N]</code> com <code>init/set/unset/destroy</code>.
+          </p>
+          <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;">
+            <a href="lessons/0009-tarefa09-critical-locks.html">Material 09 &rarr;</a>
+            <a href="tarefa09/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a>
+          </div>
+        </div>
+
+        <!-- Tarefa 10 -->
+        <div class="source-card" style="margin: 0;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h3 style="margin: 0; font-size: 1.2rem;">Tarefa 10: atomic, critical e reduction</h3>
+            <span class="lesson-badge" style="margin: 0; background-color: var(--success-bg); color: var(--success);">Concluída</span>
+          </div>
+          <p style="margin-bottom: 12px; font-size: 0.95rem; color: var(--text-muted);">
+            Comparativo entre shared mais critical, atomic, privado mais critical, vetor e reduction com rand_r.
+          </p>
+          <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;">
+            <a href="lessons/0010-tarefa10-atomic-critical-reduction.html">Material 10</a>
+            <a href="tarefa10/relatorio.pdf" target="_blank">Relatório PDF</a>
+          </div>
+        </div>
+
+        <!-- Tarefa 11 -->
+        <div class="source-card" style="margin: 0;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h3 style="margin: 0; font-size: 1.2rem;">Tarefa 11: difusão viscosa, schedule e collapse</h3>
+            <span class="lesson-badge" style="margin: 0; background-color: var(--success-bg); color: var(--success);">Concluída</span>
+          </div>
+          <p style="margin-bottom: 12px; font-size: 0.95rem; color: var(--text-muted);">
+            Difusão 2D validada: campos zero, constante e gaussiano; sete variantes medidas de 1 a 28 threads, com estudo de chunksize.
+          </p>
+          <div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;">
+            <a href="lessons/0011-tarefa11-difusao-schedule.html">Material 11</a>
+            <a href="lessons/0011-tarefa11-difusao-schedule.html#visualizacao-3d">Visualização 3D · 2.100.000 passos</a>
+            <a href="tarefa11/relatorio.pdf" target="_blank">Relatório PDF</a>
           </div>
         </div>
 
       </div>
     </section>
 
-        <!-- Tarefa 08 --><div class="source-card" style="margin: 0;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"><h3 style="margin: 0; font-size: 1.2rem;">Tarefa 08: pi estocástico, rand/rand_r e false sharing</h3><span class="lesson-badge" style="margin: 0; background-color: var(--success-bg); color: var(--success);">Concluída</span></div><p style="margin-bottom: 12px; font-size: 0.95rem; color: var(--text-muted);">Monte Carlo com <code>rand()</code> vs <code>rand_r()</code>, redução via <code>critical</code> vs vetor <code>hits[tid]</code>, protocolo MESI e padding de 64 bytes.</p><div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;"><a href="lessons/0008-tarefa08-pi-rand-false-sharing.html">Lição 08 &rarr;</a><a href="reference/08-teoria-coerencia-cache-false-sharing.html">Teoria 08 &rarr;</a><a href="tarefa08/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a></div></div>
-        <!-- Tarefa 09 --><div class="source-card" style="margin: 0;"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"><h3 style="margin: 0; font-size: 1.2rem;">Tarefa 09: listas, critical nomeado e locks</h3><span class="lesson-badge" style="margin: 0; background-color: var(--success-bg); color: var(--success);">Concluída</span></div><p style="margin-bottom: 12px; font-size: 0.95rem; color: var(--text-muted);">Tasks com <code>rand_r()</code>, <code>critical(lista0)</code> vs <code>critical(lista1)</code> e vetor <code>locks[N]</code> com <code>init/set/unset/destroy</code>.</p><div style="display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.88rem;"><a href="lessons/0009-tarefa09-critical-locks.html">Lição 09 &rarr;</a><a href="reference/09-teoria-critical-locks-tasks.html">Teoria 09 &rarr;</a><a href="tarefa09/relatorio.pdf" target="_blank">Relatório PDF &rarr;</a></div></div>
     <section id="fundamentos-gerais" style="margin-top: 2.5em;">
       <h2>Documentação base</h2>
       <div class="source-card">

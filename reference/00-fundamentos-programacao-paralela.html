@@ -36,8 +36,7 @@
   </nav>
 
   <header>
-    <div class="lesson-badge">Referência 00</div>
-    <h1>Conceitos de programação paralela e arquitetura</h1>
+    <h1>Referência 00: conceitos de programação paralela e arquitetura</h1>
     <div class="metadata">
       Documento base para a disciplina DCA3703 (UFRN)
     </div>
@@ -45,11 +44,10 @@
 
   <main>
     <p>
-      Este documento reúne a fundamentação teórica geral da disciplina. Cada tarefa individual possui uma dupla de
-      arquivos integrados em <code>lessons/</code> e <code>reference/</code> (teoria única com apêndice de referência rápida + lição prática).
+      Este documento reúne a fundamentação teórica geral da disciplina. Cada tarefa individual possui um material único em <code>lessons/</code>, com teoria, prática, referência rápida e quizzes.
     </p>
 
-    <div class="callout" style="border-left-color: var(--accent); background-color: var(--card-bg);">
+    <div class="callout" style="border-left: 1px solid var(--border); background-color: var(--card-bg);">
       <div class="callout-title">Índice</div>
       <ol style="margin-bottom: 0;">
         <li><a href="#crise-silicio">Fim da escala de Dennard e limites físicos</a></li>
@@ -57,7 +55,7 @@
         <li><a href="#hierarquia-memoria">Hierarquia de memória, UMA e NUMA</a></li>
         <li><a href="#modelos-desempenho">Métricas de desempenho: speedup, Amdahl e Gustafson</a></li>
         <li><a href="#patologias-concorrencia">Problemas de concorrência: condições de corrida e cache</a></li>
-        <li><a href="#mapeamento-tarefas">Estrutura de 2 documentos por tarefa</a></li>
+        <li><a href="#mapeamento-tarefas">Material único por tarefa</a></li>
       </ol>
     </div>
 
@@ -125,9 +123,9 @@
 
     <!-- Seção 6 -->
     <section id="mapeamento-tarefas">
-      <h2>6. Estrutura de 2 documentos por tarefa</h2>
+      <h2>6. Material único por tarefa</h2>
       <p>
-        Cada tarefa da disciplina possui 2 documentos integrados no repositório (teoria única + lição):
+        Cada tarefa da disciplina possui um documento integrado no repositório:
       </p>
 
       <table
@@ -135,55 +133,53 @@
         <thead>
           <tr style="border-bottom: 2px solid var(--border); text-align: left;">
             <th style="padding: 8px;">Tarefa</th>
-            <th style="padding: 8px;">Documento 1: Teoria Única</th>
-            <th style="padding: 8px;">Documento 2: Lição Prática</th>
+            <th style="padding: 8px;">Material único</th>
           </tr>
         </thead>
         <tbody>
           <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 8px;"><strong>T01 (Leibniz)</strong></td>
-            <td style="padding: 8px;"><a href="01-teoria-ponto-flutuante-hardware.html">Teoria 01</a></td>
-            <td style="padding: 8px;"><a href="../lessons/0001-tarefa01-leibniz-pi.html">Lição 01</a></td>
+            <td style="padding: 8px;"><a href="../lessons/0001-tarefa01-leibniz-pi.html">Material 01</a></td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 8px;"><strong>T02 (MxV)</strong></td>
-            <td style="padding: 8px;"><a href="02-teoria-hierarquia-memoria-cache.html">Teoria 02</a></td>
-            <td style="padding: 8px;"><a href="../lessons/0002-tarefa02-mxv-cache.html">Lição 02</a></td>
+            <td style="padding: 8px;"><a href="../lessons/0002-tarefa02-mxv-cache.html">Material 02</a></td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 8px;"><strong>T03 (ILP)</strong></td>
-            <td style="padding: 8px;"><a href="03-teoria-ilp-pipeline-superscalar.html">Teoria 03</a></td>
-            <td style="padding: 8px;"><a href="../lessons/0003-tarefa03-ilp-acumuladores.html">Lição 03</a></td>
+            <td style="padding: 8px;"><a href="../lessons/0003-tarefa03-ilp-acumuladores.html">Material 03</a></td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 8px;"><strong>T04 (CPU vs Mem)</strong></td>
-            <td style="padding: 8px;"><a href="04-teoria-memory-bound-cpu-bound.html">Teoria 04</a></td>
-            <td style="padding: 8px;"><a href="../lessons/0004-tarefa04-memory-cpu-bound.html">Lição 04</a></td>
+            <td style="padding: 8px;"><a href="../lessons/0004-tarefa04-memory-cpu-bound.html">Material 04</a></td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 8px;"><strong>T05 (Primos/Race)</strong></td>
-            <td style="padding: 8px;"><a href="05-teoria-primos-openmp.html">Teoria 05</a></td>
-            <td style="padding: 8px;"><a href="../lessons/0005-tarefa05-primos-openmp.html">Lição 05</a></td>
+            <td style="padding: 8px;"><a href="../lessons/0005-tarefa05-primos-openmp.html">Material 05</a></td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 8px;"><strong>T06 (Monte Carlo)</strong></td>
-            <td style="padding: 8px;"><a href="06-teoria-clausulas-escopo.html">Teoria 06</a></td>
-            <td style="padding: 8px;"><a href="../lessons/0010-tarefa06-montecarlo-escopo.html">Lição 06</a></td>
+            <td style="padding: 8px;"><a href="../lessons/0010-tarefa06-montecarlo-escopo.html">Material 06</a></td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 8px;"><strong>T07 (Task/List)</strong></td>
-            <td style="padding: 8px;"><a href="06-teoria-task-openmp.html">Teoria 07</a></td>
-            <td style="padding: 8px;"><a href="../lessons/0006-tarefa07-lista-task.html">Lição 07</a></td>
+            <td style="padding: 8px;"><a href="../lessons/0006-tarefa07-lista-task.html">Material 07</a></td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 8px;"><strong>T08 (rand/FS)</strong></td>
-            <td style="padding: 8px;"><a href="08-teoria-coerencia-cache-false-sharing.html">Teoria 08</a></td>
-            <td style="padding: 8px;"><a href="../lessons/0008-tarefa08-pi-rand-false-sharing.html">Lição 08</a></td>
+            <td style="padding: 8px;"><a href="../lessons/0008-tarefa08-pi-rand-false-sharing.html">Material 08</a></td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 8px;"><strong>T09 (crit/locks)</strong></td>
-            <td style="padding: 8px;"><a href="09-teoria-critical-locks-tasks.html">Teoria 09</a></td>
-            <td style="padding: 8px;"><a href="../lessons/0009-tarefa09-critical-locks.html">Lição 09</a></td>
+            <td style="padding: 8px;"><a href="../lessons/0009-tarefa09-critical-locks.html">Material 09</a></td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><strong>T10 (atomic/red)</strong></td>
+            <td style="padding: 8px;"><a href="../lessons/0010-tarefa10-atomic-critical-reduction.html">Material 10</a></td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 8px;"><strong>T11 (difusão validada; schedule/collapse)</strong></td>
+            <td style="padding: 8px;"><a href="../lessons/0011-tarefa11-difusao-schedule.html">Material 11</a></td>
           </tr>
         </tbody>
       </table>
@@ -192,7 +188,7 @@
 
   <footer class="footer-nav">
     <a href="../lessons/0001-tarefa01-leibniz-pi.html">&larr; Ir para a Lição 01</a>
-    <a href="01-teoria-ponto-flutuante-hardware.html">Teoria da Tarefa 01 &rarr;</a>
+    <a href="../lessons/0001-tarefa01-leibniz-pi.html">Teoria da Tarefa 01 &rarr;</a>
   </footer>
 
   <script>

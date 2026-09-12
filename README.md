@@ -16,20 +16,22 @@ Os materiais de estudo podem ser acessados diretamente no GitHub Pages:
 
 ## Mapeamento de tarefas
 
-Cada tarefa tem lição prática, teoria única (com apêndice de referência rápida), código C e relatório em LaTeX.
+Cada tarefa tem um material HTML único com teoria, prática, referência rápida e quizzes, além do código C e relatório em LaTeX.
 
-| Tarefa | Tema | Lição prática (Pages) | Teoria única (Pages) | Código e relatório (Repo) |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| Geral | Fundamentos de HPC e taxonomia | — | [Fundamentos gerais](https://eugeniovlopes.github.io/programacao-paralela/reference/00-fundamentos-programacao-paralela.html) | — |
-| 01 | Série de Leibniz e precisão numérica | [Lição 01](https://eugeniovlopes.github.io/programacao-paralela/lessons/0001-tarefa01-leibniz-pi.html) | [Teoria 01](https://eugeniovlopes.github.io/programacao-paralela/reference/01-teoria-ponto-flutuante-hardware.html) | [`tarefa01/`](tarefa01/) e [PDF](tarefa01/relatorio.pdf) |
-| 02 | Multiplicação matriz-vetor e cache | [Lição 02](https://eugeniovlopes.github.io/programacao-paralela/lessons/0002-tarefa02-mxv-cache.html) | [Teoria 02](https://eugeniovlopes.github.io/programacao-paralela/reference/02-teoria-hierarquia-memoria-cache.html) | [`tarefa02/`](tarefa02/) e [PDF](tarefa02/relatorio.pdf) |
-| 03 | Paralelismo em nível de instrução (ILP) | [Lição 03](https://eugeniovlopes.github.io/programacao-paralela/lessons/0003-tarefa03-ilp-acumuladores.html) | [Teoria 03](https://eugeniovlopes.github.io/programacao-paralela/reference/03-teoria-ilp-pipeline-superscalar.html) | [`tarefa03/`](tarefa03/) e [PDF](tarefa03/relatorio.pdf) |
-| 04 | Limitações por Memória e CPU | [Lição 04](https://eugeniovlopes.github.io/programacao-paralela/lessons/0004-tarefa04-memory-cpu-bound.html) | [Teoria 04](https://eugeniovlopes.github.io/programacao-paralela/reference/04-teoria-memory-bound-cpu-bound.html) | [`tarefa04/`](tarefa04/) e [PDF](tarefa04/relatorio.pdf) |
-| 05 | Contagem de Primos e Race Conditions | [Lição 05](https://eugeniovlopes.github.io/programacao-paralela/lessons/0005-tarefa05-primos-openmp.html) | [Teoria 05](https://eugeniovlopes.github.io/programacao-paralela/reference/05-teoria-primos-openmp.html) | [`tarefa05/`](tarefa05/) e [PDF](tarefa05/relatorio.pdf) |
-| 06 | Estimativa de $\pi$ (Monte Carlo) e Cláusulas OpenMP | [Lição 06](https://eugeniovlopes.github.io/programacao-paralela/lessons/0010-tarefa06-montecarlo-escopo.html) | [Teoria 06](https://eugeniovlopes.github.io/programacao-paralela/reference/06-teoria-clausulas-escopo.html) | [`tarefa06/`](tarefa06/) e [PDF](tarefa06/relatorio.pdf) |
-| 07 | lista encadeada, tasks e single | [Lição 07](https://eugeniovlopes.github.io/programacao-paralela/lessons/0006-tarefa07-lista-task.html) | [Teoria 07](https://eugeniovlopes.github.io/programacao-paralela/reference/06-teoria-task-openmp.html) | [`tarefa07/`](tarefa07/) e [PDF](tarefa07/relatorio.pdf) |
-| 08 | pi estocástico, rand/rand_r e false sharing | [Lição 08](https://eugeniovlopes.github.io/programacao-paralela/lessons/0008-tarefa08-pi-rand-false-sharing.html) | [Teoria 08](https://eugeniovlopes.github.io/programacao-paralela/reference/08-teoria-coerencia-cache-false-sharing.html) | [`tarefa08/`](tarefa08/) e [PDF](tarefa08/relatorio.pdf) |
-| 09 | listas, critical nomeado e locks | [Lição 09](https://eugeniovlopes.github.io/programacao-paralela/lessons/0009-tarefa09-critical-locks.html) | [Teoria 09](https://eugeniovlopes.github.io/programacao-paralela/reference/09-teoria-critical-locks-tasks.html) | [`tarefa09/`](tarefa09/) e [PDF](tarefa09/relatorio.pdf) |
+| Tarefa | Tema | Material único (Pages) | Código e relatório (Repo) |
+| :--- | :--- | :--- | :--- |
+| Geral | Fundamentos de HPC e taxonomia | [Fundamentos gerais](https://eugeniovlopes.github.io/programacao-paralela/reference/00-fundamentos-programacao-paralela.html) | — |
+| 01 | Série de Leibniz e precisão numérica | [Material 01](https://eugeniovlopes.github.io/programacao-paralela/lessons/0001-tarefa01-leibniz-pi.html) | [`tarefa01/`](tarefa01/) e [PDF](tarefa01/relatorio.pdf) |
+| 02 | Multiplicação matriz-vetor e cache | [Material 02](https://eugeniovlopes.github.io/programacao-paralela/lessons/0002-tarefa02-mxv-cache.html) | [`tarefa02/`](tarefa02/) e [PDF](tarefa02/relatorio.pdf) |
+| 03 | Paralelismo em nível de instrução (ILP) | [Material 03](https://eugeniovlopes.github.io/programacao-paralela/lessons/0003-tarefa03-ilp-acumuladores.html) | [`tarefa03/`](tarefa03/) e [PDF](tarefa03/relatorio.pdf) |
+| 04 | Limitações por Memória e CPU | [Material 04](https://eugeniovlopes.github.io/programacao-paralela/lessons/0004-tarefa04-memory-cpu-bound.html) | [`tarefa04/`](tarefa04/) e [PDF](tarefa04/relatorio.pdf) |
+| 05 | Contagem de Primos e Race Conditions | [Material 05](https://eugeniovlopes.github.io/programacao-paralela/lessons/0005-tarefa05-primos-openmp.html) | [`tarefa05/`](tarefa05/) e [PDF](tarefa05/relatorio.pdf) |
+| 06 | Estimativa de $\pi$ e cláusulas OpenMP | [Material 06](https://eugeniovlopes.github.io/programacao-paralela/lessons/0010-tarefa06-montecarlo-escopo.html) | [`tarefa06/`](tarefa06/) e [PDF](tarefa06/relatorio.pdf) |
+| 07 | Lista encadeada, tasks e single | [Material 07](https://eugeniovlopes.github.io/programacao-paralela/lessons/0006-tarefa07-lista-task.html) | [`tarefa07/`](tarefa07/) e [PDF](tarefa07/relatorio.pdf) |
+| 08 | Pi estocástico, rand_r e false sharing | [Material 08](https://eugeniovlopes.github.io/programacao-paralela/lessons/0008-tarefa08-pi-rand-false-sharing.html) | [`tarefa08/`](tarefa08/) e [PDF](tarefa08/relatorio.pdf) |
+| 09 | Listas, critical nomeado e locks | [Material 09](https://eugeniovlopes.github.io/programacao-paralela/lessons/0009-tarefa09-critical-locks.html) | [`tarefa09/`](tarefa09/) e [PDF](tarefa09/relatorio.pdf) |
+| 10 | Comparativo atomic, critical e reduction | [Material 10](https://eugeniovlopes.github.io/programacao-paralela/lessons/0010-tarefa10-atomic-critical-reduction.html) | [`tarefa10/`](tarefa10/) e [PDF](tarefa10/relatorio.pdf) |
+| 11 | Difusão viscosa, schedule e collapse | [Material 11](https://eugeniovlopes.github.io/programacao-paralela/lessons/0011-tarefa11-difusao-schedule.html) · [Visualização 3D](https://eugeniovlopes.github.io/programacao-paralela/lessons/0011-tarefa11-difusao-schedule.html#visualizacao-3d) | [`tarefa11/`](tarefa11/) e [PDF](tarefa11/relatorio.pdf) |
 
 ---
 
@@ -41,23 +43,14 @@ Cada tarefa tem lição prática, teoria única (com apêndice de referência r�
 ├── assets/
 │   ├── style.css                # Estilo das páginas HTML
 │   └── scientific_report.sty    # Pacote LaTeX dos relatórios
-├── lessons/                     # Lições com quizzes
+├── lessons/                     # Material único por tarefa, com teoria, prática e quizzes
 │   ├── 0001-tarefa01-leibniz-pi.html
 │   ├── 0002-tarefa02-mxv-cache.html
 │   ├── 0003-tarefa03-ilp-acumuladores.html
 │   ├── 0004-tarefa04-memory-cpu-bound.html
 │   └── 0005-tarefa05-primos-openmp.html
-├── reference/                   # Teoria única por tarefa (com apêndice de referência rápida)
-│   ├── 00-fundamentos-programacao-paralela.html
-│   ├── 01-teoria-ponto-flutuante-hardware.html
-│   ├── 02-teoria-hierarquia-memoria-cache.html
-│   ├── 03-teoria-ilp-pipeline-superscalar.html
-│   ├── 04-teoria-memory-bound-cpu-bound.html
-│   ├── 05-teoria-primos-openmp.html
-│   ├── 06-teoria-clausulas-escopo.html
-│   ├── 06-teoria-task-openmp.html
-│   ├── 08-teoria-coerencia-cache-false-sharing.html
-│   ├── 09-teoria-critical-locks-tasks.html
+├── reference/
+│   └── 00-fundamentos-programacao-paralela.html # Fundamentos gerais
 ├── tarefa01/                    # Código C, script de teste e relatório de Leibniz
 │   ├── tarefa01.c
 │   ├── execute.sh
