@@ -73,3 +73,21 @@ Thumbs.db
 .vscode/
 .idea/
 /tarefa10/pi_v*
+/tarefa09/v1_critical
+/tarefa09/v2_locks
+/tarefa10/pi_v*
+/tarefa10/v1_critical
+/tarefa10/v2_locks
+# Tarefa 11 compiled binaries
+/tarefa11/ns_v*
+/tarefa11/ns_*
+/tarefa11/runs/**/v[0-6]_*
+/tarefa11/*campo*.txt
+/tarefa11/zero.txt
+/tarefa11/constante.txt
+/tarefa11/inicial.txt
+/tarefa11/final.txt
+
+# Resultados regeneráveis da Tarefa 11
+/tarefa11/runs/
+/tarefa11/quadros_difusao.bin
