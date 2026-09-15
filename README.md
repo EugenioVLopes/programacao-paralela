@@ -21,7 +21,7 @@ Cada tarefa tem um material HTML único com teoria, prática, referência rápid
 | Tarefa | Tema | Material único (Pages) | Código e relatório (Repo) |
 | :--- | :--- | :--- | :--- |
 | Geral | Fundamentos de HPC e taxonomia | [Fundamentos gerais](https://eugeniovlopes.github.io/programacao-paralela/reference/00-fundamentos-programacao-paralela.html) | — |
-| 01 | Série de Leibniz e precisão numérica | [Material 01](https://eugeniovlopes.github.io/programacao-paralela/lessons/0001-tarefa01-leibniz-pi.html) | [`tarefa01/`](tarefa01/) e [PDF](tarefa01/relatorio.pdf) |
+| 01 | Leibniz, poder computacional, limites sequenciais e núcleos físicos e lógicos | [Material 01](https://eugeniovlopes.github.io/programacao-paralela/lessons/0001-tarefa01-leibniz-pi.html) · [Fundamentação teórica](https://eugeniovlopes.github.io/programacao-paralela/lessons/0001-tarefa01-leibniz-pi.html#teoria) | [`tarefa01/`](tarefa01/) e [PDF](tarefa01/relatorio.pdf) |
 | 02 | Multiplicação matriz-vetor e cache | [Material 02](https://eugeniovlopes.github.io/programacao-paralela/lessons/0002-tarefa02-mxv-cache.html) | [`tarefa02/`](tarefa02/) e [PDF](tarefa02/relatorio.pdf) |
 | 03 | Paralelismo em nível de instrução (ILP) | [Material 03](https://eugeniovlopes.github.io/programacao-paralela/lessons/0003-tarefa03-ilp-acumuladores.html) | [`tarefa03/`](tarefa03/) e [PDF](tarefa03/relatorio.pdf) |
 | 04 | Limitações por Memória e CPU | [Material 04](https://eugeniovlopes.github.io/programacao-paralela/lessons/0004-tarefa04-memory-cpu-bound.html) | [`tarefa04/`](tarefa04/) e [PDF](tarefa04/relatorio.pdf) |

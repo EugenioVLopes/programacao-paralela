@@ -50,7 +50,7 @@
     <div class="callout" style="border-left: 1px solid var(--border); background-color: var(--card-bg);">
       <div class="callout-title">Índice</div>
       <ol style="margin-bottom: 0;">
-        <li><a href="#crise-silicio">Fim da escala de Dennard e limites físicos</a></li>
+        <li><a href="#crise-silicio">Fundamentação da tarefa 1: poder computacional e núcleos</a></li>
         <li><a href="#taxonomia-flynn">Taxonomia de Flynn</a></li>
         <li><a href="#hierarquia-memoria">Hierarquia de memória, UMA e NUMA</a></li>
         <li><a href="#modelos-desempenho">Métricas de desempenho: speedup, Amdahl e Gustafson</a></li>
@@ -61,16 +61,13 @@
 
     <!-- Seção 1 -->
     <section id="crise-silicio">
-      <h2>1. Fim da escala de Dennard e limites físicos</h2>
+      <h2>1. Fundamentação da tarefa 1</h2>
       <p>
-        Entre 1970 e 2005, processadores aumentavam a frequência de clock mantendo a densidade de potência constante
-        (Escala de Dennard). Com o surgimento das correntes de fuga em escala nanométrica, a voltagem não pôde mais
-        cair, gerando a barreira térmica (Power Wall) e forçando a transição para múltiplos núcleos em um único chip.
+        Poder computacional, limitações dos processadores sequenciais (incluindo escala de Dennard e Power Wall)
+        e a distinção entre núcleos físicos e lógicos são estudados na
+        <a href="../lessons/0001-tarefa01-leibniz-pi.html#teoria">fundamentação teórica da tarefa 1</a>,
+        junto ao experimento de aproximação de $\pi$.
       </p>
-
-      <div class="math-block">
-        $$P_{\text{dinâmica}} \approx C \cdot V^2 \cdot f$$
-      </div>
     </section>
 
     <!-- Seção 2 -->
@@ -138,8 +135,8 @@
         </thead>
         <tbody>
           <tr style="border-bottom: 1px solid var(--border);">
-            <td style="padding: 8px;"><strong>T01 (Leibniz)</strong></td>
-            <td style="padding: 8px;"><a href="../lessons/0001-tarefa01-leibniz-pi.html">Material 01</a></td>
+            <td style="padding: 8px;"><strong>T01 (Leibniz, poder computacional e núcleos)</strong></td>
+            <td style="padding: 8px;"><a href="../lessons/0001-tarefa01-leibniz-pi.html">Material 01</a> · <a href="../lessons/0001-tarefa01-leibniz-pi.html#teoria">Fundamentação teórica</a></td>
           </tr>
           <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 8px;"><strong>T02 (MxV)</strong></td>
@@ -188,7 +185,7 @@
 
   <footer class="footer-nav">
     <a href="../lessons/0001-tarefa01-leibniz-pi.html">&larr; Ir para a Lição 01</a>
-    <a href="../lessons/0001-tarefa01-leibniz-pi.html">Teoria da Tarefa 01 &rarr;</a>
+    <a href="../lessons/0001-tarefa01-leibniz-pi.html#teoria">Teoria da Tarefa 01 &rarr;</a>
   </footer>
 
   <script>

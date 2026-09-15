@@ -41,18 +41,54 @@
     <h1>Tarefa 01: Série de Leibniz, poder computacional e limites de hardware</h1>
 
     <div class="metadata">
-      Tempo estimado: 15 min &bull; Foco: Sintaxe C, precisão numérica, evolução dos processadores e transição para multicore
+      Tempo estimado: 20 min &bull; Foco: Poder computacional, limites sequenciais, núcleos físicos e lógicos, precisão numérica
     </div>
   </header>
 
   <main>
     <p>
-      Esta lição analisa a implementação em <a href="../tarefa01/tarefa01.c">tarefa01.c</a> e os conceitos fundamentais sobre a evolução do poder computacional, as limitações físicas do processamento sequencial e a necessidade de utilizar múltiplos núcleos lógicos.
+      A tarefa 1 usa a aproximação de $\pi$ para estudar três fundamentos: poder computacional, limitações de processadores sequenciais e uso de múltiplos núcleos. A implementação em <a href="../tarefa01/tarefa01.c">tarefa01.c</a> e o <a href="../tarefa01/relatorio.pdf">relatório do experimento</a> permitem relacionar essa teoria ao custo de obter resultados mais precisos.
     </p>
 
-    <!-- Seção 1: Código-fonte -->
+    <section id="teoria">
+      <h2>1. Fundamentação teórica da tarefa 1</h2>
+      <p>Nos <a href="../assets/index.md">slides do professor</a>, o tópico “Histórico e evolução da programação” relaciona a demanda crescente por computação aos limites físicos dos processadores. Aqui, a sequência é: mais precisão exige mais trabalho; um núcleo tem limites; dividir o trabalho abre espaço para o paralelismo.</p>
+
+      <h3 id="poder-computacional">1.1. Poder computacional</h3>
+      <p><strong>Poder computacional</strong> é a capacidade que um sistema oferece para executar tarefas. Para um mesmo problema e uma mesma precisão, podemos avaliá-lo pelo tempo necessário para produzir o resultado. Problemas maiores, modelos mais detalhados ou exigências de maior precisão geralmente demandam mais operações.</p>
+      <p>Na série de Leibniz, aumentar $N$ aumenta o trabalho do programa: cada termo exige calcular uma fração e atualizar a soma. Para valores grandes de $N$, o tempo tende a crescer proporcionalmente a $N$, enquanto o erro de truncamento cai na ordem de $1/N$. Assim, reduzir esse erro por um fator de dez exige aproximadamente dez vezes mais iterações.</p>
+      <p>Esse compromisso também motiva a computação de alto desempenho (HPC): simulações físicas, previsão do tempo e treinamento de modelos de IA precisam processar problemas maiores dentro de prazos úteis. O algoritmo escolhido também importa: uma série com convergência mais rápida pode reduzir o trabalho necessário para aproximar $\pi$.</p>
+
+      <h3 id="limites-sequenciais">1.2. Limitação de processadores sequenciais</h3>
+      <p>Mais transistores permitem construir caches maiores e mais unidades de execução; frequências maiores oferecem mais ciclos por segundo. Isso pode melhorar o desempenho de um núcleo, mas a quantidade de transistores e o clock, isoladamente, não determinam quanto trabalho um programa conclui.</p>
+      <ul>
+        <li><strong>Limite espacial:</strong> a área do chip, as dimensões dos transistores e as interconexões limitam quantos componentes podem ser integrados e como se comunicam.</li>
+        <li><strong>Limite energético e térmico (Power Wall):</strong> comutar transistores consome energia e produz calor. Elevar a frequência pode exigir maior tensão, aumentando a potência que o sistema precisa fornecer e dissipar.</li>
+      </ul>
+      <div class="math-block">
+        $$P_{\text{dinâmica}} \approx C_{\text{efetiva}} \cdot V^2 \cdot f$$
+      </div>
+      <p>Nesse modelo simplificado, $C_{\text{efetiva}}$ representa a capacitância comutada considerando a atividade do circuito, $V$ é a tensão e $f$ é a frequência. A potência total também inclui correntes de fuga. A dependência quadrática da tensão ajuda a explicar por que aumentar o clock não é uma solução ilimitada. <a href="https://www.intel.com/content/dam/doc/white-paper/power-management-technologies-for-processor-graphics-display-and-memory-paper.pdf">Fonte: Intel, gerenciamento de potência</a>.</p>
+      <p>A escala de Dennard descrevia como reduzir dimensões e tensão permitia aumentar a densidade de transistores sem elevar proporcionalmente a densidade de potência. Com o enfraquecimento dessa escala, tornou-se mais difícil continuar acelerando um único núcleo. Isso não estabelece um teto universal de frequência: os limites dependem do projeto, da carga e da refrigeração.</p>
+
+      <h3 id="cores-logicos">1.3. Cores lógicos e a transição para múltiplos núcleos</h3>
+      <p>Uma resposta às limitações sequenciais é distribuir trabalho entre vários núcleos. Para entender essa estratégia, precisamos distinguir o núcleo físico dos processadores lógicos que o sistema operacional enxerga:</p>
+      <ul>
+        <li><strong>Núcleo físico:</strong> unidade de processamento do chip com recursos de execução. Um processador <em>multicore</em> reúne vários desses núcleos.</li>
+        <li><strong>Núcleo lógico:</strong> contexto de execução de hardware disponível ao sistema operacional. Com SMT (multithreading simultâneo), um núcleo físico pode expor mais de um contexto, que compartilham seus recursos de execução.</li>
+        <li><strong>Thread de software:</strong> fluxo de instruções do programa que o sistema operacional pode escalonar em um processador lógico.</li>
+      </ul>
+      <p>Por exemplo, quatro núcleos físicos com dois contextos SMT por núcleo oferecem oito processadores lógicos. Eles continuam compartilhando recursos de quatro núcleos físicos; oito lógicos não garantem o desempenho de oito físicos nem o dobro da velocidade. <a href="https://www.intel.com/content/www/us/en/developer/articles/guide/hyper-thread-tuning-guide-for-video-ai-workload.html">Fonte: Intel, recursos compartilhados no Hyper-Threading</a>.</p>
+      <div class="callout">
+        <div class="callout-title">O que isso significa nesta tarefa?</div>
+        <p>O código da tarefa 1 executa o laço em uma única thread. Ter vários núcleos disponíveis não divide esse laço automaticamente. Uma versão paralela precisaria repartir os termos entre threads, manter somas parciais e combiná-las ao final por uma redução. A soma atual depende do valor anterior de <code>pi</code> (dependência RAW: leitura após escrita).</p>
+        <p>O experimento sequencial mostra o custo de buscar precisão e motiva o paralelismo. Ele não mede ganhos de multicore ou de SMT. O speedup e seus limites são apresentados nos <a href="../reference/00-fundamentos-programacao-paralela.html#modelos-desempenho">modelos gerais de desempenho</a>.</p>
+      </div>
+    </section>
+
+    <!-- Código-fonte -->
     <section>
-      <h2>1. Código-fonte em C</h2>
+      <h2>2. Código-fonte em C</h2>
       <p>Implementação sequencial do cálculo de $\pi$ via Série de Leibniz:</p>
 
       <pre><code><span class="hl-prep">#include</span> <span class="hl-str">&lt;stdio.h&gt;</span>
@@ -84,16 +120,16 @@
 }</code></pre>
     </section>
 
-    <!-- Seção 2: Análise do código C -->
+    <!-- Análise do código C -->
     <section>
-      <h2>2. Análise do código C</h2>
+      <h2>3. Análise do código C</h2>
 
       <h3>A. Leitura de argumentos e tipos de 64 bits</h3>
       <pre><code><span class="hl-type">long long</span> N = <span class="hl-fn">atoll</span>(argv[<span class="hl-num">1</span>]);
 <span class="hl-type">double</span> pi = <span class="hl-num">0.0</span>;</code></pre>
       <ul>
         <li><strong><code>long long</code> e <code>atoll</code></strong>: Um inteiro de 32 bits (<code>int</code>) sofre estouro aritmético ao ultrapassar $2^{31}-1 \approx 2{,}14 \times 10^9$. Como os testes de convergência demandam $N = 10^{10}$ ou mais, utiliza-se <code>long long</code> (64 bits, limite de $\approx 9{,}22 \times 10^{18}$) e a função <code>atoll</code> para converter a string informada na linha de comando.</li>
-        <li><strong><code>double</code></strong>: Ponto flutuante de precisão dupla (IEEE 754, 64 bits). Oferece 52 bits de mantissa, garantindo de 15 a 17 dígitos decimais de precisão exata.</li>
+        <li><strong><code>double</code></strong>: Ponto flutuante de precisão dupla (IEEE 754, 64 bits). Usa 52 bits fracionários e um bit implícito nos números normais. Essa representação não garante que todas as casas impressas estejam corretas: há erro de truncamento da série e arredondamento nas operações.</li>
       </ul>
 
       <h3>B. Laço de redução e custo de operações</h3>
@@ -103,7 +139,7 @@
 }
 pi *= <span class="hl-num">4.0</span>;</code></pre>
       <ul>
-        <li><strong>Custo da divisão</strong>: A instrução <code>divsd</code> no x86-64 exige de 12 a 20 ciclos de clock por iteração. É o gargalo computacional do laço.</li>
+        <li><strong>Custo da divisão</strong>: Cada termo exige uma divisão em ponto flutuante. Seu custo depende da CPU e do código gerado; não se pode deduzir um número fixo de ciclos por iteração apenas lendo o código C.</li>
         <li><strong>Operador módulo</strong>: A expressão <code>(k % 2 == 0)</code> testa a paridade de $k$. Substituir por alternância simples de sinal (<code>sinal = -sinal</code>) ou por um laço desenrolado de passo 2 elimina desvios condicionais.</li>
         <li><strong>Fator multiplicativo</strong>: Multiplicar por 4.0 ao final (<code>pi *= 4.0;</code>) economiza $N-1$ multiplicações durante o laço.</li>
       </ul>
@@ -118,87 +154,32 @@ pi *= <span class="hl-num">4.0</span>;</code></pre>
       </ul>
     </section>
 
-    <!-- Seção 3: Conceitos Teóricos de Programação Paralela -->
+    <!-- Relação entre a teoria e os dados do experimento -->
     <section>
-      <h2>3. Por que Leibniz pede paralelismo</h2>
-
-      <div class="callout">
-        <div class="callout-title">Contexto teórico na Teoria 01</div>
-        <p>
-          Poder computacional, limites físicos (Power Wall) e a transição para multicore estão em
-          <a href="#teoria">Fundamentação teórica</a>.
-          Aqui vai direto ao ponto: por que a série de Leibniz pede paralelismo.
-        </p>
-      </div>
-
-      <h3>D. A Série de Leibniz e a demanda por paralelismo</h3>
-      <p>A fórmula da série alternada é dada por:</p>
-      <div class="math-block">
-        $$\pi = 4 \sum_{k=0}^{\infty} \frac{(-1)^k}{2k + 1} = 4 \left( 1 - \frac{1}{3} + \frac{1}{5} - \frac{1}{7} + \frac{1}{9} - \dots \right)$$
-      </div>
-      <p>
-        O erro de truncamento decresce a uma taxa muito lenta de $\mathcal{O}(1/N)$. Para obter cada nova casa decimal de precisão em $\pi$, o número de iterações $N$ precisa ser multiplicado por 10. Obter 15 casas decimais em um único núcleo levaria anos de processamento sequencial. Dividir o laço entre múltiplos núcleos lógicos é a única forma de obter o resultado em tempo hábil.
-      </p>
+      <h2>4. Precisão e custo no experimento sequencial</h2>
+      <p>Os <a href="../tarefa01/results.json">resultados registrados</a> mostram o compromisso entre tempo e erro:</p>
+      <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; text-align: left;">
+        <thead><tr><th scope="col">Iterações ($N$)</th><th scope="col">Tempo (s)</th><th scope="col">Erro absoluto registrado</th></tr></thead>
+        <tbody>
+          <tr><td>$10^9$</td><td>1,943419</td><td>$1{,}00 \times 10^{-9}$</td></tr>
+          <tr><td>$10^{10}$</td><td>17,407810</td><td>$1{,}01 \times 10^{-10}$</td></tr>
+          <tr><td>$10^{11}$</td><td>188,135046</td><td>$1{,}13 \times 10^{-11}$</td></tr>
+        </tbody>
+      </table>
+      <p>O <a href="../tarefa01/execute.sh">script disponível</a> compila com <code>gcc tarefa01.c -o tarefa01 -lm</code>, sem flag explícita de otimização ou OpenMP, e mede externamente com <code>date +%s%N</code>. O programa tem uma thread; os dados abrangem $N = 1$ até $10^{11}$. Os arquivos não identificam a CPU, a versão do GCC ou uma execução no NPAD, portanto não permitem atribuir os tempos a um hardware específico.</p>
+      <p>Para $N$ grande, multiplicar as iterações por dez aumenta o tempo aproximadamente na mesma proporção e reduz o erro em cerca de uma ordem de grandeza. Para $N$ pequeno, o custo de iniciar o processo e medir pelo shell pesa mais. A curva ilustra a demanda por processamento; não demonstra a Power Wall nem mede speedup paralelo.</p>
     </section>
 
-    <!-- Seção 4: Quiz -->
-    <section>
-      <h2>4. Quiz de fixação</h2>
-
-      <!-- Quiz 1 -->
-      <div class="quiz-container" id="quiz-1">
-        <div class="quiz-header">
-          <span>Questão 1: Tipos inteiros em C</span>
-          <button class="quiz-reset-btn" onclick="resetQuiz(1)">Tentar novamente</button>
-        </div>
-        <div class="quiz-question">
-          Por que o programa usa <code>long long</code> para a variável $N$ em vez de <code>int</code>?
-        </div>
-        <div class="quiz-options">
-          <button class="quiz-option-btn" onclick="checkAnswer(1, 0, false)">O tipo int gera lentidão no barramento de dados da CPU.</button>
-          <button class="quiz-option-btn" onclick="checkAnswer(1, 1, false)">O compilador GCC recusa converter strings em int com atoll.</button>
-          <button class="quiz-option-btn" onclick="checkAnswer(1, 2, true)">O tipo int sofre estouro de representação acima de dois bilhões.</button>
-          <button class="quiz-option-btn" onclick="checkAnswer(1, 3, false)">O tipo int impede o uso de números com ponto flutuante.</button>
-        </div>
-        <div class="quiz-explanation" id="exp-1"></div>
-      </div>
-
-      <!-- Quiz 2 -->
-      <div class="quiz-container" id="quiz-2">
-        <div class="quiz-header">
-          <span>Questão 2: Limites de hardware e multicore</span>
-          <button class="quiz-reset-btn" onclick="resetQuiz(2)">Tentar novamente</button>
-        </div>
-        <div class="quiz-question">
-          Qual fator físico motivou a transição da computação sequencial para processadores multicore?
-        </div>
-        <div class="quiz-options">
-          <button class="quiz-option-btn" onclick="checkAnswer(2, 0, false)">A escassez mundial de silício para a manufatura de novos circuitos.</button>
-          <button class="quiz-option-btn" onclick="checkAnswer(2, 1, true)">A barreira de potência térmica que estagnou as frequências de clock.</button>
-          <button class="quiz-option-btn" onclick="checkAnswer(2, 2, false)">A incapacidade técnica de se construir memórias RAM de alta largura.</button>
-          <button class="quiz-option-btn" onclick="checkAnswer(2, 3, false)">O abandono definitivo da linguagem C pelos sistemas computacionais.</button>
-        </div>
-        <div class="quiz-explanation" id="exp-2"></div>
-      </div>
-    </section>
-
-    <!-- Seção 5: Fontes -->
-    <section>
-      <h2>5. Leitura recomendada</h2>
-      <div class="source-card">
-        <strong>Fontes:</strong> <em>Computer Systems: A Programmer's Perspective (CS:APP)</em>, R. Bryant e D. O'Hallaron, Capítulo 2 (Ponto Flutuante IEEE 754); <em>An Introduction to Parallel Programming</em>, Peter S. Pacheco, Capítulo 1 (Necessidade de sistemas paralelos).
-      </div>
-    </section>
-  <section id="teoria"><h2>Fundamentação teórica</h2><p>Teoria, modelagem matemática e contexto de HPC integrados à prática desta tarefa.</p></section>
-<section>
-      <h2>1. Representação de ponto flutuante (IEEE 754)</h2>
+    <section id="modelagem-matematica">
+      <h2>5. Modelagem matemática e precisão numérica</h2>
+      <h3>5.1. Representação de ponto flutuante (IEEE 754)</h3>
       <p>
         O formato de precisão dupla (<code>double</code>) usa 64 bits alocados em três campos:
       </p>
 
       <pre><code>[ 1 bit de sinal (S) ] [ 11 bits de expoente (E) ] [ 52 bits de mantissa (M) ]</code></pre>
 
-      <p>O valor numérico representado corresponde a:</p>
+      <p>Para números normais, o valor numérico representado corresponde a:</p>
       <div class="math-block">
         $$V = (-1)^S \times (1 + M) \times 2^{E - 1023}$$
       </div>
@@ -209,7 +190,7 @@ pi *= <span class="hl-num">4.0</span>;</code></pre>
         <li><strong>Mantissa ($M$)</strong>: 52 bits fracionários. O bit 1 implícito antes da vírgula confere 53 bits de precisão efetiva, equivalente a 15 a 17 dígitos decimais.</li>
       </ul>
 
-      <h3>Epsilon de máquina</h3>
+      <h4>Epsilon de máquina</h4>
       <p>
         O epsilon de máquina ($\epsilon_{\text{mach}}$) é a menor diferença entre 1,0 e o próximo valor representável em <code>double</code>:
       </p>
@@ -217,12 +198,9 @@ pi *= <span class="hl-num">4.0</span>;</code></pre>
         $$\epsilon_{\text{mach}} = 2^{-52} \approx 2{,}220446 \times 10^{-16}$$
       </div>
       <p>
-        Quando a magnitude dos termos adicionados em uma soma se torna menor que $\epsilon_{\text{mach}} \times \text{acumulador}$, a adição de ponto flutuante deixa de alterar o resultado.
+        Um termo muito pequeno em relação ao acumulador pode deixar de alterar a soma: o resultado exato da operação é arredondado de volta ao mesmo valor representável. O limite depende do espaçamento entre os valores representáveis nessa magnitude.
       </p>
-    </section>
-
-    <section>
-      <h2>2. Série de Leibniz e taxa de erro</h2>
+      <h3>5.2. Série de Leibniz e taxa de erro</h3>
       <p>A expansão em série da função $\arctan(1)$ resulta em:</p>
       <div class="math-block">
         $$\pi = 4 \sum_{k=0}^{\infty} \frac{(-1)^k}{2k + 1} = 4 \left( 1 - \frac{1}{3} + \frac{1}{5} - \frac{1}{7} + \frac{1}{9} - \dots \right)$$
@@ -239,51 +217,98 @@ pi *= <span class="hl-num">4.0</span>;</code></pre>
         <thead>
           <tr style="border-bottom: 2px solid var(--border); text-align: left;">
             <th style="padding: 8px;">Iterações ($N$)</th>
-            <th style="padding: 8px;">Erro teórico ($|E(N)|$)</th>
-            <th style="padding: 8px;">Casas decimais exatas</th>
+            <th style="padding: 8px;">Limite superior do erro de truncamento ($4/(2N+1)$)</th>
           </tr>
         </thead>
         <tbody>
-          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 8px;">$10^3$</td><td style="padding: 8px;">$\approx 2 \times 10^{-3}$</td><td style="padding: 8px;">3</td></tr>
-          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 8px;">$10^6$</td><td style="padding: 8px;">$\approx 2 \times 10^{-6}$</td><td style="padding: 8px;">6</td></tr>
-          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 8px;">$10^9$</td><td style="padding: 8px;">$\approx 2 \times 10^{-9}$</td><td style="padding: 8px;">9</td></tr>
-          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 8px;">$10^{15}$</td><td style="padding: 8px;">$\approx 2 \times 10^{-15}$</td><td style="padding: 8px;">15 (limite do <code>double</code>)</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 8px;">$10^3$</td><td style="padding: 8px;">$\approx 2 \times 10^{-3}$</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 8px;">$10^6$</td><td style="padding: 8px;">$\approx 2 \times 10^{-6}$</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 8px;">$10^9$</td><td style="padding: 8px;">$\approx 2 \times 10^{-9}$</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 8px;">$10^{15}$</td><td style="padding: 8px;">$\approx 2 \times 10^{-15}$</td></tr>
         </tbody>
       </table>
+      <p>Esse limite considera a soma em aritmética exata. Ele não é o erro medido nem garante um número de casas decimais corretas em <code>double</code>, pois as operações também acumulam arredondamento.</p>
     </section>
 
+    <!-- Quiz -->
     <section>
-      <h2>3. Limites de hardware e a barreira térmica (Power Wall)</h2>
-      <p>
-        A potência dinâmica consumida por uma CPU uniprocessada é proporcional à capacitância $C$, ao quadrado da tensão $V$ e à frequência $f$:
-      </p>
-      <div class="math-block">
-        $$P = C \cdot V^2 \cdot f$$
+      <h2>6. Quiz de fixação</h2>
+
+      <!-- Quiz 1 -->
+      <div class="quiz-container" id="quiz-1">
+        <div class="quiz-header">
+          <span>Questão 1: Tipos inteiros em C</span>
+          <button class="quiz-reset-btn" onclick="resetQuiz(1)">Tentar novamente</button>
+        </div>
+        <div class="quiz-question">
+          Por que o programa usa <code>long long</code> para a variável $N$ em vez de <code>int</code>?
+        </div>
+        <div class="quiz-options">
+          <button class="quiz-option-btn" onclick="checkAnswer(1, 0, false)">Para executar divisões usando apenas três registradores inteiros.</button>
+          <button class="quiz-option-btn" onclick="checkAnswer(1, 1, false)">Para converter argumentos sem chamar funções externas auxiliares.</button>
+          <button class="quiz-option-btn" onclick="checkAnswer(1, 2, true)">Para representar contagens maiores que dois bilhões corretamente.</button>
+          <button class="quiz-option-btn" onclick="checkAnswer(1, 3, false)">Para armazenar frações usando apenas três registradores inteiros.</button>
+        </div>
+        <div class="quiz-explanation" id="exp-1"></div>
       </div>
 
-      <p>
-        Até 2005, a redução do tamanho dos transistores permitia reduzir $V$ junto com as dimensões físicas (Escala de Dennard), mantendo a potência por unidade de área constante enquanto a frequência subia.
-      </p>
-      <p>
-        Com componentes em escala nanométrica, a corrente de fuga impediu a redução de $V$. Aumentar $f$ causou um pico no consumo elétrico e na dissipação de calor (Power Wall). Como o clock ficou travado entre 3 e 5 GHz, a alternativa para processar somas de $10^9$ ou $10^{12}$ iterações em tempo viável passou a ser a divisão de laços entre múltiplos núcleos.
-      </p>
+      <!-- Quiz 2 -->
+      <div class="quiz-container" id="quiz-2">
+        <div class="quiz-header">
+          <span>Questão 2: Limites de hardware e multicore</span>
+          <button class="quiz-reset-btn" onclick="resetQuiz(2)">Tentar novamente</button>
+        </div>
+        <div class="quiz-question">
+          Qual fator físico motivou a transição da computação sequencial para processadores multicore?
+        </div>
+        <div class="quiz-options">
+          <button class="quiz-option-btn" onclick="checkAnswer(2, 0, false)">Os limites de endereços na RAM ao executar programas.</button>
+          <button class="quiz-option-btn" onclick="checkAnswer(2, 1, true)">Os limites de potência e calor ao elevar frequências.</button>
+          <button class="quiz-option-btn" onclick="checkAnswer(2, 2, false)">Os limites de arquivos no disco ao gravar resultados.</button>
+          <button class="quiz-option-btn" onclick="checkAnswer(2, 3, false)">Os limites de precisão em double ao calcular frações.</button>
+        </div>
+        <div class="quiz-explanation" id="exp-2"></div>
+      </div>
+    <section id="questoes-adicionais">
+      <h3>Questões 3 e 4: poder computacional e núcleos</h3>
+      <div class="quiz-container">
+        <div class="quiz-header"><span>Questão 3: Poder computacional</span></div>
+        <div class="quiz-question">Para uma carga de trabalho e precisão fixas, qual alternativa descreve poder computacional?</div>
+        <ol class="quiz-options" type="A">
+          <li>É a capacidade de armazenar valores em determinado disco.</li>
+          <li>É a capacidade de atualizar imagens em determinado vídeo.</li>
+          <li>É a capacidade de conectar usuários em determinada nuvem.</li>
+          <li>É a capacidade de executar trabalho em determinado tempo.</li>
+        </ol>
+        <details><summary>Conferir resposta</summary><p><strong>Resposta: D.</strong> A capacidade de executar trabalho relaciona a tarefa ao tempo necessário para concluí-la. Na série de Leibniz, exigir menor erro aumenta o número de termos a calcular.</p></details>
+      </div>
+      <div class="quiz-container">
+        <div class="quiz-header"><span>Questão 4: Núcleos físicos e lógicos</span></div>
+        <div class="quiz-question">Uma CPU com quatro núcleos físicos e dois contextos SMT por núcleo possui qual organização?</div>
+        <ol class="quiz-options" type="A">
+          <li>Oito núcleos físicos oferecem oito contextos para executar cálculos.</li>
+          <li>Quatro núcleos físicos expondo oito contextos para executar threads.</li>
+          <li>Quatro núcleos físicos garantindo oito vezes mais velocidade sempre.</li>
+          <li>Oito núcleos físicos garantindo quatro vezes mais velocidade sempre.</li>
+        </ol>
+        <details><summary>Conferir resposta</summary><p><strong>Resposta: B.</strong> São oito processadores lógicos sobre quatro núcleos físicos. Os contextos SMT compartilham recursos; o ganho depende do programa. O laço sequencial desta tarefa não é distribuído automaticamente entre eles.</p></details>
+      </div>
+    </section>
     </section>
 
-    <section id="questoes-adicionais"><h2>Questões adicionais</h2><div class="quiz-container">
-        <div class="quiz-header"><span>Questão adicional 1 de 2</span></div>
-        <div class="quiz-question">Qual limite descreve o erro após N termos?</div>
-        <ol class="quiz-options"><li>A) Quatro dividido por dois N mais um</li><li>B) Dois multiplicado por N menos um agora</li><li>C) N elevado ao quadrado sobre quatro sempre</li><li>D) Epsilon multiplicado por N mais dois sempre</li></ol>
-        <details><summary>Conferir resposta</summary><p><strong>Resposta: A.</strong> Quatro dividido por dois N mais um.</p></details>
-      </div><div class="quiz-container">
-        <div class="quiz-header"><span>Questão adicional 2 de 2</span></div>
-        <div class="quiz-question">O que ocorre quando um termo fica pequeno demais?</div>
-        <ol class="quiz-options"><li>A) A soma pode deixar de mudar numericamente</li><li>B) A divisão passa a retornar inteiro automaticamente</li><li>C) O processador troca double por float sozinho</li><li>D) A série converge exatamente naquele mesmo instante</li></ol>
-        <details><summary>Conferir resposta</summary><p><strong>Resposta: A.</strong> A soma pode deixar de mudar numericamente.</p></details>
-      </div></section><section id="referencia-rapida">
+    <!-- Fontes -->
+    <section>
+      <h2>7. Fontes e leitura complementar</h2>
+      <p><strong>Fonte primária da disciplina:</strong> <a href="../assets/index.md">slides do professor, “Histórico e evolução da programação”</a>, sobre demanda por poder computacional e limitações físicas dos processadores sequenciais. As referências da Intel nas seções 1.2 e 1.3 complementam a explicação de potência e SMT.</p>
+      <div class="source-card">
+        <strong>Fontes:</strong> <em>Computer Systems: A Programmer's Perspective (CS:APP)</em>, R. Bryant e D. O'Hallaron, Capítulo 2 (Ponto Flutuante IEEE 754); <em>An Introduction to Parallel Programming</em>, Peter S. Pacheco, Capítulo 1 (Necessidade de sistemas paralelos).
+      </div>
+    </section>
+    <section id="referencia-rapida">
       <h2>Apêndice: Referência rápida</h2>
-      <p><em>Conteúdo consolidado do antigo arquivo de referência rápida. Mantido aqui para consulta rápida sem trocar de página.</em></p>
+      <p>Fórmulas, sintaxe e conceitos essenciais para revisar a tarefa.</p>
 <section>
-      <h2>1. Tipos e funções em C</h2>
+      <h3>1. Tipos e funções em C</h3>
 
       <table style="width: 100%; border-collapse: collapse; margin: 1.5em 0; font-family: 'Inter', sans-serif; font-size: 0.9rem;">
         <thead>
@@ -317,14 +342,14 @@ pi *= <span class="hl-num">4.0</span>;</code></pre>
           <tr style="border-bottom: 1px solid var(--border);">
             <td style="padding: 10px 8px;"><code>M_PI</code></td>
             <td style="padding: 10px 8px;"><code><span class="hl-type">double</span></code></td>
-            <td style="padding: 10px 8px;">Constante de $\pi$ em <code>&lt;math.h&gt;</code>. Exige a flag <code>-lm</code> no GCC.</td>
+            <td style="padding: 10px 8px;">Constante de $\pi$ fornecida como extensão por ambientes como GNU; não pertence ao C99/C11 estrito. A flag <code>-lm</code> liga a biblioteca matemática, mas não define essa macro.</td>
           </tr>
         </tbody>
       </table>
     </section>
 
     <section>
-      <h2>2. Formato IEEE 754 (precisão dupla)</h2>
+      <h3>2. Formato IEEE 754 (precisão dupla)</h3>
       <pre><code>[ 1 bit de sinal ] [ 11 bits de expoente com bias 1023 ] [ 52 bits de mantissa ]
 Tamanho: 64 bits (8 bytes)
 Precisão decimal: ~15 a 17 dígitos significativos
@@ -332,7 +357,7 @@ Epsilon de máquina: 2.220446e-16</code></pre>
     </section>
 
     <section>
-      <h2>3. Série de Leibniz</h2>
+      <h3>3. Série de Leibniz</h3>
       <div class="math-block">
         $$\pi = 4 \sum_{k=0}^{\infty} \frac{(-1)^k}{2k + 1} = 4 \left( 1 - \frac{1}{3} + \frac{1}{5} - \frac{1}{7} + \dots \right)$$
       </div>
@@ -348,11 +373,14 @@ Epsilon de máquina: 2.220446e-16</code></pre>
     </section>
 
     <section>
-      <h2>4. Limites de escala em processadores</h2>
+      <h3>4. Resumo dos fundamentos da tarefa</h3>
       <ul>
-        <li><strong>Fim da escala de Dennard (2005)</strong>: A densidade de potência parou de se manter constante com a redução dos transistores.</li>
-        <li><strong>Power Wall</strong>: O limite de dissipação térmica impediu que a frequência passasse de 3 a 5 GHz.</li>
-        <li><strong>Multicore</strong>: A alternativa da indústria foi colocar vários núcleos em um mesmo chip, tornando o paralelismo necessário para ganhos de tempo.</li>
+        <li><strong>Poder computacional:</strong> capacidade de executar trabalho; compare tempos para o mesmo problema e precisão.</li>
+        <li><strong>Limites sequenciais:</strong> área, interconexões, energia e dissipação térmica limitam o avanço de um único núcleo.</li>
+        <li><strong>Power Wall:</strong> $P_{\text{dinâmica}} \approx C_{\text{efetiva}} V^2 f$; frequência e tensão maiores elevam a potência.</li>
+        <li><strong>Multicore:</strong> vários núcleos físicos permitem dividir trabalho quando o programa explora paralelismo.</li>
+        <li><strong>Núcleos lógicos e SMT:</strong> contextos visíveis ao sistema operacional; contextos do mesmo núcleo compartilham recursos.</li>
+        <li><strong>Tarefa 1:</strong> uma thread; mais iterações custam mais tempo. Os resultados não medem speedup paralelo.</li>
       </ul>
     </section>
     </section>
@@ -372,7 +400,7 @@ Epsilon de máquina: 2.220446e-16</code></pre>
         wrong: "<strong>Incorreto.</strong> O problema é o estouro de representação do <code>int</code> de 32 bits quando $N > 2{,}147{,}483{,}647$."
       },
       2: {
-        text: "<strong>Correto.</strong> O fim da escala de Dennard e a barreira térmica (Power Wall) limitaram o clock uniprocessado a $\\approx 3\\text{ a }5\\text{ GHz}$, exigindo a multiplicação de cores lógicos para elevar o poder computacional.",
+        text: "<strong>Correto.</strong> Os limites de potência e dissipação térmica dificultaram continuar elevando o desempenho de um único núcleo. A transição para multicore permite distribuir trabalho entre núcleos físicos; SMT expõe contextos lógicos que compartilham recursos.",
         wrong: "<strong>Incorreto.</strong> A causa foi a dissipação térmica excessiva (Power Wall) decorrente da quebra da escala de Dennard."
       }
     };
