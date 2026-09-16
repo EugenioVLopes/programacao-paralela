@@ -30,7 +30,7 @@ def final_field() -> np.ndarray:
         binary = Path(directory) / "ns_v0_vis"
         output = Path(directory) / "campo.txt"
         subprocess.run(
-            ["gcc", "-std=c11", "-O2", "-Wall", "-Wextra", "v0_seq.c", "-lm", "-o", str(binary)],
+            ["gcc", "-std=c11", "-O2", "-Wall", "-Wextra", "-fopenmp", str(ROOT.parent / "v0_seq.c"), "-lm", "-o", str(binary)],
             cwd=ROOT,
             check=True,
         )
@@ -81,7 +81,7 @@ def plot_diffusion(fields: dict[int, np.ndarray]) -> None:
     colorbar = fig.colorbar(image, ax=axes[0, :], shrink=0.75)
     colorbar.set_label("u(x,y)")
     fig.suptitle("Difusão suave da perturbação gaussiana", fontsize=15)
-    fig.savefig(ROOT / "visualizacao_difusao.png", dpi=180)
+    fig.savefig(ROOT.parent / "visualizacao_difusao.png", dpi=180)
     plt.close(fig)
 
 

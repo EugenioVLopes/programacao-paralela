@@ -1,14 +1,14 @@
-// Executar: node tarefa11/test_visualizacao.cjs (requer GCC).
+// Executar: node tarefa11/extras/test_visualizacao.cjs (requer GCC).
 const assert = require('node:assert/strict');
 const {execFileSync} = require('node:child_process');
 const {mkdtempSync, readFileSync, writeFileSync, rmSync} = require('node:fs');
 const {tmpdir} = require('node:os');
 const {join} = require('node:path');
-const {DiffusionField} = require('../assets/difusao3d.js');
+const {DiffusionField} = require('./difusao3d.js');
 
 const directory = mkdtempSync(join(tmpdir(), 'difusao3d-test-'));
 const compile = (source, binary) => execFileSync('gcc',
-  ['-std=c11', '-O2', '-Wall', '-Wextra', '-Werror', source, '-lm', '-o', binary]);
+  ['-std=c11', '-O2', '-Wall', '-Wextra', '-Werror', '-fopenmp', source, '-lm', '-o', binary]);
 try {
   const published = readFileSync(join(__dirname, 'quadros_difusao.bin'));
   const buffer = published.buffer.slice(published.byteOffset, published.byteOffset + published.byteLength);
@@ -53,7 +53,7 @@ try {
   }
   assert.ok(Math.abs(field.peak - expectedFinalPeak) < 4e-11,
     `Pico final ${field.peak}, esperado ${expectedFinalPeak}`);
-  const reference = readFileSync(join(__dirname, 'v0_seq.c'), 'utf8');
+  const reference = readFileSync(join(__dirname, '..', 'v0_seq.c'), 'utf8');
   for (const index of [1, 20]) {
     field.seek(index);
     const steps = field.time;

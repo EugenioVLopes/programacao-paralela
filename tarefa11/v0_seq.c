@@ -1,42 +1,20 @@
-// gcc -std=c11 -O2 -Wall -Wextra v0_seq.c -lm -o ns_v0
-#ifdef _OPENMP
-#error "Compile a referencia sequencial sem -fopenmp"
-#endif
-#define _POSIX_C_SOURCE 199309L
-#include <errno.h>
+// gcc -std=c11 -O2 -Wall -Wextra -fopenmp v0_seq.c -lm -o ns_v0
+#include <omp.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-
-static int integer(const char *text, int minimum, int maximum, int *out) {
-    char *end;
-    errno = 0;
-    long value = strtol(text, &end, 10);
-    if (errno || end == text || *end || value < minimum || value > maximum)
-        return 0;
-    *out = (int)value;
-    return 1;
-}
-
-static double agora(void) {
-    struct timespec t;
-    if (clock_gettime(CLOCK_MONOTONIC, &t)) {
-        perror("clock_gettime");
-        exit(EXIT_FAILURE);
-    }
-    return (double)t.tv_sec + (double)t.tv_nsec / 1e9;
-}
 
 int main(int argc, char **argv) {
     const int tamanho_grid = 512;
     const int num_passos_tempo = 500;
-    int mode = 0, threads = 1;
-    if (argc > 3 || (argc > 1 && !integer(argv[1], 0, 2, &mode))) {
+    if (argc > 3 || (argc > 1 &&
+        (argv[1][0] < '0' || argv[1][0] > '2' || argv[1][1] != '\0'))) {
         fprintf(stderr, "Uso: %s [modo=0|1|2 [campo.txt]]\n", argv[0]);
         return EXIT_FAILURE;
     }
+    int mode = argc > 1 ? argv[1][0] - '0' : 0;
+    int threads = 1;
     size_t count = (size_t)tamanho_grid * tamanho_grid;
     double *u = malloc(count * sizeof(*u));
     double *v = malloc(count * sizeof(*v));
@@ -59,21 +37,17 @@ int main(int argc, char **argv) {
     }
     /* Bordas fixas iguais nos dois buffers: nenhuma escrita posterior. */
     memcpy(v, u, count * sizeof(*v));
-    double start = agora();
-    {
-        for (int t = 0; t < num_passos_tempo; ++t) {
-            for (int i = 1; i < tamanho_grid-1; ++i) {
-                for (int j = 1; j < tamanho_grid-1; ++j) {
-                    size_t c = (size_t)i*tamanho_grid+j;
-                    v[c] = u[c] + r * (u[c-1]+u[c+1]+u[c-tamanho_grid]+u[c+tamanho_grid]-4*u[c]);
-                }
-            } /* Barreira: todas as escritas terminam antes da troca. */
-            {
-                double *tmp = u; u = v; v = tmp;
-            } /* Barreira: todas as threads veem a troca antes do próximo passo. */
+    double start = omp_get_wtime();
+    for (int t = 0; t < num_passos_tempo; ++t) {
+        for (int i = 1; i < tamanho_grid-1; ++i) {
+            for (int j = 1; j < tamanho_grid-1; ++j) {
+                size_t c = (size_t)i*tamanho_grid+j;
+                v[c] = u[c] + r * (u[c-1]+u[c+1]+u[c-tamanho_grid]+u[c+tamanho_grid]-4*u[c]);
+            }
         }
+        double *tmp = u; u = v; v = tmp;
     }
-    double elapsed = agora() - start;
+    double elapsed = omp_get_wtime() - start;
     double peak = u[0], minimum = u[0], sum = 0.0;
     for (size_t c = 0; c < count; ++c) {
         peak = fmax(peak, u[c]); minimum = fmin(minimum, u[c]); sum += u[c];

@@ -31,7 +31,8 @@ Cada tarefa tem um material HTML único com teoria, prática, referência rápid
 | 08 | Pi estocástico, rand_r e false sharing | [Material 08](https://eugeniovlopes.github.io/programacao-paralela/lessons/0008-tarefa08-pi-rand-false-sharing.html) | [`tarefa08/`](tarefa08/) e [PDF](tarefa08/relatorio.pdf) |
 | 09 | Listas, critical nomeado e locks | [Material 09](https://eugeniovlopes.github.io/programacao-paralela/lessons/0009-tarefa09-critical-locks.html) | [`tarefa09/`](tarefa09/) e [PDF](tarefa09/relatorio.pdf) |
 | 10 | Comparativo atomic, critical e reduction | [Material 10](https://eugeniovlopes.github.io/programacao-paralela/lessons/0010-tarefa10-atomic-critical-reduction.html) | [`tarefa10/`](tarefa10/) e [PDF](tarefa10/relatorio.pdf) |
-| 11 | Difusão viscosa, schedule e collapse | [Material 11](https://eugeniovlopes.github.io/programacao-paralela/lessons/0011-tarefa11-difusao-schedule.html) · [Visualização 3D](https://eugeniovlopes.github.io/programacao-paralela/lessons/0011-tarefa11-difusao-schedule.html#visualizacao-3d) | [`tarefa11/`](tarefa11/) e [PDF](tarefa11/relatorio.pdf) |
+| 11 | Particionamento de dados e balanceamento de carga | [Material 11](https://eugeniovlopes.github.io/programacao-paralela/lessons/0011-tarefa11-difusao-schedule.html) · [Extra: visualização 3D](https://eugeniovlopes.github.io/programacao-paralela/lessons/0011-tarefa11-difusao-schedule.html#visualizacao-3d) | [`tarefa11/`](tarefa11/) · [PDF](tarefa11/relatorio.pdf) · [Extras](tarefa11/extras/) |
+| 12 | Escalabilidade no NPAD e PaScal Viewer (em andamento) | [Material 12](https://eugeniovlopes.github.io/programacao-paralela/lessons/0012-tarefa12-escalabilidade-npad.html) | [`tarefa12/`](tarefa12/) e [PDF preliminar](tarefa12/relatorio.pdf) |
 
 ---
 

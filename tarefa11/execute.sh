@@ -15,15 +15,14 @@ export OMP_PLACES=${OMP_PLACES:-cores}
  date -Iseconds
  uname -a
  "$CC" --version
- echo "flags=-std=c11 -O2 -Wall -Wextra; paralelas=-fopenmp; link=-lm"
+ echo "flags=-std=c11 -O2 -Wall -Wextra -fopenmp; link=-lm; timer=omp_get_wtime"
  echo "tamanho_grid=512 num_passos_tempo=500 REPS=$REPS THREADS=1..$MAX_THREADS"
  echo "OMP_DYNAMIC=$OMP_DYNAMIC OMP_PROC_BIND=$OMP_PROC_BIND OMP_PLACES=$OMP_PLACES"
  lscpu
  sha256sum v*.c
 } > "$OUT/metadata.txt"
 for source in v*.c; do
- flags=(); [[ $source == v0* ]] || flags=(-fopenmp)
- "$CC" -std=c11 -O2 -Wall -Wextra "${flags[@]}" "$source" -lm -o "$OUT/${source%.c}"
+ "$CC" -std=c11 -O2 -Wall -Wextra -fopenmp "$source" -lm -o "$OUT/${source%.c}"
 done
 printf 'version,threads,rep,seconds\n' > "$OUT/raw.csv"
 for binary in "$OUT"/v*; do

@@ -90,4 +90,10 @@ Thumbs.db
 
 # Resultados regeneráveis da Tarefa 11
 /tarefa11/runs/
-/tarefa11/quadros_difusao.bin
+/tarefa11/extras/quadros_difusao.bin
+/tarefa11/extras/runs/
+
+# Tarefa 12: binarios e dados brutos preservados localmente
+/tarefa12/build/
+/tarefa12/runs/
+/tarefa12/*.bin

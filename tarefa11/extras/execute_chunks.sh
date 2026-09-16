@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 REPS=5
 THREADS=8
-OUT="runs/chunks-$(date +%Y%m%d-%H%M%S)-$$"
+OUT="extras/runs/chunks-$(date +%Y%m%d-%H%M%S)-$$"
 mkdir -p "$(dirname "$OUT")"
 mkdir "$OUT"
 CC=${CC:-gcc}
@@ -17,8 +17,10 @@ printf 'schedule,unit,chunk,equivalent_rows,rep,seconds\n' > "$OUT/raw_chunks.cs
 
 measure() {
  local source=$1 schedule=$2 unit=$3 chunk=$4 equivalent_rows=$5 binary="$OUT/program"
- "$CC" -std=c11 -O2 -Wall -Wextra -fopenmp -DCHUNK_SIZE="$chunk" \
-   "$source" -lm -o "$binary"
+ # Alterar apenas o texto enviado ao compilador; preservar o fonte principal.
+ grep -Fq "schedule($schedule, 16)" "$source"
+ sed "s/schedule($schedule, 16)/schedule($schedule, $chunk)/" "$source" |
+   "$CC" -std=c11 -O2 -Wall -Wextra -fopenmp -x c - -lm -o "$binary"
  "$binary" >/dev/null
  for ((rep=1; rep<=REPS; rep++)); do
   line=$("$binary")
@@ -51,4 +53,4 @@ rm -f "$OUT/program"
 } > "$OUT/metadata.txt"
 
 echo "Experimento de chunks: $OUT"
-echo "Gráfico: python3 plot_chunks.py '$OUT/raw_chunks.csv'"
+echo "Gráfico: python3 extras/plot_chunks.py '$OUT/raw_chunks.csv'"

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 REPS=${REPS:-10}
 SLEEP_SECONDS=${SLEEP_SECONDS:-1}
 RANDOM_SEED=${RANDOM_SEED:-3703}
 MAX_THREADS=$(nproc)
-OUT=${OUT:-"runs/stable-$(date +%Y%m%d-%H%M%S)-$$"}
+OUT=${OUT:-"extras/runs/stable-$(date +%Y%m%d-%H%M%S)-$$"}
 CC=${CC:-gcc}
 
 [[ $REPS =~ ^[1-9][0-9]*$ ]] || { echo "REPS deve ser inteiro positivo" >&2; exit 1; }
@@ -27,9 +27,7 @@ export OMP_PLACES=${OMP_PLACES:-cores}
 export OMP_WAIT_POLICY=${OMP_WAIT_POLICY:-ACTIVE}
 
 for source in v*.c; do
-  flags=()
-  [[ $source == v0* ]] || flags=(-fopenmp)
-  "$CC" -std=c11 -O2 -Wall -Wextra "${flags[@]}" \
+  "$CC" -std=c11 -O2 -Wall -Wextra -fopenmp \
     "$source" -lm -o "$BUILD/${source%.c}"
 done
 
@@ -93,7 +91,7 @@ done
   date -Iseconds
   uname -a
   "$CC" --version
-  echo "flags=-std=c11 -O2 -Wall -Wextra; paralelas=-fopenmp; link=-lm"
+  echo "flags=-std=c11 -O2 -Wall -Wextra -fopenmp; link=-lm; timer=omp_get_wtime"
   echo "tamanho_grid=512 num_passos_tempo=500"
   echo "repeticoes=$REPS sleep_seconds=$SLEEP_SECONDS random_seed=$RANDOM_SEED"
   echo "threads=1..$MAX_THREADS"

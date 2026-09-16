@@ -4,13 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Lição prática 11: validação e particionamento da difusão viscosa 2D com OpenMP.">
-  <title>Material 11: Validar e particionar a difusão</title>
+  <title>Material 11: Particionamento de dados e balanceamento de carga</title>
   <link rel="stylesheet" href="../assets/style.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
   <script defer src="../assets/lesson.js"></script>
-  <script defer src="../assets/difusao3d.js"></script>
+  <script defer src="../tarefa11/extras/difusao3d.js"></script>
 </head>
 <body>
   <nav class="top-nav">
@@ -23,7 +23,7 @@
 
   <header>
     <div class="lesson-badge">Material 11 &bull; DCA3703</div>
-    <h1>Primeiro preserve o campo; depois distribua o trabalho</h1>
+    <h1>Particionamento de dados e balanceamento de carga</h1>
     <div class="metadata">
       Tarefa 11 &bull; Difusão viscosa 2D &bull; Validação, <code>schedule</code> e <code>collapse</code>
     </div>
@@ -67,7 +67,7 @@
 #pragma omp for schedule(guided,16)</code></pre>
 
       <p>
-        Compile v0 sem OpenMP, e v1–v6 com <code>-fopenmp</code>. Compare, por exemplo,
+        Compile todas as versões com <code>-fopenmp</code> para usar <code>omp_get_wtime()</code>. A v0 continua sequencial, sem região paralela. Compare, por exemplo,
         <code>diff -u v1_static.c v2_static_collapse.c</code>: além da identificação da versão, muda apenas o
         pragma de distribuição.
       </p>
@@ -81,16 +81,16 @@
         </thead>
         <tbody>
           <tr>
-            <td>_POSIX_C_SOURCE; includes</td>
-            <td>Disponibilizam temporização POSIX, alocação, conversão, matemática e OpenMP.</td>
+            <td>includes; omp.h</td>
+            <td>Disponibilizam alocação, matemática, entrada/saída e funções OpenMP.</td>
           </tr>
           <tr>
-            <td>integer(...), strtol(..., &amp;end, 10)</td>
-            <td>O ponteiro end recebe onde a conversão terminou. errno, limites e sufixos inválidos são verificados; *out recebe o inteiro validado.</td>
+            <td>v0: modo; v1–v6: gaussiana fixa</td>
+            <td>Somente v0 aceita o modo 0, 1 ou 2, com zero como padrão. Nas paralelas, o único argumento opcional é o arquivo de saída.</td>
           </tr>
           <tr>
             <td>tamanho_grid; num_passos_tempo</td>
-            <td>Fixam uma malha 512×512 e 500 atualizações temporais. A linha de comando recebe apenas modo e saída opcional.</td>
+            <td>Fixam uma malha 512×512 e 500 atualizações temporais. A v0 recebe modo e saída opcional; v1–v6 recebem apenas a saída opcional.</td>
           </tr>
           <tr>
             <td>malloc(count * sizeof(*u))</td>
@@ -109,8 +109,8 @@
             <td>Copia também as bordas, que não serão escritas durante os passos.</td>
           </tr>
           <tr>
-            <td>agora(), clock_gettime(..., &amp;t)</td>
-            <td>Passa o endereço de timespec à função; converte tv_sec e tv_nsec em segundos. Falha encerra a execução.</td>
+            <td>omp_get_wtime()</td>
+            <td>Retorna tempo em segundos. Subtrair as chamadas feitas na mesma thread, antes e depois do cálculo.</td>
           </tr>
         </tbody>
       </table>
@@ -151,7 +151,7 @@
 
       <pre><code>bash tarefa11/test.sh
 cd tarefa11
-gcc -std=c11 -O2 -Wall -Wextra v0_seq.c -lm -o ns_v0
+gcc -std=c11 -O2 -Wall -Wextra -fopenmp v0_seq.c -lm -o ns_v0
 ./ns_v0 1 zero.txt
 ./ns_v0 2 constante.txt
 ./ns_v0 0 perturbacao.txt</code></pre>
@@ -162,21 +162,21 @@ gcc -std=c11 -O2 -Wall -Wextra v0_seq.c -lm -o ns_v0
         de difusão compara o campo inicial calculado com o campo após 500 passos.
       </p>
       <p>
-        <code>test.sh</code> compila com avisos tratados como erros e realiza 30 comparações de campos completos de
-        512×512. Verifica os três modos e executa a perturbação com 1, 2 e 4 threads, além de rejeitar entradas inválidas. Igualdade apenas de pico e soma não garante igualdade espacial.
+        <code>test.sh</code> compila com avisos tratados como erros e realiza 18 comparações de campos completos de
+        512×512. Verifica os três modos na v0 e compara a perturbação nas paralelas com 1, 2 e 4 threads, além de rejeitar entradas inválidas. Igualdade apenas de pico e soma não garante igualdade espacial.
       </p>
     </section>
 
     <section id="visualizacao-3d">
-      <h2>Explore o campo em 3D</h2>
+      <h2>Extra: explore o campo em 3D</h2>
       <p>
         A altura e a cor representam <code>u(x,y)</code>, a componente de velocidade simulada sobre o plano
         x–y. O terceiro eixo representa o valor do campo, não uma terceira dimensão espacial do fluido.
         Arraste a superfície para girar ou use os controles de rotação e inclinação com o teclado.
       </p>
-      <div class="diffusion-view" data-diffusion data-frames="../tarefa11/quadros_difusao.bin">
+      <div class="diffusion-view" data-diffusion data-frames="../tarefa11/extras/quadros_difusao.bin">
         <figure data-fallback>
-          <img src="../tarefa11/visualizacao_animacao.png" width="1600" height="640"
+          <img src="../tarefa11/extras/visualizacao_animacao.png" width="1600" height="640"
                alt="Comparação da gaussiana inicial e após 2.100.000 passos: o pico cai cerca de 99,04% e o perfil se alarga."
                style="width: 100%; height: auto;">
           <figcaption>A visualização interativa requer JavaScript e Canvas 2D. A figura mostra os campos inicial e final.</figcaption>
@@ -232,16 +232,17 @@ gcc -std=c11 -O2 -Wall -Wextra v0_seq.c -lm -o ns_v0
 
     <section id="medicao">
       <h2>4. Meça uma variável por vez</h2>
+      <p>Os resultados publicados foram medidos antes da simplificação do cronômetro. O código atual usa <code>omp_get_wtime()</code>; os gráficos não representam uma nova execução após essa mudança.</p>
 
       <pre><code>bash tarefa11/execute.sh
 # O script percorre de 1 até nproc threads.
 python3 tarefa11/plot_results.py tarefa11/runs/EXECUCAO/raw.csv
-bash tarefa11/execute_chunks.sh
-python3 tarefa11/plot_chunks.py tarefa11/runs/CHUNKS/raw_chunks.csv</code></pre>
+# Experimento complementar, fora do escopo mínimo:
+bash tarefa11/extras/execute_chunks.sh
+python3 tarefa11/extras/plot_chunks.py tarefa11/extras/runs/CHUNKS/raw_chunks.csv</code></pre>
 
       <p>
-        Flags: <code>-std=c11 -O2 -Wall -Wextra</code>, <code>-lm</code> e <code>-fopenmp</code> apenas nas
-        paralelas. O script faz aquecimento, mede o sequencial e guarda cada repetição. Registra compilador, CPU,
+        Flags: <code>-std=c11 -O2 -Wall -Wextra</code>, <code>-lm</code> e <code>-fopenmp</code> em todas as versões para usar o cronômetro OpenMP. O script faz aquecimento, mede o sequencial e guarda cada repetição. Registra compilador, CPU,
         afinidade, hashes dos fontes e threads reais. A região medida inclui equipe paralela, stencil,
         barreiras e troca; exclui alocação, inicialização, diagnósticos e exportação.
       </p>
@@ -349,8 +350,8 @@ $$r_x=\nu\Delta t/\Delta x^2,\qquad r_y=\nu\Delta t/\Delta y^2.$$</p>
 <p>Dois campos N=512 ocupam 4 MiB. Se couberem na LLC, o limite pode ser cache ou sincronização, não RAM. Para distinguir, varie N e meça banda/cache misses. SMT, núcleos heterogêneos, afinidade e ruído são hipóteses a investigar, não conclusões automáticas.</p>
 <p>$$S(p)=T_{seq}/T_p,\qquad E(p)=S(p)/p,$$
 $$S_{Amdahl}(p)=\frac{1}{s+(1-s)/p},\qquad S_{Gustafson}(p)=p-\alpha(p-1).$$</p>
-<p>Amdahl usa a fração serial s do trabalho fixo, sem overhead no modelo ideal. Gustafson usa a fração serial $\alpha$ do tempo paralelo com problema escalado. Reporte também $T_{omp,1}/T_{omp,p}$, mas não confunda essa referência com o sequencial sem OpenMP.</p>
-<p>A medição corrigida percorre de 1 até 28 threads com grade 512×512 e 500 passos. Um ensaio separado varia chunks equivalentes a 1, 4, 16 e 64 linhas para distinguir granularidade do efeito de collapse. As amostras e os metadados ficam em <code>tarefa11/runs/</code>.</p></section>
+<p>Amdahl usa a fração serial s do trabalho fixo, sem overhead no modelo ideal. Gustafson usa a fração serial $\alpha$ do tempo paralelo com problema escalado. Reporte também $T_{omp,1}/T_{omp,p}$, mas não confunda essa referência com o sequencial sem região paralela.</p>
+<p>A medição corrigida percorre de 1 até 28 threads com grade 512×512 e 500 passos. Um ensaio separado varia chunks equivalentes a 1, 4, 16 e 64 linhas para distinguir granularidade do efeito de collapse. As amostras principais ficam em <code>tarefa11/runs/</code>; o estudo complementar de chunks fica em <code>tarefa11/extras/runs/</code>.</p></section>
 <section><h2>6. Sections, schedule e SIMD: três decisões distintas</h2>
 <p>Os slides 33–34 incluem <code>sections</code>, <code>schedule</code>, <code>chunksize</code>, <code>collapse</code> e <code>simd</code>. Para a defesa, diferencie a divisão por blocos de operações, a distribuição de iterações entre threads e a execução vetorial dentro de um núcleo.</p>
 <h3>Sections distribui blocos, não iterações</h3>
@@ -380,14 +381,13 @@ $$S_{Amdahl}(p)=\frac{1}{s+(1-s)/p},\qquad S_{Gustafson}(p)=p-\alpha(p-1).$$</p>
 <table><thead><tr><th>Tipo / função / flag</th><th>Uso e cuidado</th></tr></thead><tbody>
 <tr><td>int / size_t</td><td>Contadores / índices e tamanhos. size_t também transborda: verificar antes de multiplicar.</td></tr>
 <tr><td>double / double *</td><td>Valor de velocidade / endereço do buffer.</td></tr>
-<tr><td>strtol, errno</td><td>Validar texto, intervalo e fim da conversão; rejeitar entradas inválidas.</td></tr>
+<tr><td>argv[1]</td><td>Na v0, modo 0, 1 ou 2. Nas paralelas, caminho opcional para exportar a gaussiana.</td></tr>
 <tr><td>malloc, free, memcpy</td><td>Alocar, liberar e copiar bordas/inicialização para o segundo buffer.</td></tr>
 <tr><td>exp, fmin, fmax</td><td>Gaussiana e diagnósticos; ligar libm com -lm.</td></tr>
-<tr><td>clock_gettime, struct timespec</td><td>POSIX: CLOCK_MONOTONIC; segundos + nanossegundos/1e9; verificar retorno.</td></tr>
+<tr><td>omp_get_wtime()</td><td>Tempo decorrido em segundos; medir início e fim na mesma thread.</td></tr>
 <tr><td>fopen, fprintf, fclose</td><td>Exportar campo após o trecho cronometrado; verificar erros de escrita.</td></tr>
 <tr><td>-std=c11 -O2 -Wall -Wextra</td><td>Padrão, otimização e avisos usados nos testes.</td></tr>
-<tr><td>-fopenmp / -lm</td><td>OpenMP somente nas variantes paralelas / biblioteca matemática.</td></tr>
-<tr><td>_POSIX_C_SOURCE 199309L</td><td>Definir antes dos includes para disponibilizar clock_gettime.</td></tr>
+<tr><td>-fopenmp / -lm</td><td>OpenMP em todas as versões para usar o cronômetro / biblioteca matemática.</td></tr>
 </tbody></table>
 <table><thead><tr><th>Pragma</th><th>Regra</th></tr></thead><tbody>
 <tr><td>omp parallel default(none) shared(...)</td><td>Equipe persistente; escopos explícitos não garantem ausência de corridas.</td></tr>
