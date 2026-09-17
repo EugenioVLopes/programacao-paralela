@@ -4,24 +4,15 @@ Material complementar, separado do escopo mínimo do enunciado.
 Os fontes principais continuam em `../v*.c`; não há cópias independentes deles aqui.
 
 - `execute_chunks.sh`, `plot_chunks.py`, `chunksize_plot.png` e `runs/chunks-*`: estudo de chunks equivalentes. O experimento substitui o chunk fixo 16 apenas no texto enviado ao compilador, sem modificar os fontes principais.
-- `execute_stable.sh` e `runs/final-stable/`: benchmark com ordem aleatória, pausas e dez repetições.
 - `gerar_quadros.c`, `plot_visualizacao.py`, `difusao3d.js`, imagens, quadros e `test_visualizacao.cjs`: visualização complementar.
-- `relatorio-completo.tex` e `relatorio-completo.pdf`: relatório anterior preservado, incluindo o estudo de chunks.
-- `roteiro-defesa.md`: material local de apresentação, mantido fora do versionamento.
 
 A partir de `tarefa11/`:
 
 ```bash
 bash extras/execute_chunks.sh
 python3 extras/plot_chunks.py extras/runs/CHUNKS/raw_chunks.csv
-OUT=extras/runs/nova-execucao bash extras/execute_stable.sh
-python3 plot_results.py extras/runs/nova-execucao/raw.csv
 # Regenerar a figura de 500 passos usada no relatório principal:
 python3 extras/plot_visualizacao.py
-# Compilar o relatório completo preservado:
-cd extras
-pdflatex -interaction=nonstopmode -halt-on-error relatorio-completo.tex
-pdflatex -interaction=nonstopmode -halt-on-error relatorio-completo.tex
 ```
 
 Os scripts de benchmark resolvem os fontes a partir de `tarefa11/` e, por padrão,

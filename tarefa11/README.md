@@ -37,7 +37,7 @@ gaussiana e iguais ao campo constante nos modos de validação da v0.
 `test.sh` compila com avisos tratados como erros, verifica os três modos na v0
 e compara 18 campos gaussianos completos das paralelas com a referência,
 usando 1, 2 e 4 threads. Também verifica as interfaces e falhas de saída.
-`execute.sh` mede de 1 até `nproc` threads, com cinco repetições e aquecimento;
+`execute.sh` mede de 1 até o número de núcleos físicos detectados pelo `lscpu`, com cinco repetições e aquecimento;
 guarda CSV e metadados em `runs/`. Usa GCC C11, `-O2 -Wall -Wextra`, `-lm` e
 `-fopenmp` em todas as versões para usar `omp_get_wtime()`. A v0 continua sequencial, sem região paralela. `CC`, `OUT`, `OMP_PROC_BIND` e `OMP_PLACES`
 são configuráveis. No NPAD, executar dentro da alocação de um nó de computação.
@@ -45,8 +45,7 @@ Os testes exigem GCC/OpenMP e Python; os gráficos exigem Matplotlib.
 
 ## Resultados e relatório
 
-O conjunto medido está em `runs/resultado-confirmado/`, com as execuções de origem
-preservadas em `runs/`. Os gráficos de tempo e speedup e `visualizacao_difusao.png`
+O conjunto medido está em `runs/20260917-152818-2/`. O gráfico de tempo e `visualizacao_difusao.png`
 documentam o experimento de 500 passos. O relatório principal está em
 [relatorio.pdf](relatorio.pdf), com fonte em `relatorio.tex`.
 
@@ -57,4 +56,4 @@ o estudo adicional de chunks, o protocolo ampliado de benchmark e a versão
 completa anterior do relatório. Nada disso é necessário para compilar, validar
 ou medir as sete versões acima. Instruções: [extras/README.md](extras/README.md).
 
-Os gráficos e a tabela existentes preservam as medições anteriores à troca do cronômetro. Novas execuções usam `omp_get_wtime()`; os tempos não foram medidos novamente nesta simplificação.
+Os gráficos e a tabela foram refeitos com `omp_get_wtime()`, cinco repetições por configuração e intervalo de um segundo entre medições. Os dados brutos e metadados desta coleta estão em `runs/20260917-152818-2/`.

@@ -2,7 +2,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 REPS=5
-MAX_THREADS=$(nproc)
+SLEEP_SECONDS=${SLEEP_SECONDS:-1}
+MAX_THREADS=${MAX_THREADS:-$(lscpu -p=CORE | awk -F, '!/^#/ {print $2}' | sort -nu | wc -l)}
 THREADS=$(seq 1 "$MAX_THREADS")
 OUT=${OUT:-"runs/$(date +%Y%m%d-%H%M%S)-$$"}
 mkdir -p "$(dirname "$OUT")"
@@ -16,7 +17,7 @@ export OMP_PLACES=${OMP_PLACES:-cores}
  uname -a
  "$CC" --version
  echo "flags=-std=c11 -O2 -Wall -Wextra -fopenmp; link=-lm; timer=omp_get_wtime"
- echo "tamanho_grid=512 num_passos_tempo=500 REPS=$REPS THREADS=1..$MAX_THREADS"
+ echo "tamanho_grid=512 num_passos_tempo=500 REPS=$REPS SLEEP_SECONDS=$SLEEP_SECONDS THREADS=1..$MAX_THREADS"
  echo "OMP_DYNAMIC=$OMP_DYNAMIC OMP_PROC_BIND=$OMP_PROC_BIND OMP_PLACES=$OMP_PLACES"
  lscpu
  sha256sum v*.c
@@ -31,6 +32,7 @@ for binary in "$OUT"/v*; do
   export OMP_NUM_THREADS=$t
   "$binary" > /dev/null # aquecimento
   for ((rep=1;rep<=REPS;rep++)); do
+   sleep "$SLEEP_SECONDS"
    line=$("$binary")
    echo "$line" >> "$OUT/stdout.txt"
    seconds=${line##* tempo=}; seconds=${seconds%% *}

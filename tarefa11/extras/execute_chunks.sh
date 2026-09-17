@@ -2,8 +2,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-REPS=5
-THREADS=8
+REPS=${REPS:-5}
+THREADS=${THREADS:-8}
+CHUNK_ROWS=(1 2 4 8 16 32 64 128)
 OUT="extras/runs/chunks-$(date +%Y%m%d-%H%M%S)-$$"
 mkdir -p "$(dirname "$OUT")"
 mkdir "$OUT"
@@ -23,6 +24,7 @@ measure() {
    "$CC" -std=c11 -O2 -Wall -Wextra -fopenmp -x c - -lm -o "$binary"
  "$binary" >/dev/null
  for ((rep=1; rep<=REPS; rep++)); do
+  sleep 1
   line=$("$binary")
   seconds=${line##* tempo=}; seconds=${seconds%% *}
   printf '%s,%s,%s,%s,%s,%s\n' \
@@ -33,7 +35,7 @@ measure() {
 
 # Sem collapse, o chunk conta linhas. Com collapse, conta células.
 # Como há 510 células internas por linha, os pares abaixo têm volume equivalente.
-for rows in 1 4 16 64; do
+for rows in "${CHUNK_ROWS[@]}"; do
  cells=$((rows * 510))
  measure v3_dynamic.c dynamic linhas "$rows" "$rows"
  measure v4_dynamic_collapse.c dynamic celulas "$cells" "$rows"
@@ -47,7 +49,7 @@ rm -f "$OUT/program"
  uname -a
  "$CC" --version
  echo "tamanho_grid=512 num_passos_tempo=500 threads=$THREADS repeticoes=$REPS"
- echo "chunks equivalentes: linhas={1,4,16,64}; celulas=linhas*510"
+ echo "chunks equivalentes: linhas={1,2,4,8,16,32,64,128}; celulas=linhas*510"
  echo "OMP_DYNAMIC=$OMP_DYNAMIC OMP_PROC_BIND=$OMP_PROC_BIND OMP_PLACES=$OMP_PLACES"
  sha256sum v3_dynamic.c v4_dynamic_collapse.c v5_guided_collapse.c v6_guided.c
 } > "$OUT/metadata.txt"

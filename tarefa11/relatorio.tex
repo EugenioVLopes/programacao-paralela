@@ -1,287 +1,246 @@
 \documentclass[11pt,letterpaper]{article}
 \usepackage{../assets/scientific_report}
-\usepackage{amsmath}
-\usepackage{float}
-\usepackage{listings}
-\usepackage{xcolor}
-\usepackage{graphicx}
-\usepackage{geometry}
-\geometry{headheight=23pt, top=2cm, bottom=2cm, left=2.5cm, right=2.5cm}
-\setlength{\parskip}{0.5em}
-\setlength{\parindent}{0pt}
-\lstset{
-  language=C,
-  basicstyle=\ttfamily\small,
-  keywordstyle=\color{blue}\bfseries,
-  commentstyle=\color{green!60!black}\itshape,
-  stringstyle=\color{red!80!black},
-  numbers=left,
-  numberstyle=\tiny\color{gray},
-  numbersep=8pt,
-  frame=single,
-  breaklines=true,
-  captionpos=b,
-  tabsize=4,
-  showstringspaces=false,
-  inputencoding=utf8,
-  extendedchars=true,
-  literate={ã}{{\~a}}1 {õ}{{\~o}}1 {á}{{\'a}}1 {à}{{\`a}}1 {â}{{\^a}}1 {é}{{\'e}}1 {ê}{{\^e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ô}{{\^o}}1 {ú}{{\'u}}1 {ç}{{\c{c}}}1 {Ã}{{\~A}}1 {Õ}{{\~O}}1 {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ô}{{\^O}}1 {Ú}{{\'U}}1 {Ç}{{\c{C}}}1 {—}{{---}}1
-}
+\usepackage{amsmath,float,listings,xcolor,graphicx,geometry}
+\geometry{headheight=23pt,top=2cm,bottom=2cm,left=2.5cm,right=2.5cm}
+\setlength{\parskip}{0.5em}\setlength{\parindent}{0pt}
+\lstset{language=C,basicstyle=\ttfamily\small,keywordstyle=\color{blue}\bfseries,commentstyle=\color{green!60!black}\itshape,stringstyle=\color{red!80!black},numbers=left,numberstyle=\tiny\color{gray},numbersep=8pt,frame=single,breaklines=true,captionpos=b,tabsize=4,showstringspaces=false,inputencoding=utf8,extendedchars=true,literate={ã}{{\~a}}1 {õ}{{\~o}}1 {á}{{\'a}}1 {à}{{\`a}}1 {â}{{\^a}}1 {é}{{\'e}}1 {ê}{{\^e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ô}{{\^o}}1 {ú}{{\'u}}1 {ç}{{\c{c}}}1 {Ã}{{\~A}}1 {Õ}{{\~O}}1 {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ô}{{\^O}}1 {Ú}{{\'U}}1 {Ç}{{\c{C}}}1 {—}{{---}}1}
 \begin{document}
 \pagestyle{plain}
 \begin{center}
 {\LARGE\bfseries Particionamento de dados e balanceamento de carga}\\[0.4em]
 {\normalsize Eugenio Vitor Lopes dos Santos}\\[0.3em]
-{\small DCA3703, Programação Paralela, Universidade Federal do Rio Grande do Norte}\\[0.3em]
+{\small DCA3703, Programação Paralela, Universidade Federal do Rio Grande do Norte}
 \end{center}
+
 \section{Enunciado}
 \begin{quote}
-``Escreva um código que simule o movimento de um fluido ao longo do tempo usando a equação de Navier-Stokes, considerando apenas os efeitos da viscosidade. Desconsidere a pressão e quaisquer forças externas. Utilize diferenças finitas para discretizar o espaço e simule a evolução da velocidade do fluido no tempo. Inicialize o fluido parado ou com velocidade constante e verifique se o campo permanece estável. Em seguida, crie uma pequena perturbação e observe se ela se difunde suavemente. Após validar o código, paralelize-o com OpenMP e explore o impacto das cláusulas \texttt{schedule} e \texttt{collapse} no desempenho da execução paralela.''
+Escreva um código que simule o movimento de um fluido ao longo do tempo usando a equação de Navier-Stokes, considerando apenas os efeitos da viscosidade.
+
+Desconsidere a pressão e quaisquer forças externas. Utilize diferenças finitas para discretizar o espaço e simule a evolução da velocidade do fluido no tempo. Inicialize o fluido parado ou com velocidade constante e verifique se o campo permanece estável. Em seguida, crie uma pequena perturbação e observe se ela se difunde suavemente. Após validar o código, paralelize-o com OpenMP e explore o impacto das cláusulas schedule e collapse no desempenho da execução paralela.
 \end{quote}
 
-\section{O cálculo comum às sete versões}
-A simulação suaviza uma perturbação em uma malha. A operação principal está nesta linha, em que \texttt{c} identifica uma célula e \texttt{tamanho\_grid} é a largura da malha:
-\lstinputlisting[firstline=46,lastline=47,firstnumber=46,gobble=20,caption={Leituras do campo atual e escrita no próximo campo.}]{v1_static.c}
+\section{Fundamentação teórica}
+Considerando apenas a viscosidade, usa-se $\partial u/\partial t=\nu\nabla^2u$. Euler explícito e diferenças centrais formam o stencil de cinco pontos:
+\[
+u^{n+1}_{i,j}=u^n_{i,j}+r(u^n_{i-1,j}+u^n_{i+1,j}+u^n_{i,j-1}+u^n_{i,j+1}-4u^n_{i,j}),\quad r=\nu\Delta t/h^2.
+\]
+Com $\nu=0{,}1$, $\Delta t=0{,}2$ e $h=1$, $r=0{,}02$, dentro do limite de estabilidade bidimensional. A gaussiana se espalha e reduz seu pico; campos nulo e constante permanecem invariantes.
 
-A expressão lê cinco posições de \texttt{u} e escreve uma posição de \texttt{v}. As posições \texttt{c-1} e \texttt{c+1} são os vizinhos na mesma linha; \texttt{c-tamanho\_grid} e \texttt{c+tamanho\_grid} são os vizinhos nas linhas anterior e seguinte. Esse padrão é chamado de stencil de cinco pontos. A física determina a expressão, mas a possibilidade de paralelizar vem de onde ela lê e escreve.
+As cláusulas OpenMP definem como as iterações são distribuídas. Cada política tem um custo de coordenação e uma unidade de trabalho próprios.
+
+\subsection{\texttt{schedule(static)}}
+A divisão das iterações é feita antes do início do laço. Cada thread recebe uma parte previsível do trabalho e não precisa solicitar novos chunks durante a execução. Essa política é adequada quando as células têm custo semelhante, como no stencil desta tarefa.
+
+\subsection{\texttt{schedule(dynamic,k)}}
+As threads recebem novos chunks de até $k$ iterações quando terminam o anterior. A distribuição pode compensar diferenças de carga, mas cada solicitação acrescenta coordenação. O valor de $k$ conta iterações do laço distribuído.
+
+\subsection{\texttt{schedule(guided,k)}}
+O escalonador começa entregando chunks maiores e reduz seus tamanhos à medida que o laço avança, sem ficar abaixo de $k$ iterações. Essa combinação reduz solicitações no início e conserva alguma redistribuição no final.
+
+\subsection{\texttt{collapse(n)}}
+Os $n$ laços aninhados mais externos passam a formar um único espaço de iterações. Sem a cláusula, a distribuição considera as iterações do laço externo; com ela, cada iteração lógica combina os índices dos $n$ laços. Portanto, a mesma configuração de chunk pode representar volumes de cálculo diferentes e deve ser comparada junto com a política de \texttt{schedule}.
+
+A Figura~\ref{fig:distribuicao} compara as políticas de distribuição e mostra como
+\texttt{collapse(2)} altera a unidade do chunk.
+
+\begin{figure}[H]\centering
+\begin{tikzpicture}[font=\small,align=center,
+  painel/.style={draw=none,fill=white},
+  titulo/.style={font=\small\bfseries,text=primaryblue},
+  nota/.style={font=\footnotesize,text width=6.5cm,align=center}]
+  \foreach \x/\y in {0/0,7.7/0,0/-4.3,7.7/-4.3}
+    \draw[painel] (\x,\y) rectangle ++(7.3,4.0);
+
+  \begin{scope}
+    \node[titulo] at (3.65,3.55) {(a) static: divisão fixa};
+    \node[font=\footnotesize] at (3.65,2.95) {16 iterações, quatro threads};
+    \foreach \t/\inicio/\fim/\cor in
+      {0/0/3/secondaryblue,1/4/7/cautionorange,2/8/11/sciencegreen,3/12/15/recommendpurple} {
+      \draw[fill=\cor!25,draw=\cor] (0.45+1.6*\t,1.6) rectangle ++(1.6,0.9);
+      \node[font=\footnotesize] at (1.25+1.6*\t,2.05) {T\t\\$i_{\inicio}$--$i_{\fim}$};
+    }
+    \node[nota] at (3.65,0.65) {Blocos contíguos definidos antes do laço,\\sem solicitações de novos chunks.};
+  \end{scope}
+
+  \begin{scope}[shift={(7.7,0)}]
+    \node[titulo] at (3.65,3.55) {(b) dynamic: chunks sob demanda};
+    \foreach \t/\segundo/\cor in
+      {0/5/secondaryblue,1/7/cautionorange,2/4/sciencegreen,3/6/recommendpurple} {
+      \node[font=\footnotesize] at (0.8,2.85-0.48*\t) {T\t};
+      \draw[draw=\cor,fill=\cor!25] (1.3,2.65-0.48*\t) rectangle ++(1.35,0.4);
+      \node[font=\footnotesize] at (1.975,2.85-0.48*\t) {C\t};
+      \draw[->,draw=mediumgray] (2.8,2.85-0.48*\t) -- (3.3,2.85-0.48*\t);
+      \draw[draw=\cor,fill=\cor!25] (3.45,2.65-0.48*\t) rectangle ++(1.35,0.4);
+      \node[font=\footnotesize] at (4.125,2.85-0.48*\t) {C\segundo};
+    }
+    \node[font=\footnotesize,text width=1.6cm] at (5.95,2.1) {C0--C7:\\chunks de\\mesmo tamanho};
+    \node[nota] at (3.65,0.55) {Quem termina o chunk recebe o próximo.\\A atribuição acima é apenas um exemplo.};
+  \end{scope}
+
+  \begin{scope}[shift={(0,-4.3)}]
+    \node[titulo] at (3.65,3.55) {(c) guided: chunks decrescentes};
+    \node[font=\footnotesize] at (3.65,2.95) {ordem de entrega dos chunks};
+    \foreach \inicio/\largura/\rotulo in {0/2.2/C0,2.2/1.6/C1,3.8/1.1/C2,4.9/0.7/C3,5.6/0.7/C4} {
+      \draw[draw=secondaryblue,fill=lightblue] (0.5+\inicio,1.85) rectangle ++(\largura,0.6);
+      \node[font=\footnotesize] at (0.5+\inicio+\largura/2,2.15) {\rotulo};
+    }
+    \draw[->,draw=mediumgray] (0.5,1.5) -- (6.8,1.5);
+    \node[nota] at (3.65,0.65) {Tamanhos ilustrativos, reduzidos até $k$.\\O último chunk pode ter menos iterações.};
+  \end{scope}
+
+  \begin{scope}[shift={(7.7,-4.3)}]
+    \node[titulo] at (3.65,3.55) {(d) collapse(2): unidade do chunk};
+    \node[font=\footnotesize] at (3.65,2.98) {exemplo: duas linhas de oito células, $k=2$};
+    \foreach \base/\legenda in {2.0/sem collapse: 2 linhas,0.8/com collapse: 2 células} {
+      \node[font=\footnotesize,anchor=west] at (0.7,\base+0.6) {\legenda};
+      \foreach \linha in {0,1} {
+        \foreach \coluna in {0,...,7} {
+          \draw[fill=lightgray,draw=tableborder] (0.7+0.7*\coluna,\base-0.3*\linha) rectangle ++(0.7,0.3);
+        }
+      }
+    }
+    \foreach \linha in {0,1} {
+      \foreach \coluna in {0,...,7} {
+        \draw[fill=lightblue,draw=secondaryblue] (0.7+0.7*\coluna,2.0-0.3*\linha) rectangle ++(0.7,0.3);
+      }
+    }
+    \foreach \coluna in {0,1} {
+      \draw[fill=lightblue,draw=secondaryblue] (0.7+0.7*\coluna,0.8) rectangle ++(0.7,0.3);
+    }
+    \node[font=\footnotesize] at (3.65,0.18) {azul = um chunk; cinza = células restantes};
+  \end{scope}
+\end{tikzpicture}
+\caption{Distribuição ilustrativa do trabalho. T identifica threads e C identifica chunks;
+os quadros não representam tempos de execução.}
+\label{fig:distribuicao}\end{figure}
 
 
-\section{Comparação direta entre as versões}
-As sete versões atualizam a mesma malha, com a mesma expressão e os mesmos passos. A v0 é sequencial. As outras mantêm a mesma região paralela e as mesmas barreiras; as mudanças estão na política de distribuição e no uso de \texttt{collapse(2)}. Os trechos abaixo destacam apenas essas diferenças. O apêndice contém os arquivos completos.
+\section{Experimento}
+Foram usadas uma malha $512\times512$, 500 passos, GCC 13.3.0, \texttt{-O2 -Wall -Wextra -lm} e \texttt{-fopenmp} nas versões paralelas, no Intel Core i7-14700HX sob WSL2. \texttt{omp\_get\_wtime()} mede somente stencil, barreiras e troca de ponteiros. Inicialização, diagnósticos e exportação ficam fora. Cada ponto é a mediana de cinco repetições, com intervalo de um segundo entre medições.
 
-\begin{table}[H]
-\centering
-\begin{tabular}{lll}
-\hline
-Versão & Política & Unidade distribuída \\
-\hline
-v0 & Sequencial & Sem distribuição \\
-v1 & \texttt{static} & Linha \\
-v2 & \texttt{static}, \texttt{collapse(2)} & Célula \\
-v3 & \texttt{dynamic,16} & Bloco de 16 linhas \\
-v4 & \texttt{dynamic,16}, \texttt{collapse(2)} & Bloco de 16 células \\
-v5 & \texttt{guided,16}, \texttt{collapse(2)} & Bloco decrescente de células \\
-v6 & \texttt{guided,16} & Bloco decrescente de linhas \\
-\hline
-\end{tabular}
-\caption{Versões completas e independentes. Em guided, 16 é o tamanho mínimo, salvo o último bloco.}
-\end{table}
+\begin{table}[H]\centering
+\begin{tabular}{lll}\hline
+Estratégia & Política & Unidade distribuída\\\hline
+Sequencial & sequencial & --\\
+Static & \texttt{static} & linha\\
+Static com collapse & \texttt{static}, \texttt{collapse(2)} & célula\\
+Dynamic & \texttt{dynamic,16} & 16 linhas\\
+Dynamic com collapse & \texttt{dynamic,16}, \texttt{collapse(2)} & 16 células\\
+Guided com collapse & \texttt{guided,16}, \texttt{collapse(2)} & chunks decrescentes de células\\
+Guided & \texttt{guided,16} & chunks decrescentes de linhas\\\hline
+\end{tabular}\caption{Variantes comparadas.}\end{table}
 
-\subsection{v0 e v1: execução sequencial e divisão por linhas}
-\begin{lstlisting}[caption={Mudança de v0 para v1, em forma resumida.}]
-/* v0: uma thread percorre todas as linhas. */
-for (int i = 1; i < tamanho_grid-1; ++i) { ... }
+\section{Implementação}
+Cada passo lê somente \texttt{u} e escreve em \texttt{v}. A troca dos dois ponteiros após o passo evita misturar instantes. As células do mesmo passo têm escritores distintos, mas o passo seguinte depende do anterior (RAW); por isso, apenas os laços espaciais são distribuídos.
 
-/* v1: a equipe divide as linhas. */
-#pragma omp for schedule(static)
-for (int i = 1; i < tamanho_grid-1; ++i) { ... }
+\begin{lstlisting}[caption={Estrutura comum às versões paralelas.}]
+#pragma omp parallel
+for (t = 0; t < num_passos_tempo; t++) {
+  #pragma omp for schedule(...)
+  for (i = 1; i < N-1; i++) for (j = 1; j < N-1; j++) /* stencil */
+  #pragma omp single
+  { tmp = u; u = v; v = tmp; }
+}
 \end{lstlisting}
-Na v0, uma thread faz todas as atualizações. Na v1, a região \texttt{parallel} mantém uma equipe, e o \texttt{omp for} entrega um bloco de linhas a cada thread. Quem recebe uma linha executa todas as suas colunas. O total de células calculadas é o mesmo; muda quem as calcula.
+As barreiras implícitas de \texttt{omp for} e \texttt{single} garantem que a saída esteja completa antes da troca e que a troca termine antes do próximo passo.
 
-A v1 pode ganhar porque diferentes núcleos executam blocos ao mesmo tempo. A divisão estática combina com este código: não há células que executem um algoritmo mais caro que as demais. Cada linha tem aproximadamente o mesmo custo, então a atribuição inicial já tende a equilibrar a equipe.
+\section{Resultados}
+Os campos nulo e constante permaneceram inalterados. As versões paralelas reproduziram o campo gaussiano da referência sequencial com 1, 2 e 4 threads.
 
-A v1 também paga custos que a v0 não tem: entrada na região paralela, distribuição das linhas e sincronização entre passos. Com pouco trabalho por thread, esses custos podem consumir o ganho. Usar uma thread OpenMP mantém essa estrutura sem repartir o cálculo entre núcleos; por isso, não garante o mesmo tempo da versão sequencial.
+\begin{figure}[H]\centering
+\includegraphics[width=0.92\textwidth]{visualizacao_difusao.png}
+\caption{Difusão da perturbação gaussiana ao longo dos 500 passos. O pico diminui e se espalha, enquanto as bordas permanecem fixas.}
+\label{fig:visualizacao-difusao}\end{figure}
 
-\subsection{v1 e v2: static por linhas ou por células}
-\begin{lstlisting}[caption={A única mudança no escalonamento entre v1 e v2.}]
-/* v1 */
+\begin{table}[H]\centering\small\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrr}\hline
+Estratégia & 1 & 2 & 4 & 8 & 14\\\hline
+Sequencial & 0,0818 & -- & -- & -- & --\\
+Static & 0,0726 & 0,0420 & 0,0263 & 0,0155 & 0,0159\\
+Static com collapse & 0,1554 & 0,0881 & 0,0573 & 0,0327 & 0,0299\\
+Dynamic & 0,1087 & 0,0740 & 0,0444 & 0,0244 & 0,0219\\
+Dynamic com collapse & 0,2693 & 0,4002 & 0,3510 & 0,3252 & 0,3364\\
+Guided com collapse & 0,1207 & 0,0784 & 0,0429 & 0,0172 & 0,0166\\
+Guided & 0,0696 & 0,0403 & 0,0222 & 0,0141 & 0,0159\\\hline
+\end{tabular}}\caption{Tempo mediano em segundos; os números das colunas são threads.}\label{tab:desempenho}\end{table}
+
+\begin{figure}[H]\centering\includegraphics[width=0.98\textwidth]{tempo_execucao_log_plot.png}\caption{Tempo mediano em escala logarítmica.}\label{fig:tempo}\end{figure}
+
+\begin{figure}[H]\centering\includegraphics[width=0.98\textwidth]{estrategias_14_threads.png}
+\caption{Comparação das estratégias com 14 threads, correspondente ao número de núcleos físicos do ambiente.}\label{fig:estrategias}\end{figure}
+
+\textbf{Desempenho e distribuição do trabalho.}
+A estratégia \texttt{guided} foi a mais rápida na varredura até 14 threads, com \texttt{static}
+próxima em parte das contagens. Ambas distribuem linhas e preservam a localidade do stencil;
+a diferença observada é compatível
+com a forma como \texttt{guided} reduz os chunks e com a variação residual do ambiente. A
+versão \texttt{static} com \texttt{collapse(2)} foi mais lenta: combinar os laços não trouxe
+vantagem para essa malha e pode acrescentar
+custo de indexação, não isolado pela medição.
+
+As estratégias \texttt{dynamic} e \texttt{guided} preservam o processamento por linhas.
+\texttt{dynamic} acrescenta coordenação para redistribuir uma carga uniforme; \texttt{guided}
+obteve a melhor mediana global, embora a vantagem não seja uniforme em todas as contagens.
+
+A estratégia \texttt{dynamic} com \texttt{collapse(2)} foi a mais lenta. Com \texttt{collapse(2)},
+cada chunk de \texttt{dynamic,16} contém apenas 16 células, enquanto \texttt{dynamic} sem
+\texttt{collapse} contém até 16 linhas. Essa redução aumenta
+as solicitações ao escalonador e é compatível com o overhead observado. A estratégia
+\texttt{guided} com \texttt{collapse(2)} foi mais
+rápida que a versão \texttt{dynamic} com \texttt{collapse} porque \texttt{guided} começa com chunks maiores, reduzindo a frequência
+dessas solicitações. Os tempos, porém, não isolam o custo de cada mecanismo.
+
+
+
+\textbf{Análise do tamanho do chunk.}
+Para isolar o efeito do tamanho do chunk, a execução foi repetida com oito threads e os
+volumes equivalentes $\{1,2,4,8,16,32,64,128\}$ em linhas da grade. Nos laços sem
+\texttt{collapse}, o valor é contado em linhas; nos laços com \texttt{collapse(2)}, o
+chunk contém o número equivalente de células, isto é, o valor da abscissa multiplicado
+por 510. Cada ponto representa a mediana de cinco execuções.
+
+\begin{figure}[H]\centering\includegraphics[width=0.98\textwidth]{extras/chunksize_plot.png}
+\caption{Efeito do tamanho do chunk com oito threads; a abscissa mostra o volume equivalente em linhas.}
+\label{fig:chunksize}\end{figure}
+
+\textbf{Efeito do tamanho do chunk.}
+Na Figura~\ref{fig:chunksize}, aumentar os chunks menores tornou \texttt{dynamic} com
+\texttt{collapse} mais rápido, comportamento compatível com a redução do custo de
+distribuição. No maior volume testado, todas as versões ficaram mais lentas: chunks
+grandes deixam menos blocos disponíveis para dividir entre as threads. A escolha exige
+equilibrar granularidade e coordenação; em \texttt{guided}, o valor configurado é um
+limite inferior, e não um tamanho fixo.
+
+
+
+\section{Conclusão}
+Os testes validaram a difusão e a equivalência numérica. A melhor configuração observada
+foi \texttt{guided} por linhas, com 9 threads na varredura até 14 threads. \texttt{static} por
+linhas permaneceu competitiva em várias contagens. A piora de
+\texttt{dynamic} com chunks de poucas células aponta o custo de distribuição como
+principal limitação dessa configuração, sem isolar sua contribuição dos demais custos.
+
+\appendix\newpage
+\section{Código-fonte}
+
+\lstinputlisting[caption={Código sequencial de referência}]{v0_seq.c}
+
+\begin{lstlisting}[caption={Divisão estática por linhas.}]
 #pragma omp for schedule(static)
-/* v2 */
+\end{lstlisting}
+\begin{lstlisting}[caption={Divisão estática com dois laços combinados.}]
 #pragma omp for collapse(2) schedule(static)
 \end{lstlisting}
-A v1 divide as iterações de \texttt{i}. A v2 associa os laços de \texttt{i} e \texttt{j} e distribui pares de índices. Imagine uma malha didática com duas linhas internas e várias colunas, executada por quatro threads. Sem collapse, só existem duas iterações externas para distribuir, então parte da equipe fica sem trabalho. Com collapse, há várias células para dividir entre as quatro threads.
-
-Na malha desta tarefa, já existem 510 linhas internas, mais que as threads usadas. A v2 não precisa de collapse para ocupar a equipe. Ela muda a organização do laço sem obter aquela vantagem do exemplo pequeno.
-
-Static continua dividindo o espaço de iterações em blocos. Na v2, uma célula é uma iteração lógica, mas não exige uma solicitação ao escalonador para cada atualização. Portanto, o custo de muitos pedidos de trabalho, discutido para a v4, não explica automaticamente a diferença entre v1 e v2.
-
-Na v1, o compilador encontra um laço interno simples que percorre colunas contíguas. Collapse pode alterar a geração dos índices e a vetorização desse percurso. Para atribuir a diferença de tempo a uma dessas causas, seria preciso examinar o código gerado ou os diagnósticos de vetorização. O gráfico mostra que v2 ficou acima de v1, mas não separa esses efeitos.
-
-\subsection{v1 e v3: divisão fixa ou entrega de novos blocos}
-\begin{lstlisting}[caption={Comparação mantendo a linha como unidade.}]
-/* v1 */
-#pragma omp for schedule(static)
-/* v3 */
+\begin{lstlisting}[caption={Chunks dinâmicos por linhas.}]
 #pragma omp for schedule(dynamic, 16)
 \end{lstlisting}
-Ambas distribuem linhas. Na v1, cada thread recebe sua parte e a executa. Na v3, uma thread termina um bloco de até 16 linhas e solicita outro. Para entregar blocos distintos às threads, o ambiente de execução precisa coordenar quais ainda estão disponíveis.
-
-A v3 pode ganhar se algumas threads terminarem antes e assumirem trabalho que, em uma divisão fixa, ficaria preso a uma thread mais lenta. Mas as células deste stencil têm custo uniforme. Nesse caso, fazer novos pedidos pode acrescentar mais custo do que o tempo de espera que evita.
-
-Esta comparação muda a política e o tamanho dos blocos: v1 não fixa chunk, enquanto v3 fixa 16 linhas. Ela não permite atribuir toda diferença apenas ao nome static ou dynamic. A política e a granularidade trabalham juntas.
-
-\subsection{v3 e v4: o mesmo chunk entrega quantidades diferentes de cálculo}
-\begin{lstlisting}[caption={Collapse muda o significado do chunk.}]
-/* v3 */
-#pragma omp for schedule(dynamic, 16)
-/* v4 */
+\begin{lstlisting}[caption={Chunks dinâmicos com dois laços combinados.}]
 #pragma omp for collapse(2) schedule(dynamic, 16)
 \end{lstlisting}
-Com chunk 16, a v3 entrega até 16 linhas por solicitação. Cada linha contém 510 células internas. A v4 entrega até 16 células. O cálculo é o mesmo, mas a v4 retorna ao escalonador depois de muito menos trabalho útil.
-
-Para visualizar a diferença sem recorrer aos tempos medidos, imagine quatro linhas de seis células e chunk dois. Sem collapse, um bloco reúne duas linhas, ou 12 atualizações; bastam dois blocos para percorrer a malha. Com collapse, cada bloco reúne duas células; são necessários 12 blocos. O número de threads não mudou. O número de entregas de trabalho aumentou.
-
-Cada entrega exige coordenação. Se o bloco contém poucas operações, a equipe passa uma parcela maior da execução obtendo trabalho em vez de calculá-lo. Isso torna o custo de escalonamento uma explicação compatível com a curva alta da v4. Blocos de linhas, como os da v3, diluem esse custo em mais atualizações.
-
-Para investigar o efeito de collapse sem essa diferença de volume, seria necessário comparar chunks que representassem quantidades equivalentes de células. A comparação atual mostra o efeito da combinação \texttt{dynamic,16} com collapse, não uma desvantagem universal de collapse.
-
-\subsection{v4 e v5: blocos pequenos fixos ou blocos decrescentes}
-\begin{lstlisting}[caption={Comparação mantendo collapse nas duas versões.}]
-/* v4 */
-#pragma omp for collapse(2) schedule(dynamic, 16)
-/* v5 */
+\begin{lstlisting}[caption={Chunks guiados com dois laços combinados.}]
 #pragma omp for collapse(2) schedule(guided, 16)
 \end{lstlisting}
-As duas distribuem células, mas o valor 16 tem papéis diferentes. Em dynamic, ele fixa o tamanho dos blocos, salvo o último. Em guided, ele define o mínimo, salvo o último. A v5 pode entregar blocos grandes no começo, quando há muito trabalho disponível, e blocos menores perto do fim.
-
-Essa diferença reduz a necessidade de solicitar blocos pequenos desde o início. Por isso, guided pode amortizar parte do custo que pesa na v4, sem abandonar a redistribuição durante o laço. A curva da v5 abaixo da v4 é coerente com esse mecanismo.
-
-Guided não elimina toda coordenação e não garante equilíbrio perfeito. Uma thread que recebe um bloco caro continua responsável por ele. A política ajusta as próximas entregas, não transfere automaticamente um bloco que já está em execução.
-
-\subsection{v5 e v6: guided por células ou por linhas}
-\begin{lstlisting}[caption={Comparação mantendo guided nas duas versões.}]
-/* v5 */
-#pragma omp for collapse(2) schedule(guided, 16)
-/* v6 */
+\begin{lstlisting}[caption={Chunks guiados por linhas.}]
 #pragma omp for schedule(guided, 16)
 \end{lstlisting}
-A v5 usa células como iterações; a v6 usa linhas. Nas duas, os blocos diminuem. Ao chegar perto do tamanho mínimo, porém, um bloco mínimo completo da v6 reúne 16 linhas, enquanto o da v5 reúne 16 células. O último bloco pode ser menor nas duas versões.
-
-A v6 conserva um laço interno de colunas contíguas e mais cálculo por bloco mínimo. A v5 permite entregas menores no final, o que pode ajudar a distribuir o trabalho restante, mas exige mais coordenação se muitos blocos pequenos forem necessários. O ganho depende de qual custo pesa mais: deixar trabalho concentrado em uma thread ou distribuir muitos blocos.
-
-Para comparar guided com static sem mudar para células, o par é v6 e v1. Para comparar guided com dynamic mantendo linhas e o parâmetro de chunk, o par é v6 e v3. Isso evita atribuir a uma política uma diferença que também envolve collapse.
-
-\section{O que permanece igual nas versões paralelas}
-\subsection{Leituras compartilhadas e escritas independentes}
-Imagine uma thread calculando \texttt{v[c]} e outra calculando \texttt{v[c+1]}. As duas consultam valores de \texttt{u} em comum, mas nenhuma modifica \texttt{u} durante esse passo. As escritas vão para posições distintas de \texttt{v}. Não há conflito de leitura com escrita nem de escrita com escrita entre essas duas iterações.
-
-Esse é o argumento para usar \texttt{omp for}: as atualizações espaciais do mesmo passo são independentes. Compartilhar memória não exige um lock em todo acesso. O que exige atenção é o acesso concorrente à mesma posição quando pelo menos uma operação escreve nela.
-
-\subsection{Dois vetores evitam misturar passos}
-Se a primeira thread sobrescrever \texttt{u[c]} antes de a segunda ler esse vizinho, a segunda usará um valor novo junto de outros valores antigos. Se a ordem das threads mudar, ela poderá ler o valor antigo. O resultado passa a depender da ordem de execução e deixa de representar a atualização que usa apenas o campo anterior.
-
-Os dois vetores separam os instantes: \texttt{u} é a entrada deste passo e \texttt{v} é a saída. Depois de concluir todas as células, o programa troca os ponteiros. Essa troca muda o papel dos vetores sem copiar a malha inteira.
-
-\subsection{A dependência entre passos impede paralelizar o tempo}
-O passo seguinte lê o campo produzido pelo passo atual. Há uma dependência de leitura após escrita, ou RAW. Distribuir passos diferentes entre threads permitiria ler um campo que ainda não está pronto. Por isso, \texttt{collapse(2)} se aplica aos laços espaciais de \texttt{i} e \texttt{j}, nunca ao laço temporal desta implementação.
-
-\subsection{A execução de um passo}
-\lstinputlisting[firstline=38,lastline=55,firstnumber=38,gobble=4,caption={Região paralela completa da versão v1.}]{v1_static.c}
-
-\subsection{parallel forma a equipe; omp for divide as iterações}
-\texttt{parallel} forma a equipe. Todas as threads executam o bloco delimitado pelas chaves. \texttt{omp for} divide entre essa equipe as iterações do laço que vem logo depois. Sem \texttt{omp for}, cada thread percorreria todas as linhas, repetiria o cálculo e escreveria nas mesmas posições das demais.
-
-No código, cada thread executa seu próprio laço \texttt{t}, mas recebe apenas parte das iterações de \texttt{i}. Todas participam do mesmo passo temporal. As barreiras impedem que uma avance para o próximo passo enquanto outra ainda termina o atual.
-
-A equipe permanece ativa ao longo de todos os passos porque \texttt{parallel} está fora do laço \texttt{t}. Colocar uma região paralela dentro desse laço repetiria o custo de entrar e sair da região a cada passo, mesmo que o ambiente de execução reaproveitasse as threads.
-
-\subsection{A ordem das operações em duas threads}
-Considere duas threads, A e B, responsáveis por blocos distintos de linhas:
-\begin{enumerate}
-\item A e B leem \texttt{u} e preenchem suas posições de \texttt{v}.
-\item A termina primeiro e espera na barreira do \texttt{omp for}. B ainda está escrevendo sua parte.
-\item Quando B termina, ambas podem chegar ao \texttt{single}. Apenas uma executa a troca dos ponteiros.
-\item A barreira ao final de \texttt{single} só libera a equipe depois da troca. O próximo passo lê o vetor que acabou de ser preenchido.
-\end{enumerate}
-A thread que executa \texttt{single} não precisa ser a thread de número zero, nem precisa ser a mesma em todos os passos.
-
-\subsection{Cada barreira protege uma etapa diferente}
-Elas protegem momentos diferentes. A primeira separa o preenchimento da saída da troca de ponteiros. A segunda separa a troca do início das próximas leituras.
-
-Se o \texttt{omp for} tiver \texttt{nowait}, A poderá trocar os ponteiros enquanto B ainda usa \texttt{u} e \texttt{v} no cálculo. Além de o campo estar incompleto, B poderá observar os ponteiros alterados durante seu trabalho.
-
-Se apenas o \texttt{single} tiver \texttt{nowait}, uma thread que não executa a troca poderá chegar ao próximo passo antes de ela terminar. A primeira barreira, sozinha, não garante que a troca já aconteceu. Nesta organização, retirar qualquer uma delas quebra a ordenação necessária.
-
-\subsection{single executa uma vez; critical executaria várias vezes}
-A troca deve acontecer uma única vez por passo. \texttt{single} escolhe uma thread para executá-la. \texttt{critical} permitiria que todas a executassem, uma após a outra; ele garante exclusão mútua, não execução única. A equipe faria várias trocas em vez de uma.
-
-\texttt{atomic} protege uma operação de memória compatível com a diretiva. Ele não transforma as três atribuições da troca em uma operação única para a equipe, nem espera todas as células ficarem prontas. \texttt{reduction} combina resultados parciais, como somas, e não representa a troca de dois ponteiros.
-
-Dentro do stencil, cada posição de saída tem um único escritor. Colocar \texttt{critical} em cada atualização faria as threads disputarem uma região exclusiva sem resolver nenhum conflito necessário. A sincronização deve ficar na passagem de um passo para o outro.
-
-\subsection{Escopo dos ponteiros, dos vetores e dos índices}
-\texttt{u} e \texttt{v} são ponteiros compartilhados. Todos devem enxergar a mesma troca de papéis dos vetores. O escopo do ponteiro e o da memória apontada são questões distintas: tornar um ponteiro privado não cria uma cópia da malha e, com \texttt{private}, nem preserva automaticamente seu valor inicial.
-
-O contador \texttt{t} é local a cada thread porque é declarado dentro da região paralela. O contador \texttt{i} do laço distribuído é privado; \texttt{j}, \texttt{c} e \texttt{tmp} também são locais. Assim, uma thread não altera o índice de outra. Os parâmetros usados no cálculo são compartilhados e apenas lidos.
-
-\texttt{default(none)} obriga a explicitar o escopo das variáveis que não têm escopo predeterminado. Ele ajuda a revisar o código, mas não detecta nem elimina sozinho uma condição de corrida.
-
-\section{Memória e sincronização na leitura das curvas}
-\subsection{Localidade: o que a divisão por linhas preserva}
-No acesso \texttt{c=i*N+j}, aumentar \texttt{j} em uma unidade avança um \texttt{double} na memória. Uma linha de cache de 64 bytes comporta oito valores desse tipo no ambiente usado. Trazer uma linha de cache pode atender vários acessos seguintes; o mesmo valor também participa de atualizações vizinhas do stencil.
-
-Nas versões sem collapse, uma thread percorre as colunas da linha recebida antes de passar à próxima. Isso favorece acessos contíguos e reutilização local. Collapse não muda a disposição dos vetores na memória. Blocos contíguos de células também podem aproveitar cache; não basta ver collapse no pragma para concluir que a localidade foi perdida.
-
-O problema aparece quando a distribuição fragmenta o trabalho entre threads e reduz a reutilização em cada núcleo. A política e o tamanho do bloco determinam essa fragmentação. O gráfico de tempo não mede diretamente os acertos e as faltas de cache.
-
-\subsection{Falso compartilhamento não é condição de corrida}
-Imagine duas posições de \texttt{v} na mesma linha de cache, escritas por threads em núcleos diferentes. Cada posição tem um único escritor, então o resultado pode estar correto. Ainda assim, a coerência de cache opera sobre a linha inteira, e as escritas podem exigir transferências de propriedade e invalidações.
-
-Esse é o falso compartilhamento: disputa pelo bloco de cache sem disputa pelo mesmo elemento. Um lock não é a solução para esse custo. A investigação deve olhar a distribuição das escritas e os limites dos blocos. Nesta tarefa, não houve uma medição específica que permita apontá-lo como causa da diferença entre versões.
-
-\subsection{Por que as curvas param de melhorar?}
-No começo, mais threads podem reduzir o cálculo atribuído a cada uma. Depois, cada thread já recebe pouco trabalho, mas ainda precisa chegar às mesmas barreiras em todos os passos. A equipe só prossegue quando a última termina. Distribuição de blocos, sincronização e disputa por recursos passam a pesar mais em relação ao cálculo útil.
-
-Isso explica por que aumentar a equipe pode produzir um patamar ou uma piora, em vez de reduzir o tempo continuamente. A distinção é importante: uma barreira faz parte da implementação e é um custo conhecido; afirmar que a RAM saturou exigiria outra evidência. Os vetores também podem ser atendidos por cache, e threads lógicas podem compartilhar recursos de um mesmo núcleo.
-
-\subsection{Cronômetro e entrada simplificados}
-O código chama \texttt{omp\_get\_wtime()} antes e depois do cálculo. A diferença fornece o tempo decorrido em segundos. As duas chamadas ficam na mesma thread, fora da região paralela. Todas as versões são compiladas com \texttt{-fopenmp}; na v0, a biblioteca fornece apenas o cronômetro, sem criar uma equipe.
-
-Somente a v0 recebe \texttt{[modo [campo.txt]]}, com \texttt{0} para a gaussiana, \texttt{1} para o campo parado e \texttt{2} para o constante. Esses modos permitem validar a referência sequencial. As versões v1 a v6 fixam a gaussiana na inicialização e recebem apenas \texttt{[campo.txt]} para exportação opcional. Assim, a comparação paralela mantém o mesmo campo sem repetir a seleção de modos em cada arquivo.
-
-\section{Tabela e gráfico para referência}
-A tabela e o gráfico preservam as medições anteriores à simplificação do cronômetro. A troca para \texttt{omp\_get\_wtime()} não foi acompanhada de uma nova medição de desempenho.
-
-A Tabela~\ref{tab:desempenho} e a Figura~\ref{fig:tempo} registram as medições com malha de $512\times512$ pontos e 500 passos, usando GCC 13.3.0 com \texttt{-O2} em um Intel Core i7-14700HX sob WSL2. Os pontos até 25 threads usam medianas de cinco repetições após aquecimento; os de 26 a 28 usam dez repetições de confirmação.
-
-\begin{table}[H]
-\centering
-\small
-\resizebox{\textwidth}{!}{%
-\begin{tabular}{lrrrrrr}
-\hline
-Versão & 1 thread & 2 threads & 4 threads & 8 threads & 14 threads & 28 threads \\
-\hline
-v1 static & 0,0970 & 0,0531 & 0,0289 & 0,0223 & 0,0207 & 0,0185 \\
-v2 static + collapse & 0,1312 & 0,0722 & 0,0411 & 0,0326 & 0,0280 & 0,0488 \\
-v3 dynamic & 0,1064 & 0,0621 & 0,0337 & 0,0220 & 0,0228 & 0,0276 \\
-v4 dynamic + collapse & 0,2241 & 0,3662 & 0,3482 & 0,3342 & 0,3007 & 0,3225 \\
-v5 guided + collapse & 0,1318 & 0,0706 & 0,0395 & 0,0277 & 0,0242 & 0,0329 \\
-v6 guided & 0,1239 & 0,0588 & 0,0327 & 0,0240 & 0,0229 & 0,0269 \\
-\hline
-\end{tabular}%
-}
-\caption{Tempo mediano em segundos, selecionado da varredura completa de 1 a 28 threads. A referência sequencial teve mediana de 0,1049 s.}
-\label{tab:desempenho}
-\end{table}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.98\textwidth]{tempo_execucao_log_plot.png}
-\caption{Tempo mediano das políticas com e sem \texttt{collapse(2)}, de 1 a 28 threads, em escala logarítmica.}
-\label{fig:tempo}
-\end{figure}
-
-
-Nos testes da v0, o campo parado continuou nulo e o constante permaneceu constante. As versões paralelas produziram o mesmo campo gaussiano da referência sequencial com 1, 2 e 4 threads. A comparação de desempenho usa a mesma malha e as mesmas opções de compilação. O cronômetro inclui o stencil e a sincronização; exclui inicialização, exportação e diagnósticos.
-
-Associe cada tendência à comparação correspondente. A proximidade das versões por linhas se relaciona à carga uniforme. A curva alta de v4 é compatível com o custo de entregar muitos blocos pequenos. A diferença entre v4 e v5 relaciona-se ao uso de blocos fixos e decrescentes. O patamar nas equipes maiores indica o peso das barreiras e dos recursos compartilhados, sem atribuir uma causa única ao tempo medido.
-
-\appendix
-\newpage
-\section{Código-fonte}
-O apêndice reúne os sete códigos completos usados nos testes e nas medições.
-\lstinputlisting[caption={v0\_seq.c: referência sequencial}]{v0_seq.c}
-\newpage
-\lstinputlisting[caption={v1\_static.c: static por linhas}]{v1_static.c}
-\newpage
-\lstinputlisting[caption={v2\_static\_collapse.c: static por células}]{v2_static_collapse.c}
-\newpage
-\lstinputlisting[caption={v3\_dynamic.c: dynamic por linhas}]{v3_dynamic.c}
-\newpage
-\lstinputlisting[caption={v4\_dynamic\_collapse.c: dynamic por células}]{v4_dynamic_collapse.c}
-\newpage
-\lstinputlisting[caption={v5\_guided\_collapse.c: guided por células}]{v5_guided_collapse.c}
-\newpage
-\lstinputlisting[caption={v6\_guided.c: guided por linhas}]{v6_guided.c}
 \end{document}
