@@ -20,20 +20,19 @@ O documento deve cobrir, sem repetir conteúdo:
 
 5. **Prática**: análise linha a linha do código C e medição do que foi executado de verdade (flags, threads, N e interpretação das curvas).
 6. **Quizzes simétricos**: criar ao menos quatro questões de múltipla escolha quando o conteúdo permitir, com opções de tamanho e contagem de palavras idênticos.
-7. **Navegação**: usar links relativos para o documento geral `reference/00-fundamentos-programacao-paralela.html`, código e relatório.
+7. **Navegação**: usar links relativos para o índice `index.html`, as lições em `lessons/`, código e relatório.
 
-Não criar documentos teóricos separados em `reference/`. Os nomes antigos nessa pasta existem apenas como redirecionamentos de compatibilidade.
+Concentrar teoria, prática e referência rápida no documento único de cada tarefa em `lessons/`. Não recriar o diretório obsoleto `reference/` nem seus redirecionamentos.
 
 ## 2. Portabilidade, GitHub Pages e links
 
-- **Caminhos relativos internos**: Todo link dentro dos arquivos HTML deve usar caminhos relativos (ex: `../assets/style.css`, `reference/01-ponto-flutuante-e-leibniz.html`, `../tarefa01/tarefa01.c`).
+- **Caminhos relativos internos**: Todo link dentro dos arquivos HTML deve usar caminhos relativos (ex: `../assets/style.css`, `../lessons/0001-tarefa01-leibniz-pi.html#referencia-rapida`, `../tarefa01/tarefa01.c`).
 - **Links no README.md**:
   - Materiais HTML (lições, teoria e referência rápida) devem usar URLs absolutas do GitHub Pages: `https://eugeniovlopes.github.io/programacao-paralela/...` para abrir a página renderizada diretamente no navegador.
   - Códigos C e relatórios PDF devem usar links relativos do repositório (`tarefaXX/` e `tarefaXX/relatorio.pdf`).
 - **Atualização contínua de índices**: Ao concluir qualquer tarefa, atualizar obrigatoriamente:
   1. `index.html` na raiz (adicionar o card da tarefa com links para o material único — incluindo âncora `#referencia-rapida` se preciso — e relatório).
-  2. `reference/00-fundamentos-programacao-paralela.html` (adicionar a linha da tarefa na tabela de mapeamento).
-  3. `README.md` (adicionar a linha na tabela de tarefas com links para o GitHub Pages).
+  2. `README.md` (adicionar a linha na tabela de tarefas com links para o GitHub Pages).
 
 ## 3. Padrões de Git e arquivos ignorados
 
@@ -71,6 +70,13 @@ Os relatórios devem ser documentos técnicos. Priorizar a explicação dos conc
 - Distinguir tendências medidas de hipóteses sobre suas causas. Não atribuir uma curva a falso compartilhamento, saturação de memória ou vetorização sem evidência específica.
 - Não mencionar arquivos ou comandos `.sh` no texto nem nos exemplos do relatório. Descrever a validação e a medição diretamente.
 - Organizar a explicação por comparação direta entre versões. Mostrar o trecho ou pragma alterado, o que muda no trabalho de cada thread e por que isso pode afetar o desempenho. Usar exemplos pequenos de distribuição ou de ordem de execução; evitar definições genéricas sem ligação com o código. Reunir em uma seção comum os mecanismos que não mudam entre versões.
+- Ao explicar versões sucessivas, referenciar somente a linha, pragma ou trecho que mudou. Descrever o código comum uma vez e deixar os arquivos completos no apêndice; não repetir o programa inteiro em cada versão.
+- Quando o relatório tiver várias versões do programa, usar uma sequência estável: enunciado, fundamentação, experimento, resultados e conclusão. Descrever primeiro o que todas as versões mantêm em comum e depois comparar apenas a alteração de cada versão.
+- Na seção de experimento, registrar malha, passos, ambiente, compilador, flags, número de threads, repetições e o que entra no intervalo cronometrado. Separar configuração do experimento da interpretação dos resultados.
+- Na seção de resultados, separar desempenho, speedup, eficiência, escalabilidade forte e escalabilidade fraca quando houver dados para cada indicador. Manter tabelas e gráficos como referência e comentar tendências relacionando-as a um conceito específico, como overhead de criação, distribuição de trabalho, barreiras, localidade ou acesso à memória.
+- Declarar quando um indicador não foi medido. Não inferir escalabilidade fraca a partir de um experimento de tamanho fixo; não atribuir uma causa única a uma curva sem medição que a sustente.
+- Encerrar com uma conclusão curta que retome a melhor configuração observada, o principal gargalo e o limite da evidência. Deixar os códigos completos em um apêndice separado da discussão.
 - Usar frases claras e diretas, sem repetições ou conclusões genéricas. Ao alterar o relatório LaTeX, recompilar e conferir o PDF correspondente.
+- Fazer revisão terminológica em todo o relatório antes da entrega: preferir vocabulário técnico padronizado de OpenMP e programação paralela (por exemplo, conjunto/time de threads OpenMP, chunk, granularidade, escalonador, overhead, sincronização, localidade e speedup) e substituir expressões coloquiais ou ambíguas. Manter a mesma terminologia em texto, tabelas, legendas e títulos.
 
 Não mencionar defesa, apresentação ou finalidade oral nos relatórios. Os requisitos das lições HTML da seção 1 continuam válidos.

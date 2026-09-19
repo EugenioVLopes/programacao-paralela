@@ -20,7 +20,6 @@ Cada tarefa tem um material HTML único com teoria, prática, referência rápid
 
 | Tarefa | Tema | Material único (Pages) | Código e relatório (Repo) |
 | :--- | :--- | :--- | :--- |
-| Geral | Fundamentos de HPC e taxonomia | [Fundamentos gerais](https://eugeniovlopes.github.io/programacao-paralela/reference/00-fundamentos-programacao-paralela.html) | — |
 | 01 | Leibniz, poder computacional, limites sequenciais e núcleos físicos e lógicos | [Material 01](https://eugeniovlopes.github.io/programacao-paralela/lessons/0001-tarefa01-leibniz-pi.html) · [Fundamentação teórica](https://eugeniovlopes.github.io/programacao-paralela/lessons/0001-tarefa01-leibniz-pi.html#teoria) | [`tarefa01/`](tarefa01/) e [PDF](tarefa01/relatorio.pdf) |
 | 02 | Multiplicação matriz-vetor e cache | [Material 02](https://eugeniovlopes.github.io/programacao-paralela/lessons/0002-tarefa02-mxv-cache.html) | [`tarefa02/`](tarefa02/) e [PDF](tarefa02/relatorio.pdf) |
 | 03 | Paralelismo em nível de instrução (ILP) | [Material 03](https://eugeniovlopes.github.io/programacao-paralela/lessons/0003-tarefa03-ilp-acumuladores.html) | [`tarefa03/`](tarefa03/) e [PDF](tarefa03/relatorio.pdf) |
@@ -33,99 +32,7 @@ Cada tarefa tem um material HTML único com teoria, prática, referência rápid
 | 10 | Comparativo atomic, critical e reduction | [Material 10](https://eugeniovlopes.github.io/programacao-paralela/lessons/0010-tarefa10-atomic-critical-reduction.html) | [`tarefa10/`](tarefa10/) e [PDF](tarefa10/relatorio.pdf) |
 | 11 | Particionamento de dados e balanceamento de carga | [Material 11](https://eugeniovlopes.github.io/programacao-paralela/lessons/0011-tarefa11-difusao-schedule.html) · [Extra: visualização 3D](https://eugeniovlopes.github.io/programacao-paralela/lessons/0011-tarefa11-difusao-schedule.html#visualizacao-3d) | [`tarefa11/`](tarefa11/) · [PDF](tarefa11/relatorio.pdf) · [Extras](tarefa11/extras/) |
 | 12 | Escalabilidade no NPAD e PaScal Viewer (em andamento) | [Material 12](https://eugeniovlopes.github.io/programacao-paralela/lessons/0012-tarefa12-escalabilidade-npad.html) | [`tarefa12/`](tarefa12/) e [PDF preliminar](tarefa12/relatorio.pdf) |
-
----
-
-## Estrutura do repositório
-
-```text
-.
-├── index.html                   # Página inicial para o GitHub Pages
-├── assets/
-│   ├── style.css                # Estilo das páginas HTML
-│   └── scientific_report.sty    # Pacote LaTeX dos relatórios
-├── lessons/                     # Material único por tarefa, com teoria, prática e quizzes
-│   ├── 0001-tarefa01-leibniz-pi.html
-│   ├── 0002-tarefa02-mxv-cache.html
-│   ├── 0003-tarefa03-ilp-acumuladores.html
-│   ├── 0004-tarefa04-memory-cpu-bound.html
-│   └── 0005-tarefa05-primos-openmp.html
-├── reference/
-│   └── 00-fundamentos-programacao-paralela.html # Fundamentos gerais
-├── tarefa01/                    # Código C, script de teste e relatório de Leibniz
-│   ├── tarefa01.c
-│   ├── execute.sh
-│   ├── plot_results.py
-│   └── relatorio.tex
-├── tarefa02/                    # Código C, teste e relatório de acesso à matriz
-│   ├── row_major.c
-│   ├── column_major.c
-│   ├── execute.sh
-│   ├── plot_results.py
-│   └── relatorio.tex
-├── tarefa03/                    # Código C, teste e relatório de ILP com acumuladores
-│   ├── tarefa03.c
-│   ├── execute.sh
-│   ├── plot_results.py
-│   └── relatorio.tex
-├── tarefa04/                    # Código C, teste e relatório de Memory e CPU bound
-│   ├── tarefa04.c
-│   ├── execute.sh
-│   ├── plot_results.py
-│   └── relatorio.tex
-├── tarefa05/                    # Código C, teste de contagem de primos e Race Condition
-│   ├── tarefa05.c
-│   ├── execute.sh
-│   ├── plot_results.py
-│   └── relatorio.tex
-└── tarefa06/                    # Monte Carlo Pi com OpenMP, race condition e escopos
-    ├── e0.c ... e4_*.c
-    ├── execute.sh
-    ├── plot_results.py
-    └── relatorio.tex
-```
-
----
-
-## Como executar os experimentos
-
-### Compilar e rodar os programas em C
-
-Os códigos seguem o padrão C11 para Linux x86_64.
-
-Exemplo com a tarefa 03:
-
-```bash
-cd tarefa03/
-
-# Executa o benchmark nos níveis -O0, -O2 e -O3
-chmod +x execute.sh
-./execute.sh
-
-# Gera o gráfico de tempos
-python3 plot_results.py
-```
-
-### Visualizar os arquivos HTML
-
-Para abrir as lições no navegador:
-
-```bash
-# Abrir direto no navegador
-xdg-open index.html
-
-# Ou subir um servidor local
-python3 -m http.server 8080
-```
-
----
-
-## Detalhes técnicos
-
-- A folha [`assets/style.css`](assets/style.css) define tipografia com fontes Crimson Pro, Inter e JetBrains Mono, com suporte a tema claro e escuro.
-- Fórmulas matemáticas usam KaTeX com delimitadores `$...$` e `$$...$$`.
-- Medições de tempo usam `clock_gettime(CLOCK_MONOTONIC)` com resolução em nanossegundos.
-- As alternativas dos quizzes têm tamanhos de texto equivalentes para evitar pistas pelo comprimento da resposta.
+| 13 | Afinidade de threads e NUMA | [Material 13](https://eugeniovlopes.github.io/programacao-paralela/lessons/0013-tarefa13-afinidade-numa.html) · [Referência rápida](https://eugeniovlopes.github.io/programacao-paralela/lessons/0013-tarefa13-afinidade-numa.html#referencia-rapida) | [`tarefa13/`](tarefa13/) · [PDF](tarefa13/relatorio.pdf) · [código-base](tarefa12/v4_numa.c) |
 
 ---
 

@@ -27,16 +27,16 @@
 
 | Tipo | Arquivo |
 | ------ | --------- |
-| Teoria aprofundada | `reference/01-teoria-ponto-flutuante-hardware.html` |
-| Referência rápida | `reference/01-ponto-flutuante-e-leibniz.html` |
+| Teoria aprofundada | `lessons/0001-tarefa01-leibniz-pi.html#teoria` |
+| Referência rápida | `lessons/0001-tarefa01-leibniz-pi.html#referencia-rapida` |
 | Lição prática | `lessons/0001-tarefa01-leibniz-pi.html` |
 
 ### Tarefa 02 (MxV — Cache e Localidade)
 
 | Tipo | Arquivo |
 | ------ | --------- |
-| Teoria aprofundada | `reference/02-teoria-hierarquia-memoria-cache.html` |
-| Referência rápida | `reference/02-mxv-cache-localidade.html` |
+| Teoria aprofundada | `lessons/0002-tarefa02-mxv-cache.html#teoria` |
+| Referência rápida | `lessons/0002-tarefa02-mxv-cache.html#referencia-rapida` |
 | Lição prática | `lessons/0002-tarefa02-mxv-cache.html` |
 
 **Temas cobertos (T02)**: gargalo de von Neumann, Memory Wall, hierarquia L1/L2/L3, linhas de cache de 64 bytes, localidade espacial e temporal, row-major vs column-major, modelo Roofline (I = 0,25 FLOP/byte), NUMA, `clock()` vs `clock_gettime()`.
