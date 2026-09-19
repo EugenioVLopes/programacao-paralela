@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tarefa 12 — Escalabilidade da difusão viscosa no NPAD</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function applyMath() {
+      if (window.renderMathInElement) renderMathInElement(document.body, {
+        delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}],
+        throwOnError: false
+      });
+    }
+    document.addEventListener('DOMContentLoaded', applyMath);
+  </script>
+</head>
+<body>
+  <nav class="top-nav"><a href="../index.html">Todas as tarefas</a><a href="../index.html">Índice das tarefas</a></nav>
+  <header>
+    <div class="lesson-badge">DCA3703 · UFRN · Tarefa 12</div>
+    <h1>Escalabilidade da difusão viscosa</h1>
+    <p>Versões sucessivas, memória compartilhada e análise com PaScal no NPAD.</p>
+  </header>
+  <main>
+    <section id="objetivo">
+      <h2>O que será avaliado</h2>
+      <p>O experimento continua a <a href="0011-tarefa11-difusao-schedule.html">tarefa 11</a>: difusão de uma componente escalar de velocidade, considerando somente viscosidade. Advecção, pressão e forças externas permanecem omitidas. Não se trata do sistema completo de Navier–Stokes incompressível.</p>
+      <p>O objetivo dos slides 37–54 é distinguir rapidez e eficiência, localizar gargalos e acompanhar versões que tentam removê-los. A fonte primária é <a href="../assets/index.md">o material do professor</a>. A unidade de estudo é um único nó de memória compartilhada; não há MPI nem comunicação entre nós.</p>
+      <div class="callout"><strong>Estado do trabalho:</strong> código validado localmente e piloto 2095233 executado no NPAD, no nó r1i0n1.npad.internal. A campanha PaScal e a avaliação final de escalabilidade estão pendentes. O piloto anterior falhou por incompatibilidade com Python 3.6; as chamadas afetadas foram corrigidas.</div>
+      <p><a href="../tarefa12/README.md">Passo a passo de execução</a> · <a href="../tarefa12/npad.slurm">Piloto Slurm</a> · <a href="../tarefa12/pascal.slurm">Coleta PaScal</a> · <a href="../tarefa12/relatorio.pdf">Relatório preliminar</a> · <a href="#referencia-rapida">Referência rápida</a></p>
+    </section>
+    <section id="modelo">
+      <h2>Modelo numérico e tamanho do trabalho</h2>
+      <p>Com viscosidade cinemática $\nu$, a equação adotada é $\partial_t u=\nu\nabla^2u$. Euler explícito no tempo e diferenças centrais no espaço produzem:</p>
+      <p>$$u^{k+1}_{i,j}=u^k_{i,j}+r\left(u^k_{i-1,j}+u^k_{i+1,j}+u^k_{i,j-1}+u^k_{i,j+1}-4u^k_{i,j}\right),\qquad r=\frac{\nu\Delta t}{h^2}.$$</p>
+      <p>Usamos $\nu=0{,}1$, $\Delta t=0{,}2$, $h=1$: $r=0{,}02$. Os contornos são Dirichlet fixos, iguais nos dois buffers. Campos inicialmente zero ou um, com bordas iguais, permanecem invariantes. No modo perturbado, a gaussiana tem amplitude 0,1 e $\sigma=N/10$; a difusão reduz o pico, e o contorno zero pode retirar quantidade do domínio. A soma não é um invariante desse contorno.</p>
+      <p>Para um modo de Fourier, o fator de amplificação é $G=1-4r[\sin^2(k_xh/2)+\sin^2(k_yh/2)]$. A condição $0\le r\le1/4$ garante $|G|\le1$ no esquema uniforme 2D. Para soluções suaves, a consistência é de ordem $O(\Delta t+h^2)$; com estabilidade e condições adequadas, a discretização converge. Comparar versões na mesma malha verifica a implementação, mas não substitui um estudo de refinamento.</p>
+      <p>Em x86_64, <code>double</code> usa normalmente IEEE 754 binary64: 53 bits de precisão, épsilon $2^{-52}$ e arredondamento unitário $2^{-53}$. As versões mantêm a ordem das operações por célula; <code>-ffp-contract=off</code> impede contração em FMA nessa comparação e não usamos fast-math. Igualdade observada nos testes não garante identidade entre qualquer compilador ou biblioteca matemática.</p>
+      <p>Se $M$ é o número de passos, o trabalho útil contado em atualizações é $W=(N-2)^2M$; os dois buffers ocupam aproximadamente $16N^2$ bytes. Na campanha, $h$, $\Delta t$ e $M$ são fixos. Crescer N aumenta o domínio e a largura da perturbação. Se, em outro experimento, o domínio físico fosse fixo, reduzir h exigiria reduzir $\Delta t$ por estabilidade; manter o mesmo tempo físico aumentaria M e mudaria a lei de crescimento do trabalho.</p>
+    </section>
+    <section id="metricas">
+      <h2>Desempenho, escalabilidade forte e fraca</h2>
+      <p>Seja $T_v(p,W)$ o tempo mediano da versão v com p threads. Desempenho em atualizações por segundo é $W/T_v$; desempenho em tarefas completas por segundo é $1/T_v$. Uma versão pode diminuir o tempo absoluto sem melhorar seu speedup próprio.</p>
+      <p>$$S_v=\frac{T_v(1,W)}{T_v(p,W)},\quad E_v=\frac{S_v}{p},\qquad S_{seq}=\frac{T_0(1,W)}{T_v(p,W)},\quad E_{seq}=\frac{S_{seq}}p.$$</p>
+      <p>O primeiro par mede escalabilidade interna; o segundo compara com uma referência sequencial comum. Não troque o denominador entre gráficos. Speedup maior que p pode aparecer por efeitos de cache ou frequência, ou por ruído; requer investigação, não uma correção artificial dos dados.</p>
+      <table>
+        <thead><tr><th>Leitura</th><th>Experimento</th><th>Critério ideal</th></tr></thead>
+        <tbody>
+          <tr><td>Forte</td><td>Fixar N e M; aumentar p</td><td>$T(p)=T(1)/p$, eficiência constante</td></tr>
+          <tr><td>Fraca usual em HPC</td><td>Aumentar W proporcionalmente a p</td><td>Tempo constante, $E_w=T(1,W_0)/T(p,pW_0)=1$</td></tr>
+          <tr><td>Escalabilidade geral dos slides</td><td>Aumentar recursos e trabalho por algum fator</td><td>Preservar trabalho por recurso e por tempo</td></tr>
+          <tr><td>Fraca nos slides 47–49</td><td>Trabalho cresce menos que os recursos</td><td>Eficiência preservada mesmo nessa proporção</td></tr>
+        </tbody>
+      </table>
+      <p><strong>A terminologia dos slides é explicitamente diferente do teste usual.</strong> Para comparar dois pontos da mesma versão, defina $a=W_2/W_1$ e $b=p_2/p_1$. A razão de eficiência em trabalho por recurso e tempo é $R=(a/b)(T_1/T_2)$. No caso forte, $a=1$; no weak scaling usual, $a=b$; para investigar a definição fraca dos slides, use pares com $1&lt;a&lt;b$. Por exemplo, quadruplicar W ao multiplicar p por 16 exige $T_2=T_1/4$ para preservar essa eficiência.</p>
+      <p>As matrizes completas permitem selecionar esses pares. Declare a tolerância admitida para “preservar” eficiência e a dispersão observada; não derive uma classificação universal de um único ponto. O PaScal Viewer possui seus próprios diagramas e critérios, que devem ser identificados nas capturas. A eficiência sobre v0 pode ainda variar com o comportamento sequencial de cada tamanho.</p>
+      <p>$$S_{Amdahl}(p)=\frac1{f+(1-f)/p},\qquad S_{Gustafson}(p)=p-\alpha(p-1).$$</p>
+      <p>Amdahl usa uma fração serial f para trabalho fixo. Gustafson considera trabalho ampliado e uma fração serial $\alpha$ no tempo paralelo. Nenhum modelo inclui automaticamente saturação de memória, mudança de frequência ou todos os custos de barreira; um teto observado não identifica sozinho f.</p>
+      <p>Na diagonal de carga constante por thread, usamos $N_p=2+\operatorname{round}((N_1-2)\sqrt p)$. Como a malha é inteira, o CSV informa $q=(N_p-2)^2/[p(N_1-2)^2]$ e $E_{w,corr}=qE_w$. Com p=1,2,4,8,16,32,64; a diagonal usa cargas proporcionais ao número de threads, q é exatamente 1.</p>
+    </section>
+    <section id="hardware">
+      <h2>Por que mais núcleos podem deixar de ajudar</h2>
+      <p>Os conceitos abaixo seguem os tópicos de localidade, vetorização, coerência, sincronização e NUMA dos slides. Cada hipótese precisa ser relacionada à topologia realmente alocada.</p>
+      <table>
+        <thead><tr><th>Conceito físico</th><th>Efeito neste stencil e evidência a procurar</th></tr></thead>
+        <tbody>
+          <tr><td>Gargalo de von Neumann e Memory Wall</td><td>Unidades de execução esperam dados da hierarquia de memória. Aumentar p eleva a demanda agregada, mas não multiplica os canais de DRAM. N grande com MLUP/s estabilizado sugere limite de banda; tempos sozinhos não o comprovam.</td></tr>
+          <tr><td>Cache e linhas de 64 bytes</td><td>O percurso por linhas reutiliza vizinhos; numa CPU com linhas de 64 bytes, cada linha contém oito doubles. As cinco leituras do stencil não implicam cinco acessos à DRAM: caches e reutilização entre células importam. Confirme tamanhos e linhas de cache no nó.</td></tr>
+          <tr><td>Write-through, write-back e bits dirty/invalid</td><td>Write-through propaga escritas imediatamente ao próximo nível; write-back posterga a transferência de linhas modificadas, marcadas dirty. A coerência invalida cópias incompatíveis. Esses estados pertencem ao hardware; o programa não os altera diretamente.</td></tr>
+          <tr><td>Snooping e diretório</td><td>São estratégias de rastrear cópias e pedidos de coerência. Leituras dos vizinhos e alterações de posse de linhas podem exigir comunicação entre caches. A implementação real depende da CPU.</td></tr>
+          <tr><td>Falso compartilhamento</td><td>Threads podem escrever doubles distintos na mesma linha de cache. Blocos contíguos por linhas limitam a ocorrência às fronteiras entre blocos; N sem alinhamento de linha e páginas de borda ainda importam. Não é o mesmo que o compartilhamento verdadeiro dos vizinhos.</td></tr>
+          <tr><td>Dependência RAW</td><td>O passo k+1 lê resultados do passo k. A barreira do <code>omp for</code> garante todas as escritas antes da próxima leitura. SIMD é possível entre células do mesmo passo; paralelizar o tempo ou retirar essa barreira quebra o método.</td></tr>
+          <tr><td>NUMA e first touch</td><td>Na política usual de alocação local, páginas físicas tendem ao domínio que as escreve primeiro. Inicialização serial pode concentrá-las; v4 as inicializa em paralelo com <code>static</code>. Isso só investiga acesso remoto se a alocação cobrir múltiplos domínios. Distribuição de páginas, migração e política do SO também influem.</td></tr>
+          <tr><td>Power Wall</td><td>Potência e temperatura limitam a frequência sustentada. Muitos núcleos ou SIMD podem mudar o clock; por isso menos instruções não garante redução proporcional do tempo. Registre CPU, condições e política sem alterar configurações administrativas.</td></tr>
+        </tbody>
+      </table>
+      <p>Com reutilização suficiente, uma estimativa de tráfego para malhas fora de cache pode incluir cerca de 8 bytes de leitura, 8 de escrita e até 8 de alocação de linha por atualização. É um modelo aproximado, não uma medição: políticas de escrita, linhas já residentes e reutilização mudam esse valor. Compare trabalho por segundo com banda medida antes de atribuir o teto à DRAM.</p>
+      <p>No NPAD, a partição intel-128 é uma candidata de 32 núcleos físicos em dois sockets, conforme a fonte oficial indicada no guia. O hostname retornado pelo job, <code>lscpu</code>, cpuset e informação NUMA são a evidência do hardware usado. InfiniBand não acelera diretamente este programa OpenMP restrito a um nó.</p>
+    </section>
+    <section id="versoes">
+      <h2>Evolução controlada do código</h2>
+      <table>
+        <thead><tr><th>Versão</th><th>Mudança</th><th>Comparação que sustenta a hipótese</th></tr></thead>
+        <tbody>
+          <tr><td><a href="../tarefa12/v0_seq.c">v0_seq</a></td><td>Referência serial, sem runtime OpenMP</td><td>Tempo base para cada N</td></tr>
+          <tr><td><a href="../tarefa12/v1_barriers.c">v1_barriers</a></td><td>Região persistente, <code>static</code>, troca compartilhada em single</td><td>Duas barreiras por passo, como a base da tarefa 11</td></tr>
+          <tr><td><a href="../tarefa12/v2_private.c">v2_private</a></td><td>Cada thread troca seus próprios ponteiros</td><td>v1→v2 remove a segunda barreira temporal</td></tr>
+          <tr><td><a href="../tarefa12/v3_simd.c">v3_simd</a></td><td>Acrescenta <code>omp simd</code> no laço interno</td><td>v2→v3; verificar também o relatório do compilador</td></tr>
+          <tr><td><a href="../tarefa12/v4_numa.c">v4_numa</a></td><td>Inicializa os dois campos em paralelo</td><td>v3→v4; kernel idêntico, first touch diferente</td></tr>
+        </tbody>
+      </table>
+      <p>A região OpenMP já era persistente na tarefa 11; não apresentamos sua criação como otimização nova. Cada arquivo C é independente e inclui validação, inicialização e cronômetros. Nas bases v0–v3, o primeiro campo é inicializado serialmente e copiado com memcpy para o segundo, como na tarefa 11. v4 distribui a inicialização e escreve os dois campos no laço paralelo.</p>
+      <h3>Leitura linha a linha de v2_private.c</h3>
+      <table>
+        <thead><tr><th>Linha</th><th>Papel no programa</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Identifica a versão que será impressa no CSV.</td></tr>
+          <tr><td>2</td><td>Inclui a infraestrutura e a declaração da função evolve.</td></tr>
+          <tr><td>4</td><td>Recebe os buffers, tamanho, passos, coeficiente e endereço da contagem de threads.</td></tr>
+          <tr><td>5–6</td><td>Abre uma única equipe; <code>default(none)</code> exige declarar o compartilhamento.</td></tr>
+          <tr><td>7</td><td>Cria ponteiros privados a e b para campos que continuam compartilhados.</td></tr>
+          <tr><td>8–9</td><td>Uma thread registra o tamanho real da equipe, uma vez por execução.</td></tr>
+          <tr><td>10</td><td>Cada thread percorre os mesmos passos temporais na mesma ordem.</td></tr>
+          <tr><td>11</td><td>Distribui blocos de linhas por static, sem fila dinâmica.</td></tr>
+          <tr><td>12</td><td>Percorre somente as linhas internas, preservando contornos.</td></tr>
+          <tr><td>13</td><td>Percorre colunas contíguas; v3 adiciona SIMD antes deste laço.</td></tr>
+          <tr><td>14</td><td>Converte (i,j) no deslocamento linear, usando size_t.</td></tr>
+          <tr><td>15</td><td>Lê exclusivamente a e escreve b, mantendo o mesmo stencil.</td></tr>
+          <tr><td>16–17</td><td>Fecha os laços; a barreira implícita espera todas as escritas.</td></tr>
+          <tr><td>18</td><td>Troca somente ponteiros locais; nenhuma publicação compartilhada é necessária.</td></tr>
+          <tr><td>19–20</td><td>Fecha os passos e a equipe; a saída da região também sincroniza.</td></tr>
+          <tr><td>21–22</td><td>Seleciona o buffer final pela paridade dos passos e retorna.</td></tr>
+        </tbody>
+      </table>
+      <p>Em cada arquivo C, <code>integer</code> valida conversão e intervalo com strtol/errno; a medição usa <code>omp_get_wtime()</code> diretamente, como na tarefa 11. main valida a memória necessária antes de alocar dois vetores, inicializa bordas e interior, mede evolve, verifica valores finitos e só depois exporta. Falhas de alocação ou escrita retornam erro. Em modo PaScal, <code>WORKLOAD_INPUT</code> recebe um alvo de células internas e arredonda a raiz quadrada para obter o lado interno; a entrada 262144 corresponde a N=514. As regiões 1 e 2 delimitam inicialização e evolução.</p>
+    </section>
+    <section id="pratica">
+      <h2>Executar no NPAD e ler os resultados</h2>
+      <p>O <a href="../tarefa12/README.md">guia operacional</a> reúne transferência por SSH na porta 4422, piloto, instalação do Analyzer e download dos JSONs. No login, submeta com sbatch; srun executa dentro do nó reservado. O primeiro piloto usa quatro núcleos e valida antes de medir:</p>
+      <pre><code>cd ~/tarefa12
+sbatch --partition=intel-128 --cpus-per-task=4 --time=00:15:00 \
+  --export=ALL,VERIFY=1,BASE=256,STEPS=200,REPS=2 npad.slurm
+squeue -u "$USER"
+sacct -j JOBID --format=JobID,State,ExitCode,Elapsed</code></pre>
+      <p>Uma fila vazia significa que o job já saiu dos estados exibidos pelo squeue; sacct permite distinguir sucesso e falha. <code>tail -f</code> continua esperando texto mesmo após o job terminar; Ctrl+C encerra esse acompanhamento.</p>
+      <p>A coleta principal do Viewer usa <a href="../tarefa12/pascal.slurm">pascal.slurm</a>, depois de disponibilizar o env.sh do Analyzer. A configuração recomendada solicita a partição amd-512 com 64 CPUs e cruza p=1,2,4,8,16,32,64 com cargas alvo de 262144 até 16777216 células, dobrando a cada entrada. Os N são 514,726,1026,1450,2050,2898,4098; M=500 é fixo. O arredondamento do lado causa desvio de carga inferior a 0,022%, registrado em workloads.csv. O job 2095236 usou o protocolo anterior, limitado a p=1,4,16; a nova campanha amplia o estudo até 64 CPUs; em nós Intel, p=64 deve ser interpretado como SMT. O arquivo JSON é gerado pelo Analyzer, não pelo CSV do piloto.</p>
+      <p>Selecione a região 2 no Viewer para comparar os kernels e a região 1 para a inicialização. Preserve captura dos eixos, legendas e região. Analise cada versão: linhas de tamanho fixo para forte; diagonal de W/p constante para fraca usual; outros pares para crescimento subproporcional dos slides. Compare os tempos absolutos junto às cores de eficiência.</p>
+      <p>O coletor Python adicional gera uma matriz mais densa, mediana, mínimo, máximo e MAD. O tempo <code>seconds</code> inclui o kernel e suas barreiras; <code>total_seconds</code> inclui também alocação e inicialização. Diagnóstico e E/S ficam fora de ambos. Assim, melhoria no first touch pode aparecer na evolução e no total; não se deve esconder uma inicialização serial analisando apenas a região mais rápida.</p>
+      <h3>O que foi realmente verificado</h3>
+      <p>Localmente, GCC 13.3, C11, O3, Wall/Wextra/Werror, contração FMA desabilitada e OpenMP nas quatro versões paralelas: 195 comparações de campos completos com 1, 2 e 4 threads, passos pares, ímpares e zero, campos constante, nulo e gaussiano, entradas inválidas e tratamento de dados incompletos. O campo de N=512 após 500 passos coincidiu exatamente com a referência da tarefa 11. Após a correção, o pipeline local foi testado novamente; a sintaxe dos scripts também foi verificada contra Python 3.6. O piloto remoto seguinte, 2095233, gerou os resumos após a correção.</p>
+      <p>Um ensaio local de coleta, sem valor de conclusão sobre o NPAD, usou N=258,364,514, M=200, p=1,2,4 e três repetições, mais aquecimento. Na maior malha, a mediana de v1 caiu de 0,03975 s para 0,02845 s em p=2 e subiu para 0,03296 s em p=4; v2 em p=4 marcou 0,02277 s. Esses tempos curtos, no computador local virtualizado com um domínio NUMA, servem para verificar a leitura dos dados. Não comprovam o gargalo do NPAD nem um ganho de NUMA. Os dados locais estão em <code>tarefa12/runs/local-validacao/</code>, ignorados pelo Git.</p>
+      <p>O ambiente remoto informado pelo usuário é GCC 8.5.0 e Python 3.6.8. O job 2095230 chegou ao nó r1i0n1, mas falhou por um argumento de subprocess indisponível nessa versão de Python. Não gerou uma campanha de desempenho válida. As chamadas foram substituídas por universal_newlines e PIPE.</p>
+      <p>O piloto seguinte, job 2095233, gerou resultados no nó r1i0n1.npad.internal. Para N=514 e p=4, os tempos de kernel recebidos foram v2=0,017848 s, v3=0,018343 s e v4=0,017360 s, com speedups sobre v0 de 3,287, 3,199 e 3,380. Os totais foram 0,025320 s, 0,025895 s e 0,019669 s. Os valores foram transcritos do log enviado pelo usuário; os dados brutos e a dispersão ainda precisam ser conferidos. Este ponto não permite concluir escalabilidade fraca nem extrapolar para 16 ou 32 threads.</p>
+      <p>Para uma conclusão final, complete o <a href="../tarefa12/relatorio.tex">relatório</a> com hostname, job, topologia, afinidade, compilador, repetição, matriz e resultados. Evidência esperada: v1→v2 investiga sincronização; v2→v3 investiga SIMD; v3→v4 investiga colocação de páginas. Queda de eficiência em N grande pode sugerir banda, mas só atribua a causa com experimentos controlados. Registre tentativas que não melhoraram o desempenho.</p>
+    </section>
+    <section id="quizzes">
+      <h2>Verifique sua compreensão</h2>
+      <p>Escolha uma alternativa e abra a resposta. Em cada questão, as quatro alternativas têm a mesma contagem de palavras e caracteres.</p>
+      <fieldset data-symmetric-quiz><legend>1. Qual desenho mede escalabilidade forte, mantendo M constante?</legend>
+        <p><label><input type="radio" name="q1"> Fixar N; variar p.</label></p>
+        <p><label><input type="radio" name="q1"> Mudar N; manter p.</label></p>
+        <p><label><input type="radio" name="q1"> Fixar N; manter p.</label></p>
+        <p><label><input type="radio" name="q1"> Mudar N; dobrar p.</label></p>
+        <details><summary>Conferir resposta</summary><p>A primeira: trabalho fixo, recursos variáveis.</p></details>
+      </fieldset>
+      <fieldset data-symmetric-quiz><legend>2. De uma para quatro threads, qual lado interno preserva carga por thread se o inicial é 1024?</legend>
+        <p><label><input type="radio" name="q2"> Usar lado interno 1024.</label></p>
+        <p><label><input type="radio" name="q2"> Usar lado interno 2048.</label></p>
+        <p><label><input type="radio" name="q2"> Usar lado interno 4096.</label></p>
+        <p><label><input type="radio" name="q2"> Usar lado interno 8192.</label></p>
+        <details><summary>Conferir resposta</summary><p>A segunda: dobrar o lado quadruplica a área; N inclui mais duas posições de contorno.</p></details>
+      </fieldset>
+      <fieldset data-symmetric-quiz><legend>3. Com os ponteiros tornados privados em v2, qual remoção reduz a sincronização com segurança?</legend>
+        <p><label><input type="radio" name="q3"> Remover o acesso compartilhado.</label></p>
+        <p><label><input type="radio" name="q3"> Remover o buffer compartilhado.</label></p>
+        <p><label><input type="radio" name="q3"> Remover o single compartilhado.</label></p>
+        <p><label><input type="radio" name="q3"> Remover o kernel compartilhado.</label></p>
+        <details><summary>Conferir resposta</summary><p>A terceira: elimina o single da troca de ponteiros e sua barreira; a barreira do omp for permanece obrigatória. Os campos continuam compartilhados.</p></details>
+      </fieldset>
+      <fieldset data-symmetric-quiz><legend>4. Para trabalho fixo, T(1)=0,8 s e T(4)=0,4 s. Quais são S e E?</legend>
+        <p><label><input type="radio" name="q4"> Speedup 1,0; eficiência 25%.</label></p>
+        <p><label><input type="radio" name="q4"> Speedup 2,0; eficiência 50%.</label></p>
+        <p><label><input type="radio" name="q4"> Speedup 3,0; eficiência 75%.</label></p>
+        <p><label><input type="radio" name="q4"> Speedup 4,0; eficiência 50%.</label></p>
+        <details><summary>Conferir resposta</summary><p>A segunda: S=0,8/0,4=2 e E=2/4=0,5.</p></details>
+      </fieldset>
+    </section>
+    <section id="fontes">
+      <h2>Fontes e material de execução</h2>
+      <p>Vocabulário e objetivos: <a href="../assets/index.md">slides da disciplina</a>. Base de hardware e desempenho em Pacheco, <em>An Introduction to Parallel Programming</em>, cap. 2: cache (§ 2.2.1), NUMA/UMA (§ 2.3.2), coerência e falso compartilhamento (§ 2.3.4), speedup e escalabilidade (§§ 2.6.1–2.6.3). As páginas oficiais do PaScal Suite, desempenho versus escalabilidade, Analyzer, Viewer e referências, além da documentação NPAD e Slurm, estão reunidas nas <a href="../tarefa12/README.md#fontes">fontes do guia</a>. Os endereços foram consultados em 14/09/2026; a versão efetiva do Analyzer deve ser registrada no nó.</p>
+    </section>
+    <section id="referencia-rapida">
+      <h2>Apêndice: Referência rápida</h2>
+      <table>
+        <thead><tr><th>Sintaxe C / biblioteca</th><th>Uso</th></tr></thead>
+        <tbody>
+          <tr><td><code>int</code>, <code>size_t</code>, <code>double</code></td><td>Dimensões e passos; índices e tamanhos; campo numérico.</td></tr>
+          <tr><td><code>strtol</code>, <code>errno</code>, <code>SIZE_MAX</code></td><td>Validação de argumentos e prevenção de overflow no tamanho da alocação.</td></tr>
+          <tr><td><code>malloc</code>, <code>free</code></td><td>Alocar e liberar dois buffers distintos; verificar falhas.</td></tr>
+          <tr><td><code>exp</code>, <code>sqrt</code>, <code>isfinite</code></td><td>Gaussiana, conversão de carga PaScal e validação do campo.</td></tr>
+          <tr><td><code>omp_get_wtime()</code></td><td>Cronômetro OpenMP, usado também na referência sequencial sem região paralela.</td></tr>
+          <tr><td><code>fopen</code>, <code>fwrite</code>, <code>fclose</code></td><td>Exportação opcional fora da região medida; verificar retorno e fechamento.</td></tr>
+        </tbody>
+      </table>
+      <table>
+        <thead><tr><th>Pragma / flag / configuração</th><th>Regra prática</th></tr></thead>
+        <tbody>
+          <tr><td><code>parallel default(none)</code></td><td>Equipe persistente, escopos explícitos.</td></tr>
+          <tr><td><code>for schedule(static)</code></td><td>Blocos de linhas para trabalho uniforme; barreira ao final.</td></tr>
+          <tr><td><code>single</code></td><td>Uma thread executa; barreira implícita sem nowait.</td></tr>
+          <tr><td><code>simd</code></td><td>Vetorizar células independentes; não o laço temporal.</td></tr>
+          <tr><td><code>-std=c11 -O2 -Wall -Wextra -Werror</code></td><td>Mesmas opções nas versões; outros níveis de otimização somente em campanhas separadas.</td></tr>
+          <tr><td><code>-fopenmp -lm -ffp-contract=off</code></td><td>OpenMP e cronômetro em todas as versões; matemática; sem contração FMA.</td></tr>
+          <tr><td><code>-DUSE_PASCAL -DWORKLOAD_INPUT -lmpascalops</code></td><td>Instrumentação manual; entrada em células internas, não N.</td></tr>
+          <tr><td><code>OMP_PLACES=cores</code>, <code>OMP_PROC_BIND=spread</code></td><td>Afinidade restrita aos núcleos alocados; conferir topologia.</td></tr>
+          <tr><td><code>OMP_DYNAMIC=FALSE</code>, <code>OMP_WAIT_POLICY=PASSIVE</code></td><td>Equipe estável; política de espera registrada e constante entre versões.</td></tr>
+        </tbody>
+      </table>
+      <p><strong>Resumo executivo:</strong> $r=0{,}02\le1/4$; erro de discretização $O(\Delta t+h^2)$; $W=(N-2)^2M$; memória $16N^2$ bytes; $S=T(1)/T(p)$; $E=S/p$; forte mantém W; fraca usual mantém W/p; preservar eficiência entre dois pontos significa $R=(W_2/W_1)(p_1/p_2)(T_1/T_2)\approx1$. Amdahl: $1/[f+(1-f)/p]$. Gustafson: $p-\alpha(p-1)$. Menor tempo decide desempenho; medidas de eficiência e o domínio testado sustentam a conclusão de escalabilidade.</p>
+    </section>
+  </main>
+  <footer class="footer-nav"><a href="0011-tarefa11-difusao-schedule.html">← Tarefa 11</a><a href="../tarefa12/README.md">Executar no NPAD →</a></footer>
+</body>
+</html>

@@ -27,28 +27,36 @@ u^{k+1}_{i,j}=u^k_{i,j}+r(u^k_{i-1,j}+u^k_{i+1,j}+u^k_{i,j-1}+u^k_{i,j+1}-4u^k_{
 Com $\nu=0{,}1$, $\Delta t=0{,}2$ e $h=1$, obtém-se $r=0{,}02$, dentro do limite de estabilidade bidimensional. Dois campos em \texttt{double} separam leitura e escrita. As bordas ficam fixas. Os campos nulo e constante devem permanecer invariantes, enquanto a perturbação gaussiana se difunde.
 
 \subsection{Distribuição e sincronização}
-O escalonamento \texttt{static} distribui linhas entre as threads do conjunto OpenMP, adequado ao custo uniforme das células. A região paralela permanece ativa durante todos os passos. Cada passo depende dos valores produzidos no anterior (RAW), exigindo uma barreira após o stencil. A troca de ponteiros compartilhados em \texttt{single} acrescenta uma segunda barreira; ponteiros privados permitem que cada thread faça a troca localmente. Como cada thread conserva o mesmo bloco de linhas nos 500 passos, a releitura do bloco favorece a localidade temporal enquanto cabe em cache; o laço interno em j contíguo favorece a localidade espacial no armazenamento por linhas.
+O escalonamento \texttt{static} distribui blocos contíguos de linhas, adequado ao custo uniforme das células, em região paralela única nos 500 passos. Cada passo depende do anterior (RAW) e exige barreira após o stencil; a troca em \texttt{single} acrescenta segunda barreira, e ponteiros privados reduzem a troca a operação local. O bloco conservado por thread favorece a localidade temporal; o laço interno em j contíguo favorece a espacial.
 
 \subsection{SIMD e inicialização paralela}
-A diretiva \texttt{omp simd} permite processar células do laço interno com instruções vetoriais. O compilador pode vetorizar esse laço mesmo sem a diretiva, portanto sua inclusão não garante ganho.
-
-A inicialização paralela distribui a escrita inicial dos dois campos. Em sistemas NUMA, o acesso à memória ligada ao próprio processador é mais rápido que o acesso através de outro chip; sob a política de \textit{first touch}, a escrita inicial influencia a colocação das páginas, aproximando cada página da thread que a escreveu primeiro. O benefício depende da afinidade das threads e da política de memória; uma redução do tempo total, isoladamente, não comprova melhor localidade NUMA.
+A diretiva \texttt{omp simd} sugere o processamento vetorial do laço interno, mas o compilador pode vetorizar sozinho, sem garantia de ganho. A inicialização paralela distribui a escrita dos dois campos; sob \textit{first touch} em NUMA, cada página se aproxima da thread que a escreveu primeiro.
 
 \subsection{Indicadores de escalabilidade}
-Para uma estratégia e trabalho fixo $W$, o speedup próprio e a eficiência são
+Para trabalho fixo $W$, o speedup e a eficiência são
 \[
 S(p,W)=\frac{T(1,W)}{T(p,W)},\qquad E(p,W)=\frac{S(p,W)}{p}.
 \]
-O Viewer calcula esses indicadores dentro de cada versão, com referência em uma thread da própria versão. Essa referência difere de uma referência sequencial sem região paralela.
-
-A escalabilidade forte mantém o trabalho fixo e aumenta as threads. O teste usual de escalabilidade fraca mantém $W/p$ constante e compara $T(1,W_0)$ com $T(p,pW_0)$. A escalabilidade geral preserva a eficiência ao aumentar trabalho e recursos. A fraca cobre o caso em que o trabalho cresce menos que os recursos. Na matriz deste job, cada linha fixa testa o caso forte. A diagonal proporcional testa o caso fraco usual. O tempo paralelo soma a parcela útil dividida por p ao overhead da paralelização: criação do time, distribuição e sincronização. Quando o problema cresce e o overhead cresce mais devagar que o trabalho útil, speedup e eficiência sobem; no caso contrário, a eficiência cai. Em trabalho fixo, a eficiência costuma cair com p; com p fixo, costuma subir com o tamanho do problema.
+\begin{itemize}
+\item \textbf{Desempenho.} Tempo de execução da aplicação.
+\item \textbf{Eficiência.} Trabalho realizado com os recursos disponíveis para a execução.
+\item \textbf{Escalabilidade.} Capacidade de obter melhor desempenho à medida que mais recursos computacionais são utilizados.
+\item \textbf{Lei de Amdahl.} A parte do código que permanece sequencial limita o speedup máximo, por mais recursos que se adicionem.
+\item \textbf{Lei de Gustafson.} Quando o problema cresce com a quantidade de processadores, a aplicação pode continuar apresentando ganhos significativos.
+\item \textbf{Speedup.} Razão entre o tempo da referência e o tempo paralelo. Neste trabalho a referência é a própria estratégia com uma thread, pois o job não inclui versão sequencial.
+\item \textbf{Escalabilidade forte.} Problema fixo, com aumento apenas do número de processadores.
+\item \textbf{Escalabilidade fraca.} O problema cresce proporcionalmente aos processadores, mantendo aproximadamente a mesma carga por processador.
+\item \textbf{Fortemente escalável.} Mantém a eficiência ao aumentar os recursos sem aumentar o problema.
+\item \textbf{Fracamente escalável.} Mantém a eficiência quando o problema cresce menos que os recursos.
+\end{itemize}
+O tempo paralelo soma a parcela útil dividida por p ao overhead da paralelização: criação do conjunto de threads, distribuição e sincronização. Quando o problema cresce e o overhead cresce mais devagar que o trabalho útil, speedup e eficiência sobem; no caso contrário, a eficiência cai. Em trabalho fixo, a eficiência costuma cair com p; com p fixo, costuma subir com o tamanho do problema. Na matriz deste job, cada linha fixa testa o caso forte e a diagonal proporcional testa o caso fraco usual.
 
 \section{Experimento}
-O job 2106246 rodou no nó \texttt{r2n04.npad.internal}, na partição \texttt{amd-512}, com um processo, 64 CPUs e uso exclusivo. O nó tem dois AMD EPYC 7713, oito domínios NUMA e 256 CPUs lógicas. A afinidade foi fixada com dinâmica desligada e espera passiva, lugares em núcleos e amarração espalhada: \texttt{OMP\_DYNAMIC=FALSE} e \texttt{OMP\_WAIT\_POLICY=PASSIVE}, com \texttt{OMP\_PLACES=cores} e \texttt{OMP\_PROC\_BIND=spread}.
+O job 2106246 rodou no nó \texttt{r2n04.npad.internal} (dois AMD EPYC 7713, oito domínios NUMA, 256 CPUs lógicas), na partição \texttt{amd-512}, com um processo, 64 CPUs e uso exclusivo.
 
-A compilação das quatro versões usou \texttt{-std=c11 -O2 -Wall -Wextra -Werror}, \texttt{-ffp-contract=off} e \texttt{-lm}, com \texttt{-fopenmp} e a instrumentação manual do PaScal. A medição usa \texttt{omp\_get\_wtime()}. O tempo de evolução cobre stencil, região OpenMP e sincronização. O total computacional vai da alocação ao fim da evolução. Diagnóstico, exportação e liberação ficam fora. O trabalho é $W=(N-2)^2M$, com $M=500$ passos em modo gaussiano. Os dois campos ocupam cerca de $16N^2$ bytes.
+A compilação usou \texttt{-std=c11 -O2} \texttt{-Wall -Wextra} \texttt{-Werror} e \texttt{-lm}, com \texttt{-fopenmp} e a instrumentação manual do PaScal. A flag \texttt{-ffp-contract=off} desliga a contração em FMA. A medição usa \texttt{omp\_get\_wtime()}. A evolução cronometrada cobre stencil, região OpenMP e sincronização; o total vai da alocação ao fim da evolução, sem diagnóstico, exportação e liberação. O trabalho é $W=(N-2)^2M$, com $M=500$ passos em modo gaussiano, em dois campos de cerca de $16N^2$ bytes.
 
-A matriz cruza sete cargas com sete contagens de threads, em cada uma das quatro versões, com uma repetição por configuração: 49 execuções por versão. As cargas dobram a cada ponto; como o lado da malha é inteiro, a carga efetiva difere do alvo em menos de $0{,}022\,\%$. O código instrumenta duas regiões: 1~=~inicialização, incluindo \textit{first touch}, e 2~=~evolução. As figuras do Viewer usam a região do programa inteiro, com linhas $p=1,2,4,8,16,32,64$ e colunas $i1$ a $i7$ da menor para a maior carga.
+A matriz cruza sete cargas com sete contagens de threads nas quatro versões, com uma repetição por configuração: 49 execuções por versão. As cargas dobram a cada ponto, com erro de arredondamento abaixo de $0{,}022\,\%$ (Tab.~\ref{tab:cargas}). O código instrumenta inicialização (região 1, com first touch) e evolução (região 2); as figuras usam a região do programa inteiro.
 
 \begin{table}[H]\centering\small
 \begin{tabular}{lp{8.2cm}}\hline
@@ -109,11 +117,11 @@ A estratégia com inicialização paralela mantém esse cálculo e distribui tam
 Essa alteração reduz o trabalho serial anterior à evolução e permite investigar a colocação inicial das páginas.
 
 \section{Resultados}
-A validação local passou em 195 comparações, com campos completos, passos pares, ímpares e zero, e execuções com uma, duas e quatro threads. Os campos nulo e constante ficaram invariantes. As figuras do Viewer classificam a região do programa inteiro em escalas normalizadas: ordenam as configurações entre si, sem exibir segundos. O job do PaScal tem uma repetição por configuração. Sem mediana e sem dispersão, diferença pequena entre versões não ordena nada.
+A validação local passou em 195 comparações, com campos completos, passos pares, ímpares e zero, e execuções com uma, duas e quatro threads. Os campos nulo e constante ficaram invariantes. As figuras do Viewer classificam a região do programa inteiro em escalas normalizadas: ordenam as configurações entre si, sem exibir segundos. Em todos os diagramas, as linhas indicam threads (p), as colunas indicam cargas crescentes (i1--i7) e os tons indicam a posição relativa na escala de cada figura. O job do PaScal tem uma repetição por configuração. Sem mediana e sem dispersão, diferença pequena entre versões não ordena nada.
 
 \newpage
 \subsection{Desempenho}
-O diagrama de desempenho ordena as configurações na escala de cada figura, sem exibir segundos. Tons claros marcam as combinações relativamente melhores. Nas quatro versões, o melhor relativo aparece em p intermediário. Nos extremos, pesam mecanismos distintos: com poucas threads, quase todo o trabalho recai sobre cada thread; com muitas threads e carga pequena, a fatia por thread encolhe enquanto o custo de montar o time e de cruzar as barreiras a cada passo permanece. A distribuição static reparte blocos contíguos de linhas, de modo que a fração de linhas por thread cai com p e o peso relativo da sincronização cresce. As quatro versões dividem o mesmo trabalho da mesma forma; as diferenças entre elas atuam sobre essa estrutura comum dominante. Por isso os quatro mapas têm a mesma forma, e nenhuma versão se destaca na comparação visual.
+Tons claros marcam as combinações relativamente melhores. Nas quatro versões, o melhor relativo aparece em p intermediário. Nos extremos, pesam mecanismos distintos: com poucas threads, quase todo o trabalho recai sobre cada thread; com muitas threads e carga pequena, a fatia por thread encolhe enquanto o custo de criação do conjunto e de cruzar as barreiras a cada passo permanece. A distribuição static reparte blocos contíguos de linhas, de modo que a fração de linhas por thread cai com p e o peso relativo da sincronização cresce. As quatro versões dividem o mesmo trabalho da mesma forma; as diferenças entre elas atuam sobre essa estrutura comum dominante. Por isso os quatro mapas têm a mesma forma, e nenhuma versão se destaca na comparação visual.
 
 \begin{figure}[H]\centering
 \begin{subfigure}{0.48\textwidth}\centering
@@ -187,7 +195,7 @@ A eficiência divide o speedup por $p$. Tons escuros marcam eficiência maior. E
 \end{figure}
 
 \newpage
-subsection{Escalabilidade forte}
+\subsection{Escalabilidade forte}
 Cada coluna fixa a carga e varia as threads. O Viewer pinta quase tudo em tons de perda, piores em $p=32$ e $p=64$. A dependência temporal RAW entre passos exige uma barreira por passo em qualquer versão: são 500 sincronizações por execução, um custo de coordenação que não diminui quando p cresce. Com a carga fixa, cada thread recebe uma fatia cada vez mais fina do mesmo trabalho, e a coordenação passa a dominar. Nas fronteiras entre blocos, linhas de threads vizinhas podem dividir a mesma linha de cache e gerar tráfego de coerência, um mecanismo que cresce com p, mas os dados não o isolam. A célula isolada em $p=2$ e carga média destoa do entorno; com apenas uma repetição, indica variação, não ganho.
 
 \begin{figure}[H]\centering
@@ -261,12 +269,22 @@ O diagrama geral combina trabalho e recursos. Um programa é escalável, no sent
 \label{fig:geral}
 \end{figure}
 
+\newpage
 \subsection{Comparação entre versões}
-Da estratégia com barreiras para a de ponteiros privados, só sai a barreira do \texttt{single} por passo. Trabalho por thread e distribuição \texttt{static} ficam iguais. A barreira do \texttt{omp for} permanece, imposta pela dependência RAW; o que sai são 500 sincronizações adicionais da troca compartilhada. Da de ponteiros privados para SIMD, só entra o \texttt{omp simd} no laço interno. Compiladores vetorizadores identificam laços vetorizáveis sozinhos, de modo que a diretiva pode não alterar o código gerado; sem o relatório de vetorização, não dá para dizer qual código vetorial o compilador emitiu. Da SIMD para inicialização paralela, só a escrita inicial passa a ser distribuída. A inicialização serial é a fração inerentemente serial do programa: distribuí-la reduz o teto do speedup do total e, sob first touch, desloca a colocação das páginas; sem dados de afinidade por página, não dá para creditar diferença à localidade NUMA. Apesar da expectativa de destaque para o SIMD ou a inicialização, as seis figuras mostram o mesmo padrão nas quatro versões.
+\begin{table}[H]\centering\small
+\begin{tabular}{p{2.4cm}p{4.0cm}p{4.0cm}p{4.0cm}}\hline
+Transição & O que muda & Efeito esperado & Observado\\\hline
+Barreiras $\to$ ponteiros privados & Sai a barreira do \texttt{single}; ficam trabalho por thread, \texttt{static} e a barreira do \texttt{omp for} (RAW). & Menos 500 sincronizações por execução. & Mesmo padrão nos mapas; sem evolução separada, o ganho não se distingue.\\
+Ponteiros privados $\to$ SIMD & Entra \texttt{omp simd} no laço interno. & Vetorização explícita do laço de células. & Sem relatório de vetorização, sem efeito visível; o compilador pode já vetorizar sozinho.\\
+SIMD $\to$ inicialização paralela & A escrita inicial dos dois campos passa ao laço distribuído. & Menor fração serial e first touch distribuído. & Sem evolução separada e sem dados de páginas, sem atribuição a NUMA.\\\hline
+\end{tabular}
+\caption{Transições entre estratégias: mudança, efeito esperado e observado.}
+\label{tab:transicoes}
+\end{table}
 
 \appendix\newpage
 \section{Código-fonte}
-A atualização executada em cada célula é a mesma nas quatro versões:
+Os arquivos \texttt{v1\_barriers.c} (barreiras), \texttt{v2\_private.c} (ponteiros privados), \texttt{v3\_simd.c} (SIMD) e \texttt{v4\_numa.c} (inicialização paralela) compartilham \texttt{main()}, medição com \texttt{omp\_get\_wtime()}, exportação e a aritmética do stencil. A atualização executada em cada célula é a mesma nas quatro versões:
 \begin{lstlisting}[caption={Núcleo comum do stencil.}]
 size_t c = (size_t)i*n+j;
 v[c] = u[c] + r * (u[c-1]+u[c+1]+u[c-n]+u[c+n]-4*u[c]);
