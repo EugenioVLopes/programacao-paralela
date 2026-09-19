@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tarefa 13 — Afinidade de threads no NPAD</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+  <script>
+    function applyMath() {
+      if (window.renderMathInElement) renderMathInElement(document.body, {
+        delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}],
+        throwOnError: false
+      });
+    }
+    document.addEventListener('DOMContentLoaded', applyMath);
+  </script>
+</head>
+<body>
+  <nav class="top-nav"><a href="../index.html">Todas as tarefas</a><a href="../index.html">Índice das tarefas</a></nav>
+  <header>
+    <div class="lesson-badge">DCA3703 · UFRN · Tarefa 13</div>
+    <h1>Afinidade de threads e NUMA</h1>
+    <p>Mesmo código da tarefa 12; quatro novas configurações mostram como a colocação das threads muda a escalabilidade.</p>
+  </header>
+  <main>
+    <section id="objetivo">
+      <h2>O que será avaliado</h2>
+      <p>Enunciado dos slides: avaliar como a escalabilidade do código de difusão muda com os tipos de afinidade suportados pelo sistema operacional e pelo OpenMP, no mesmo nó usado na tarefa 12. Não há novo modelo físico: continua a difusão escalar $\partial_t u=\nu\nabla^2u$ com $r=0{,}02$, contorno Dirichlet fixo e $W=(N-2)^2M$ atualizações.</p>
+      <p>Base de código: a versão <a href="../tarefa12/v4_numa.c"><code>v4_numa.c</code></a> da <a href="0012-tarefa12-escalabilidade-npad.html">tarefa 12</a>, com ponteiros privados, SIMD e <em>first touch</em> paralelo. O hash do fonte permaneceu igual ao da campanha anterior; o job alterou apenas <code>OMP_PROC_BIND</code>, <code>OMP_PLACES</code> e o número de threads. Fonte primária: slides da disciplina, seção de afinidade OpenMP.</p>
+      <div class="callout"><strong>Campanha concluída:</strong> o job 2107610 produziu quatro JSONs PaScal no nó <code>r2n19</code>. A Tarefa 12 usou <code>r2n04</code>; os nós têm a mesma CPU e topologia, mas não são a mesma máquina física. A comparação interna das quatro afinidades é válida, enquanto a comparação numérica direta com a Tarefa 12 fica fora do escopo.</div>
+      <p><a href="../tarefa13/relatorio.pdf">Relatório T13</a> · <a href="../tarefa13/README.md">Execução no NPAD</a> · <a href="../tarefa12/v4_numa.c">Código reutilizado</a> · <a href="#referencia-rapida">Referência rápida</a></p>
+    </section>
+    <section id="teoria">
+      <h2>Hardware: por que o lugar da thread importa</h2>
+      <p>Em Pacheco, cap. 2, sistemas MIMD de memória compartilhada dividem-se em UMA e NUMA: no primeiro, todo acesso custa o mesmo; no segundo, cada processador tem um bloco local e acessa o bloco remoto por hardware especial, mais devagar (Pacheco, § 2.3.2). Programar NUMA exige atenção à colocação de dados e threads; o ganho potencial é o acesso local mais rápido.</p>
+      <p>O gargalo de von Neumann e o Memory Wall explicam o resto: a CPU espera pela hierarquia L1/L2/L3 e DRAM. Caches exploram localidade temporal e espacial trazendo linhas contíguas (tipicamente 64 bytes, oito <code>double</code>) e distinguindo acerto de falta (Pacheco, § 2.2.1). Escritas usam write-through (propaga de imediato) ou write-back (marca a linha como dirty e adia a escrita); cópias incompatíveis são invalidadas (Pacheco, § 2.3.4).</p>
+      <p>A coerência pode usar snooping (difusão para todos, bom em barramento pequeno) ou diretório (só os detentores da linha são contactados, escalável). Como o hardware opera em linhas e não em variáveis, threads que escrevem posições distintas da mesma linha sofrem falso compartilhamento: invalidações contínuas sem compartilhamento real (Pacheco, § 2.3.4). No stencil, blocos contíguos por linhas limitam esse efeito às fronteiras; vizinhos lidos entre threads são compartilhamento verdadeiro, não falso.</p>
+      <p>Dependência RAW impõe a barreira temporal: o passo $k+1$ lê o passo $k$, então a barreira do <code>omp for</code> é obrigatória. O Power Wall limita frequência sob carga térmica; migrar threads muda quais núcleos aquecem e qual clock sustentado aparece. Nada disso é controlado pelo programa diretamente: afinidade só decide a colocação, o hardware decide latência e coerência.</p>
+    </section>
+    <section id="metricas">
+      <h2>Modelagem: mesmas métricas da tarefa 12</h2>
+      <p>$$S(p)=\frac{T(1)}{T(p)},\qquad E(p)=\frac{S(p)}{p}.$$</p>
+      <p>Escalabilidade forte fixa $W$ e varia $p$; fraca usual cresce $W$ com $p$. Os modelos de Pacheco cap. 2 formalizam os tetos: Amdahl para trabalho fixo, $1/[f+(1-f)/p]$, e escalabilidade/gustafson para trabalho ampliado (Pacheco, §§ 2.6.1–2.6.3).</p>
+      <p>Regra de leitura: compare a mesma versão, mesmo $N$, mesmo $M$, mesmas flags, variando só $(p, \text{afinidade})$. Trocar afinidade não muda $W$ nem o algoritmo; se o tempo muda, a causa está em migração, localidade NUMA ou contenção de cache — não em "otimização" do kernel.</p>
+    </section>
+    <section id="afinidade">
+      <h2>Afinidade na prática: OpenMP e sistema operacional</h2>
+      <p>Pacheco (2011) não cobre <code>OMP_PROC_BIND</code>/<code>OMP_PLACES</code> (afinidade OpenMP 4+); a referência é a especificação OpenMP e os slides. Valores dos slides:</p>
+      <table>
+        <thead><tr><th>Configuração</th><th>Efeito</th><th>Quando testar</th></tr></thead>
+        <tbody>
+          <tr><td><code>OMP_PROC_BIND=false</code></td><td>Sem afinidade; SO pode migrar threads</td><td>Base com migração livre</td></tr>
+          <tr><td><code>OMP_PROC_BIND=true</code></td><td>Thread presa onde foi criada</td><td>Estabilidade mínima</td></tr>
+          <tr><td><code>OMP_PROC_BIND=close</code></td><td>Threads próximas da master</td><td>Um socket, cache compartilhado</td></tr>
+          <tr><td><code>OMP_PROC_BIND=spread</code></td><td>Threads espalhadas</td><td>Dois sockets, banda agregada</td></tr>
+          <tr><td><code>OMP_PROC_BIND=master</code></td><td>Todas seguem a thread 0</td><td>Diagnóstico de contenção apenas</td></tr>
+        </tbody>
+      </table>
+      <p>Granularidade com <code>OMP_PLACES</code>: <code>cores</code>, <code>threads</code>, <code>sockets</code> ou lista explícita como <code>"{0:8:1},{8:8:1}"</code>. No NPAD, confirmar topologia com <code>lscpu</code>, <code>numactl --hardware</code> e cpuset do job; registrar <code>OMP_DISPLAY_ENV=TRUE</code>. Para controle do SO, <code>taskset</code> e <code>numactl --cpunodebind --membind</code> prendem processo e memória; afinidade OpenMP distribui as threads dentro do conjunto alocado.</p>
+      <pre><code>export OMP_NUM_THREADS=16 OMP_DISPLAY_ENV=VERBOSE
+export OMP_PROC_BIND=false; unset OMP_PLACES
+./v4_numa 1026 500 0
+export OMP_PROC_BIND=close OMP_PLACES=cores
+./v4_numa 1026 500 0
+export OMP_PROC_BIND=close OMP_PLACES=threads
+./v4_numa 1026 500 0
+export OMP_PROC_BIND=spread OMP_PLACES=threads
+./v4_numa 1026 500 0</code></pre>
+      <p>Interação com <em>first touch</em>: páginas tendem ao domínio que as escreve primeiro. A versão v4 inicializa e evolui os campos com distribuição estática, de modo que a afinidade adotada acompanha as duas fases. Isso reduz uma fonte de confusão, mas não mede diretamente migrações, acessos NUMA remotos ou tráfego de cache.</p>
+    </section>
+    <section id="pratica">
+      <h2>O que foi executado</h2>
+      <p>O job 2107610 usou exclusivamente um nó <code>amd-512</code> com dois AMD EPYC 7713, 128 núcleos físicos, SMT2, 256 CPUs lógicas e oito domínios NUMA. O Slurm forneceu o cpuset <code>0-63,128-191</code>. A compilação manteve C11, <code>-O2</code>, <code>-fopenmp</code>, avisos estritos, <code>-ffp-contract=off</code> e instrumentação manual do PaScal.</p>
+      <p>Cada afinidade cruzou $p=1,2,4,8,16,32,64$ com sete cargas de 262.144 a 16.777.216 células internas: 49 pontos por JSON e uma repetição por ponto. O Viewer analisou <em>Whole Program (Region 0)</em>, que inclui alocação, inicialização e evolução. Sem repetições adicionais, não há mediana nem dispersão; diferenças pequenas e células isoladas devem ser lidas com cautela.</p>
+      <p>As quatro configurações novas foram: sem binding, <code>close+cores</code>, <code>close+threads</code> e <code>spread+threads</code>. <code>spread+cores</code> já havia sido medido na Tarefa 12 e não foi reanalisado.</p>
+    </section>
+    <section id="resultados">
+      <h2>Resultados no PaScal Viewer</h2>
+      <p>Nos mapas abaixo, as linhas são as contagens de threads e as colunas $i2$–$i7$ são cargas crescentes. Azul indica região relativamente favorável na escala normalizada do Viewer; vermelho indica perda relativa. Esses mapas não mostram segundos nem substituem análises separadas de speedup, eficiência, escalabilidade forte ou fraca.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;align-items:start;">
+        <figure><img src="../tarefa13/images/v4_numa_false_Scalability_Whole_Program_(Region_0).png" alt="Mapa de escalabilidade sem binding OpenMP" style="width:100%;"><figcaption>Sem binding: mapa irregular nas cargas maiores.</figcaption></figure>
+        <figure><img src="../tarefa13/images/v4_numa_close_cores_Scalability_Whole_Program_(Region_0).png" alt="Mapa de escalabilidade close com cores" style="width:100%;"><figcaption><code>close+cores</code>: a faixa favorável avança com mais threads.</figcaption></figure>
+        <figure><img src="../tarefa13/images/v4_numa_close_threads_Scalability_Whole_Program_(Region_0).png" alt="Mapa de escalabilidade close com threads" style="width:100%;"><figcaption><code>close+threads</code>: regiões mistas nas cargas maiores.</figcaption></figure>
+        <figure><img src="../tarefa13/images/v4_numa_spread_threads_Scalability_Whole_Program_(Region_0).png" alt="Mapa de escalabilidade spread com threads" style="width:100%;"><figcaption><code>spread+threads</code>: todas as células ficaram na faixa azul.</figcaption></figure>
+      </div>
+      <p><code>spread+threads</code> apresentou o mapa mais uniforme entre as quatro novas execuções. As configurações sem binding e com <code>close</code> alternaram faixas favoráveis e desfavoráveis, sobretudo nas cargas maiores e em valores intermediários de $p$. A distribuição mais ampla das threads é compatível com o padrão observado, mas o experimento não prova saturação de memória, redução de acessos NUMA remotos nem outra causa microarquitetural específica.</p>
+    </section>
+    <section id="quizzes">
+      <h2>Verifique sua compreensão</h2>
+      <p>Escolha uma alternativa e abra a resposta. Em cada questão, as quatro alternativas têm a mesma contagem de palavras e caracteres.</p>
+      <fieldset><legend>1. Qual configuração OpenMP espalha threads pelos núcleos disponíveis?</legend>
+        <p><label><input type="radio" name="r1"> Usar OMP_PROC_BIND igual spread.</label></p>
+        <p><label><input type="radio" name="r1"> Usar OMP_PROC_BIND igual master.</label></p>
+        <p><label><input type="radio" name="r1"> Usar OMP_PROC_BIND igual close!.</label></p>
+        <p><label><input type="radio" name="r1"> Usar OMP_PROC_BIND igual false!.</label></p>
+        <details><summary>Conferir resposta</summary><p>A primeira: spread distribui entre núcleos e sockets.</p></details>
+      </fieldset>
+      <fieldset><legend>2. Em nó NUMA, o que distingue acesso local de acesso remoto?</legend>
+        <p><label><input type="radio" name="r2"> Local usa bloco direto; remoto atravessa outro chip.</label></p>
+        <p><label><input type="radio" name="r2"> Local usa disco direto; remoto atravessa outro cabo.</label></p>
+        <p><label><input type="radio" name="r2"> Local usa vetor direto; remoto atravessa outro laço.</label></p>
+        <p><label><input type="radio" name="r2"> Local usa cache direto; remoto atravessa outro nodo.</label></p>
+        <details><summary>Conferir resposta</summary><p>A primeira: NUMA tem tempos diferentes por distância física.</p></details>
+      </fieldset>
+      <fieldset><legend>3. Qual efeito é esperado do first touch paralelo?</legend>
+        <p><label><input type="radio" name="r3"> Aproximar páginas das threads escritoras.</label></p>
+        <p><label><input type="radio" name="r3"> Aproximar núcleos das threads escritoras.</label></p>
+        <p><label><input type="radio" name="r3"> Aproximar vetores das threads escritoras.</label></p>
+        <p><label><input type="radio" name="r3"> Aproximar buffers das threads escritoras.</label></p>
+        <details><summary>Conferir resposta</summary><p>A primeira: o first touch tende a colocar cada página perto da thread que a escreveu.</p></details>
+      </fieldset>
+      <fieldset><legend>4. Com T(1)=1,2 s e T(6)=0,4 s, quais são S e E?</legend>
+        <p><label><input type="radio" name="r4"> Speedup 1,0; eficiência 17%.</label></p>
+        <p><label><input type="radio" name="r4"> Speedup 3,0; eficiência 50%.</label></p>
+        <p><label><input type="radio" name="r4"> Speedup 2,0; eficiência 33%.</label></p>
+        <p><label><input type="radio" name="r4"> Speedup 6,0; eficiência 25%.</label></p>
+        <details><summary>Conferir resposta</summary><p>A segunda: S=1,2/0,4=3 e E=3/6=0,5.</p></details>
+      </fieldset>
+    </section>
+    <section id="fontes">
+      <h2>Fontes e material de execução</h2>
+      <p>Enunciado e políticas: slides da disciplina (afinidade OpenMP, PLACES). Base em P. Pacheco, <em>An Introduction to Parallel Programming</em> (2011), cap. 2: NUMA/UMA (§ 2.3.2), cache (§ 2.2.1), coerência e falso compartilhamento (§ 2.3.4), desempenho (§§ 2.6.1–2.6.3). Evidência experimental: quatro JSONs do job 2107610 e quatro mapas de escalabilidade exportados do PaScal Viewer.</p>
+    </section>
+    <section id="referencia-rapida">
+      <h2>Apêndice: Referência rápida</h2>
+      <table>
+        <thead><tr><th>Variável / ferramenta</th><th>Sintaxe</th><th>Regra prática</th></tr></thead>
+        <tbody>
+          <tr><td><code>OMP_NUM_THREADS</code></td><td><code>export OMP_NUM_THREADS=16</code></td><td>Fixar p por ponto; cobrir até núcleos físicos.</td></tr>
+          <tr><td><code>OMP_PROC_BIND</code></td><td><code>false|true|close|spread|master</code></td><td>Comparar close contra spread no mesmo p.</td></tr>
+          <tr><td><code>OMP_PLACES</code></td><td><code>cores|threads|sockets|"{0:8:1},..."</code></td><td>Granularidade da amarração das threads.</td></tr>
+          <tr><td><code>OMP_DISPLAY_ENV</code></td><td><code>export OMP_DISPLAY_ENV=TRUE</code></td><td>Registrar afinidade efetiva no log.</td></tr>
+          <tr><td><code>lscpu</code>, <code>numactl</code></td><td><code>numactl --hardware</code></td><td>Evidência de sockets, núcleos e nós.</td></tr>
+          <tr><td><code>taskset</code></td><td><code>taskset -c 0-15 ./prog</code></td><td>Prender processo no SO quando preciso.</td></tr>
+        </tbody>
+      </table>
+      <p><strong>Resumo executivo:</strong> $S=T(1)/T(p)$; $E=S/p$; Amdahl $1/[f+(1-f)/p]$; NUMA local &lt; remoto; first touch decide o domicílio das páginas; afinidade decide o domicílio das threads; medir o par antes de concluir.</p>
+    </section>
+  </main>
+  <footer class="footer-nav"><a href="0012-tarefa12-escalabilidade-npad.html">← Tarefa 12</a><a href="../index.html">Índice das tarefas</a></footer>
+</body>
+</html>

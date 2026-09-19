@@ -1,0 +1,4 @@
+b2ae88e3dc229a892a93e079c1b175365088ed87ce6fec37b91bb9f70b77682f  /home/evldsantos/tarefa12/v4_numa.c
+ade6c23e20a3e9743a254c912be4a78d1718a8542f294da4888f0b39fcbe20b5  /home/evldsantos/tarefa12/build.sh
+89779ea494362032bd9dcc44dae5f38fd1958578c570bc0b2dc43e550f91eb46  /home/evldsantos/tarefa12/pascal.slurm
+0d36ee63b994585fe5e23da69b03c45c59f74219bc7f800d55b8ab11a0cb62d5  /home/evldsantos/tarefa13/afinidade.slurm

@@ -97,3 +97,6 @@ Thumbs.db
 /tarefa12/build/
 /tarefa12/runs/
 /tarefa12/*.bin
+
+# Tarefa 13: preservar JSONs/metadados, ignorar apenas binarios compilados
+/tarefa13/runs/**/bin/
