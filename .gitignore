@@ -3,6 +3,9 @@
 .codebase-memory/
 .pi/
 skills-lock.json
+.impeccable/
+.serena/
+assets/
 
 # Binaries and Object files
 *.o
@@ -61,6 +64,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 .venv/
+.venv-docling/
 venv/
 env/
 
@@ -100,3 +104,5 @@ Thumbs.db
 
 # Tarefa 13: preservar JSONs/metadados, ignorar apenas binarios compilados
 /tarefa13/runs/**/bin/
+/tarefa13/runs/**/build.txt
+/tarefa13/runs/**/job.txt
