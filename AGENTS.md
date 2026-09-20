@@ -1,5 +1,13 @@
 # Diretrizes para agentes (DCA3703)
 
+## Escopo mínimo para novas tarefas
+
+- Implementar somente o que o enunciado pede, com o código mais simples que atende a todos os requisitos explícitos.
+- Reutilizar bibliotecas e padrões já presentes; evitar variantes, opções de linha de comando, wrappers, scripts, arquivos e abstrações sem necessidade demonstrada.
+- Manter apenas validações e tratamento de falhas necessários para a execução correta e para não perder resultados.
+- Não acrescentar funcionalidades, análises ou artefatos opcionais por iniciativa própria. Se algo extra parecer útil, explicar o motivo e pedir aprovação antes de implementar; o usuário também pode solicitá-lo depois.
+- Em relatórios, descrever o experimento realmente executado e preservar os dados originais. Não exigir uma nova medição apenas por simplificações que não alteram a lógica do cálculo.
+
 Este repositório contém as implementações e análises de desempenho das atividades práticas da disciplina DCA3703 (Programação Paralela) da UFRN, ministrada pelo Prof. Samuel Xavier de Souza.
 
 ## 1. Regra para o fluxo de ensino (/teach)
