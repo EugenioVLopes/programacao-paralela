@@ -2,6 +2,7 @@
 .agents/
 .codebase-memory/
 .pi/
+.codex/
 skills-lock.json
 .impeccable/
 .serena/
@@ -106,3 +107,6 @@ Thumbs.db
 /tarefa13/runs/**/bin/
 /tarefa13/runs/**/build.txt
 /tarefa13/runs/**/job.txt
+
+# Tarefa 14
+/tarefa14/tarefa14

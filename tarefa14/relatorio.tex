@@ -1,0 +1,112 @@
+\documentclass[11pt,letterpaper]{article}
+\usepackage{../assets/scientific_report}
+\usepackage[brazil]{babel}
+\usepackage{amsmath,float,listings,xcolor,geometry,pgfplots}
+\pgfplotsset{compat=1.18}
+\geometry{headheight=23pt,top=2cm,bottom=2cm,left=2.5cm,right=2.5cm}
+\setlength{\parskip}{0.5em}
+\setlength{\parindent}{0pt}
+\lstset{language=C,basicstyle=\ttfamily\footnotesize,keywordstyle=\color{blue}\bfseries,commentstyle=\color{green!60!black},numbers=left,numberstyle=\tiny\color{gray},numbersep=8pt,frame=single,breaklines=true,showstringspaces=false}
+
+\begin{document}
+\pagestyle{plain}
+\begin{center}
+{\LARGE\bfseries Programação em memória distribuída}\\[0.4em]
+{\normalsize Eugenio Vitor Lopes dos Santos}\\[0.3em]
+{\small DCA3703, Programação Paralela, Universidade Federal do Rio Grande do Norte}
+\end{center}
+
+\section{Enunciado}
+Implementar uma troca de mensagens com exatamente dois processos MPI: o processo 0 envia uma mensagem ao processo 1, que responde com a mesma mensagem. Medir com \texttt{MPI\_Wtime} o tempo de múltiplas trocas consecutivas para tamanhos de 8 bytes a pelo menos 1 MB. Representar graficamente o tempo em função do tamanho e identificar as regiões dominadas pela latência e pelo custo de transferir os bytes.
+
+\section{Fundamentação}
+No MPI, cada processo possui seu próprio espaço de endereçamento. As rotinas relevantes para este experimento são:
+
+\subsection{Inicialização e finalização}
+\begin{itemize}
+\item \texttt{MPI\_Init}: inicializa o ambiente MPI antes das demais chamadas.
+\item \texttt{MPI\_Finalize}: encerra o ambiente MPI após a comunicação.
+\end{itemize}
+
+\subsection{Identificação dos processos}
+\begin{itemize}
+\item \texttt{MPI\_Comm\_rank}: informa o rank do processo em \texttt{MPI\_COMM\_WORLD}; aqui, 0 ou 1.
+\item \texttt{MPI\_Comm\_size}: informa quantos processos há nesse comunicador; aqui, exatamente 2.
+\end{itemize}
+
+\subsection{Comunicação ponto a ponto}
+\begin{itemize}
+\item \texttt{MPI\_Send}: envia uma mensagem no modo padrão.
+\item \texttt{MPI\_Recv}: recebe a mensagem correspondente ao envio.
+\end{itemize}
+No ping-pong, o rank 0 envia e depois recebe; o rank 1 recebe e responde com o mesmo buffer. Essa ordem evita deadlock.
+
+\subsection{Outros modos de envio}
+\begin{itemize}
+\item \texttt{MPI\_Bsend}: envia usando um buffer fornecido pela aplicação com \texttt{MPI\_Buffer\_attach}.
+\item \texttt{MPI\_Ssend}: envio síncrono; só conclui depois que o recebimento correspondente começa.
+\end{itemize}
+O programa não usa esses dois modos.
+
+\section{Experimento}
+O job 2109294 foi executado na partição \texttt{intel-512} do NPAD, em um nó identificado no log como \texttt{r1i3n15}. O Slurm reservou duas tarefas, uma CPU por tarefa. O programa foi compilado no job com \texttt{mpicc -std=c11 -O3 -Wall -Wextra} e iniciado com \texttt{mpirun -np 2}. O estado final foi \texttt{COMPLETED}, código \texttt{0:0}, em cinco segundos.
+
+Para cada tamanho, ambos os processos alocam e preenchem um buffer. Uma \texttt{MPI\_Barrier} os sincroniza antes da medida. O processo 0 mede, com \texttt{MPI\_Wtime}, 10\,000 pares consecutivos de \texttt{MPI\_Send}/\texttt{MPI\_Recv}. Alocação, preenchimento, barreira, impressão e finalização do MPI ficam fora do intervalo. O tempo médio é o tempo total dividido por 10\,000 e corresponde à ida e volta completa, não a uma comunicação em apenas uma direção. Houve uma execução por tamanho; não foram medidas repetições independentes nem dispersão.
+
+\section{Resultados}
+A Tabela~\ref{tab:tempos} reproduz os valores do arquivo \texttt{tarefa14-2109294.out}. A Figura~\ref{fig:tempo} representa o tempo médio por troca; como o número de trocas é constante, o tempo total tem a mesma tendência.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{rrr}
+\toprule
+Mensagem (bytes) & Tempo total (s) & Tempo médio por troca ($\mu$s) \\
+\midrule
+8       & 0,006102265 & 0,610 \\
+64      & 0,006119762 & 0,612 \\
+512     & 0,008196224 & 0,820 \\
+4\,096  & 0,048486192 & 4,849 \\
+32\,768 & 0,120328724 & 12,033 \\
+262\,144 & 0,811817241 & 81,182 \\
+1\,048\,576 & 3,030861879 & 303,086 \\
+\bottomrule
+\end{tabular}
+\caption{Medições do job 2109294, com 10\,000 trocas por tamanho.}
+\label{tab:tempos}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{loglogaxis}[
+ width=0.92\textwidth,height=7cm,
+ xlabel={Tamanho da mensagem (bytes)},
+ ylabel={Tempo médio por troca ($\mu$s)},
+ xtick={8,64,512,4096,32768,262144,1048576},
+ xticklabels={8,64,512,4 KiB,32 KiB,256 KiB,1 MiB},
+ x tick label style={rotate=35,anchor=east,font=\small},
+ grid=major,
+ ymin=0.4,ymax=500,
+ xmin=6,xmax=1400000,
+]
+\addplot+[mark=*,thick,color=primaryblue] coordinates {
+ (8,0.610) (64,0.612) (512,0.820) (4096,4.849)
+ (32768,12.033) (262144,81.182) (1048576,303.086)
+};
+\end{loglogaxis}
+\end{tikzpicture}
+\caption{Tempo médio de uma ida e volta em função do tamanho. Ambos os eixos usam escala logarítmica para mostrar os sete pontos.}
+\label{fig:tempo}
+\end{figure}
+
+Entre 8 e 64 bytes, o tempo médio praticamente não muda: é a região em que a latência domina nesta medição. Em 512 bytes já há aumento, mas os sete pontos não localizam precisamente a transição. De 32 KiB a 1 MiB, o tempo cresce com o tamanho da mensagem, indicando maior influência da transferência dos bytes. Como os dois processos foram alocados no mesmo nó, estes dados não demonstram a largura de banda de uma rede entre nós.
+
+\appendix
+\clearpage
+\section*{Anexo A: Código completo}
+\lstinputlisting{tarefa14.c}
+
+\section*{Anexo B: Script Slurm}
+\lstinputlisting[language=bash]{tarefa14.slurm}
+
+\end{document}

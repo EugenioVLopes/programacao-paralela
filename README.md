@@ -33,6 +33,7 @@ Cada tarefa tem um material HTML único com teoria, prática, referência rápid
 | 11 | Particionamento de dados e balanceamento de carga | [Material 11](https://eugeniovlopes.github.io/programacao-paralela/lessons/0011-tarefa11-difusao-schedule.html) · [Extra: visualização 3D](https://eugeniovlopes.github.io/programacao-paralela/lessons/0011-tarefa11-difusao-schedule.html#visualizacao-3d) | [`tarefa11/`](tarefa11/) · [PDF](tarefa11/relatorio.pdf) · [Extras](tarefa11/extras/) |
 | 12 | Escalabilidade no NPAD e PaScal Viewer (em andamento) | [Material 12](https://eugeniovlopes.github.io/programacao-paralela/lessons/0012-tarefa12-escalabilidade-npad.html) | [`tarefa12/`](tarefa12/) e [PDF preliminar](tarefa12/relatorio.pdf) |
 | 13 | Afinidade de threads e NUMA | [Material 13](https://eugeniovlopes.github.io/programacao-paralela/lessons/0013-tarefa13-afinidade-numa.html) · [Referência rápida](https://eugeniovlopes.github.io/programacao-paralela/lessons/0013-tarefa13-afinidade-numa.html#referencia-rapida) | [`tarefa13/`](tarefa13/) · [PDF](tarefa13/relatorio.pdf) · [código-base](tarefa12/v4_numa.c) |
+| 14 | Programação em memória distribuída com MPI | — | [`tarefa14/`](tarefa14/) · [PDF](tarefa14/relatorio.pdf) |
 
 ---
 
