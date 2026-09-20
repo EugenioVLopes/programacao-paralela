@@ -1,0 +1,107 @@
+\documentclass[11pt,letterpaper]{article}
+\usepackage{../assets/scientific_report}
+\usepackage[brazil]{babel}
+\usepackage{amsmath,float,listings,xcolor,geometry,pgfplots}
+\pgfplotsset{compat=1.18}
+\geometry{headheight=23pt,top=2cm,bottom=2cm,left=2.5cm,right=2.5cm}
+\setlength{\parskip}{0.5em}
+\setlength{\parindent}{0pt}
+\lstset{language=C,basicstyle=\ttfamily\footnotesize,keywordstyle=\color{blue}\bfseries,commentstyle=\color{green!60!black},numbers=left,numberstyle=\tiny\color{gray},numbersep=8pt,frame=single,breaklines=true,showstringspaces=false}
+
+\begin{document}
+\pagestyle{plain}
+\begin{center}
+{\LARGE\bfseries Sobreposição de computação e comunicação}\\[0.4em]
+{\normalsize Eugenio Vitor Lopes dos Santos}\\[0.3em]
+{\small DCA3703, Programação Paralela, Universidade Federal do Rio Grande do Norte}
+\end{center}
+
+\section{Enunciado}
+Simular a difusão de calor em uma barra 1D distribuída entre dois ou mais processos MPI, com células extras para trocar as bordas. Comparar três versões: comunicação com \texttt{MPI\_Send} e \texttt{MPI\_Recv}; comunicação não bloqueante com \texttt{MPI\_Isend}, \texttt{MPI\_Irecv} e \texttt{MPI\_Wait}; e uma versão que usa \texttt{MPI\_Test} enquanto calcula os pontos internos.
+
+\section{Fundamentação}
+Cada processo armazena um trecho da barra e duas células fantasma, uma de cada lado. A atualização de uma célula usa seu valor e os valores das duas vizinhas no passo anterior:
+\[
+u_i^{n+1}=u_i^n+0{,}2\left(u_{i-1}^n-2u_i^n+u_{i+1}^n\right).
+\]
+As células das extremidades locais dependem dos valores recebidos dos processos vizinhos. As células estritamente internas não dependem dessa troca e podem ser atualizadas enquanto ela está pendente. Nas extremidades globais da barra, as células fantasma permanecem em zero.
+
+\subsection{Troca bloqueante}
+\texttt{MPI\_Send} e \texttt{MPI\_Recv} trocam as bordas antes de qualquer atualização. O código envia primeiro à direita e recebe da esquerda; em seguida, envia à esquerda e recebe da direita. \texttt{MPI\_PROC\_NULL} representa o vizinho ausente nas extremidades globais.
+
+\subsection{Comunicação ponto-a-ponto não bloqueante}
+As operações não bloqueantes retornam antes de a transferência terminar. Enquanto um recebimento estiver pendente, as células fantasma correspondentes não podem ser usadas no cálculo.
+
+\subsubsection{Escondendo latência com sobreposição de computação e comunicação}
+Após iniciar a troca, o processo pode atualizar as células internas, que não dependem das bordas recebidas. Só depois da conclusão dos recebimentos atualiza as duas extremidades locais. A versão com \texttt{MPI\_Wait} espera antes de calcular; a versão com \texttt{MPI\_Test} consulta os recebimentos durante o cálculo interno. Essa consulta também tem custo.
+
+\subsubsection{Criação de \texttt{MPI\_Request}}
+\begin{itemize}
+\item \texttt{MPI\_Isend}: inicia o envio de uma borda e devolve um \texttt{MPI\_Request} para acompanhar a operação.
+\item \texttt{MPI\_Irecv}: inicia o recebimento de uma borda e devolve um \texttt{MPI\_Request} para acompanhar a operação.
+\end{itemize}
+
+\subsubsection{Consumo de \texttt{MPI\_Request}}
+\begin{itemize}
+\item \texttt{MPI\_Wait}: espera a conclusão da operação associada ao \texttt{MPI\_Request}.
+\item \texttt{MPI\_Test}: verifica se a operação terminou sem bloquear; se ainda estiver pendente, o pedido continua válido.
+\end{itemize}
+
+\section{Experimento}
+O job 2109332 foi executado na partição \texttt{intel-512} do NPAD, com dois processos no mesmo nó, uma CPU por processo. O programa foi compilado com \texttt{mpicc -std=c11 -O3 -Wall -Wextra}. A barra tinha 1\,048\,576 células, distribuídas igualmente; cada processo possuía 524\,288 células locais e duas fantasmas. A metade esquerda começou com temperatura 1, e a metade direita com 0. Foram executados 1\,000 passos com coeficiente 0,2, em cinco execuções do programa.
+
+Em cada execução, as três versões foram medidas nessa ordem, com a mesma condição inicial. O intervalo de \texttt{MPI\_Wtime} abrange os passos da simulação e a barreira final; não inclui alocação, inicialização da barra nem redução da soma final. A soma global foi impressa como verificação simples de consistência entre versões. Para comparar os tempos, usa-se a mediana das cinco execuções.
+
+\section{Resultados}
+\begin{table}[H]
+\centering
+\begin{tabular}{crrr}
+\toprule
+Execução & \texttt{Send/Recv} (s) & \texttt{Isend/Irecv+Wait} (s) & \texttt{Isend/Irecv+Test} (s) \\
+\midrule
+1 & 0,884255 & 0,884492 & 1,550740 \\
+2 & 0,884811 & 0,886287 & 1,544192 \\
+3 & 2,960670 & 2,945100 & 5,853447 \\
+4 & 0,891343 & 0,890119 & 1,561927 \\
+5 & 0,896484 & 0,896494 & 1,564830 \\
+\midrule
+Mediana & 0,891343 & 0,890119 & 1,561927 \\
+\bottomrule
+\end{tabular}
+\caption{Tempos do job 2109332. A soma final impressa foi 524\,272,535328 em todas as versões e execuções.}
+\label{tab:tempos}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    ybar, width=0.9\textwidth, height=6cm,
+    ymin=0, ymax=1.8,
+    ylabel={Mediana do tempo (s)},
+    xtick={1,2,3},
+    xticklabels={\texttt{Send/Recv},\texttt{Isend/Irecv+Wait},\texttt{Isend/Irecv+Test}},
+    x tick label style={font=\small},
+    nodes near coords,
+    grid=major,
+    bar width=28pt
+]
+\addplot+[fill=primaryblue] coordinates {(1,0.891343) (2,0.890119) (3,1.561927)};
+\end{axis}
+\end{tikzpicture}
+\caption{Mediana das cinco execuções para cada versão.}
+\label{fig:medianas}
+\end{figure}
+
+As medianas das versões bloqueante e não bloqueante seguida de espera diferem em cerca de 0,14\%, sem ganho relevante nesta medição. A versão com \texttt{MPI\_Test} teve mediana aproximadamente 75\% maior que a bloqueante: a sobreposição implementada não trouxe ganho neste caso. Uma hipótese é que o custo dos testes periódicos e sua interação com o cálculo superem o tempo de comunicação ocultado; este experimento não isolou esses custos. Cada borda contém apenas um \texttt{double} (8 bytes) e os processos estavam no mesmo nó, condições que podem limitar o benefício da sobreposição.
+
+A terceira execução foi mais lenta nas três versões. A tabela a mantém, e a mediana reduz sua influência na comparação; os dados não permitem determinar sua causa. A soma final igual é uma verificação global, não uma comparação célula a célula.
+
+\appendix
+\clearpage
+\section*{Anexo A: Código completo}
+\lstinputlisting{tarefa15.c}
+
+\section*{Anexo B: Script Slurm}
+\lstinputlisting[language=bash]{tarefa15.slurm}
+\end{document}
