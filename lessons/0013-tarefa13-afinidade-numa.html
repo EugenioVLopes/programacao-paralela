@@ -31,7 +31,7 @@
       <p>Enunciado dos slides: avaliar como a escalabilidade do código de difusão muda com os tipos de afinidade suportados pelo sistema operacional e pelo OpenMP, no mesmo nó usado na tarefa 12. Não há novo modelo físico: continua a difusão escalar $\partial_t u=\nu\nabla^2u$ com $r=0{,}02$, contorno Dirichlet fixo e $W=(N-2)^2M$ atualizações.</p>
       <p>Base de código: a versão <a href="../tarefa12/v4_numa.c"><code>v4_numa.c</code></a> da <a href="0012-tarefa12-escalabilidade-npad.html">tarefa 12</a>, com ponteiros privados, SIMD e <em>first touch</em> paralelo. O hash do fonte permaneceu igual ao da campanha anterior; o job alterou apenas <code>OMP_PROC_BIND</code>, <code>OMP_PLACES</code> e o número de threads. Fonte primária: slides da disciplina, seção de afinidade OpenMP.</p>
       <div class="callout"><strong>Campanha concluída:</strong> o job 2107610 produziu quatro JSONs PaScal no nó <code>r2n19</code>. A Tarefa 12 usou <code>r2n04</code>; os nós têm a mesma CPU e topologia, mas não são a mesma máquina física. A comparação interna das quatro afinidades é válida, enquanto a comparação numérica direta com a Tarefa 12 fica fora do escopo.</div>
-      <p><a href="../tarefa13/relatorio.pdf">Relatório T13</a> · <a href="../tarefa13/README.md">Execução no NPAD</a> · <a href="../tarefa12/v4_numa.c">Código reutilizado</a> · <a href="#referencia-rapida">Referência rápida</a></p>
+      <p><a href="../tarefa13/relatorio.pdf">Relatório T13</a> · <a href="../tarefa13/afinidade.slurm">Script Slurm</a> · <a href="../tarefa12/v4_numa.c">Código reutilizado</a> · <a href="#referencia-rapida">Referência rápida</a></p>
     </section>
     <section id="teoria">
       <h2>Hardware: por que o lugar da thread importa</h2>
