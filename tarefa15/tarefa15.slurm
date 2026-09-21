@@ -1,7 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=tarefa15
 #SBATCH --output=tarefa15-%j.out
+#SBATCH --nodes=2
 #SBATCH --ntasks=2
+#SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
 #SBATCH --time=00:10:00
 #SBATCH --partition=intel-512

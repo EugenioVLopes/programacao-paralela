@@ -3,6 +3,7 @@
 \usepackage[brazil]{babel}
 \usepackage{amsmath,float,listings,xcolor,geometry,pgfplots}
 \pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows.meta}
 \geometry{headheight=23pt,top=2cm,bottom=2cm,left=2.5cm,right=2.5cm}
 \setlength{\parskip}{0.5em}
 \setlength{\parindent}{0pt}
@@ -26,11 +27,43 @@ u_i^{n+1}=u_i^n+0{,}2\left(u_{i-1}^n-2u_i^n+u_{i+1}^n\right).
 \]
 As células das extremidades locais dependem dos valores recebidos dos processos vizinhos. As células estritamente internas não dependem dessa troca e podem ser atualizadas enquanto ela está pendente. Nas extremidades globais da barra, as células fantasma permanecem em zero.
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm,>=Stealth,font=\small,
+    cell/.style={draw,minimum height=9mm,minimum width=13mm},
+    ghost/.style={cell,dashed,fill=gray!12},
+    edge/.style={cell,fill=orange!20},
+    inner/.style={cell,fill=blue!10}]
+\node at (0,1.25) {Vizinho esquerdo};
+\node at (5.4,1.25) {Memória local do processo: \texttt{current}};
+\node at (10.8,1.25) {Vizinho direito};
+\node[cell] (left) at (0,0) {$u_m^n$};
+\node[ghost] (gleft) at (2,0) {$0$};
+\node[edge] at (3.3,0) {$1$};
+\node[inner,minimum width=29mm] at (5.4,0) {$2,\ldots,m-1$};
+\node[edge] at (7.5,0) {$m$};
+\node[ghost] (gright) at (8.8,0) {$m+1$};
+\node[cell] (right) at (10.8,0) {$u_1^n$};
+\draw[->,thick] (left) -- (gleft);
+\draw[->,thick] (right) -- (gright);
+\node[align=center] at (2,-1) {Fantasma\\recebida};
+\node[align=center] at (5.4,-1) {Interior: pode calcular\\durante a comunicação};
+\node[align=center] at (8.8,-1) {Fantasma\\recebida};
+\node[align=center,text width=12cm] at (5.4,-2.15)
+    {Bordas locais $1$ e $m$: calcular após concluir os recebimentos.\\
+     Enviar \texttt{current[1]} à esquerda e \texttt{current[m]} à direita.};
+\end{tikzpicture}
+\caption{Índices locais, com $m=\texttt{count}$. As setas mostram os recebimentos de um processo com dois vizinhos; cada mensagem contém um \texttt{double}. Nas extremidades globais, o vizinho ausente é \texttt{MPI\_PROC\_NULL} e a célula fantasma permanece em zero.}
+\label{fig:halos}
+\end{figure}
+
+Na Figura~\ref{fig:halos}, atualizar $i=1$ exige ler \texttt{current[0]}, enquanto atualizar $i=m$ exige ler \texttt{current[m+1]}. Para $2\leq i\leq m-1$, os três valores necessários já pertencem ao processo. Todas as atualizações leem \texttt{current} e escrevem em \texttt{next}; assim, nenhum valor do passo $n$ é substituído por um valor do passo $n+1$ durante o cálculo.
+
 \subsection{Troca bloqueante}
 \texttt{MPI\_Send} e \texttt{MPI\_Recv} trocam as bordas antes de qualquer atualização. O código envia primeiro à direita e recebe da esquerda; em seguida, envia à esquerda e recebe da direita. \texttt{MPI\_PROC\_NULL} representa o vizinho ausente nas extremidades globais.
 
-\subsection{Comunicação ponto-a-ponto não bloqueante}
-As operações não bloqueantes retornam antes de a transferência terminar. Enquanto um recebimento estiver pendente, as células fantasma correspondentes não podem ser usadas no cálculo.
+\subsection{Comunicação ponto a ponto não bloqueante}
+As operações não bloqueantes retornam sem exigir que a transferência esteja concluída. Enquanto um recebimento estiver pendente, as células fantasma correspondentes não podem ser usadas no cálculo.
 
 \subsubsection{Escondendo latência com sobreposição de computação e comunicação}
 Após iniciar a troca, o processo pode atualizar as células internas, que não dependem das bordas recebidas. Só depois da conclusão dos recebimentos atualiza as duas extremidades locais. A versão com \texttt{MPI\_Wait} espera antes de calcular; a versão com \texttt{MPI\_Test} consulta os recebimentos durante o cálculo interno. Essa consulta também tem custo.
@@ -47,8 +80,46 @@ Após iniciar a troca, o processo pode atualizar as células internas, que não 
 \item \texttt{MPI\_Test}: verifica se a operação terminou sem bloquear; se ainda estiver pendente, o pedido continua válido.
 \end{itemize}
 
+\subsection{Ordem das operações em cada passo}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm,>=Stealth,font=\footnotesize,
+    block/.style={draw,align=center,minimum height=11mm,text width=26mm},
+    comm/.style={block,fill=orange!20},
+    calc/.style={block,fill=blue!10}]
+\draw[->] (0,0.8) -- (13.8,0.8) node[pos=0.5,above] {Ordem de execução (sem escala de tempo)};
+\node[anchor=west,font=\small\bfseries] at (0,0) {Send/Recv};
+\node[comm] (b1) at (4,0) {Trocar bordas\\Send/Recv};
+\node[calc,text width=39mm] (b2) at (8.2,0) {Calcular todas as células\\$1,\ldots,m$};
+\node[block,text width=19mm] (b3) at (12.5,0) {Trocar\\ponteiros};
+\draw[->] (b1) -- (b2); \draw[->] (b2) -- (b3);
+\node[anchor=west,font=\small\bfseries,align=left] at (0,-1.7) {Isend/Irecv\\+ Wait};
+\node[comm,text width=19mm] (w1) at (3.5,-1.7) {Iniciar\\4 operações};
+\node[comm,text width=19mm] (w2) at (6.1,-1.7) {Wait nos\\4 pedidos};
+\node[calc] (w3) at (9.1,-1.7) {Calcular tudo\\$1,\ldots,m$};
+\node[block,text width=19mm] (w4) at (12.5,-1.7) {Trocar\\ponteiros};
+\draw[->] (w1) -- (w2); \draw[->] (w2) -- (w3); \draw[->] (w3) -- (w4);
+\node[anchor=west,font=\small\bfseries,align=left] at (0,-3.6) {Isend/Irecv\\+ Test};
+\node[comm,text width=19mm] (t1) at (3.5,-3.6) {Iniciar\\4 operações};
+\node[calc] (t2) at (6.5,-3.6) {Calcular interior\\+ Test periódico};
+\node[comm] (t3) at (10,-3.6) {Wait se recepção\\ainda pendente};
+\node[calc] (t4) at (10,-5.1) {Calcular bordas\\$1$ e $m$};
+\node[comm] (t5) at (6.5,-5.1) {Wait nos\\2 envios};
+\node[block,text width=19mm] (t6) at (3.5,-5.1) {Trocar\\ponteiros};
+\draw[->] (t1) -- (t2); \draw[->] (t2) -- (t3);
+\draw[->] (t3) -- (t4); \draw[->] (t4) -- (t5); \draw[->] (t5) -- (t6);
+\end{tikzpicture}
+\caption{Sequência implementada pelas três versões. Na terceira, seguir as setas até a linha inferior. O cálculo interno oferece uma oportunidade de sobreposição; o diagrama não representa durações medidas nem garante progresso simultâneo das transferências.}
+\label{fig:sequencia}
+\end{figure}
+
+Na versão com \texttt{MPI\_Wait}, os quatro pedidos são concluídos antes da primeira atualização. Na versão com \texttt{MPI\_Test}, o laço calcula $i=2,\ldots,m-1$ e consulta os recebimentos ainda pendentes quando \texttt{i \% 1024 == 0}. O teste informa a conclusão por uma flag; se ela continuar falsa ao terminar o interior, \texttt{MPI\_Wait} garante que a célula fantasma esteja pronta antes do cálculo das bordas.
+
+Os pedidos \texttt{requests[0]} e \texttt{requests[1]} acompanham os recebimentos; os pedidos \texttt{requests[2]} e \texttt{requests[3]}, os envios. Enquanto um envio estiver pendente, seu buffer em \texttt{current} não pode ser alterado. Escrever os resultados em \texttt{next} permite calcular sem modificar esse buffer. A espera pelos envios ao final libera sua reutilização nos passos seguintes; só então o programa troca os ponteiros dos dois vetores.
+
 \section{Experimento}
-O job 2109332 foi executado na partição \texttt{intel-512} do NPAD, com dois processos no mesmo nó, uma CPU por processo. O programa foi compilado com \texttt{mpicc -std=c11 -O3 -Wall -Wextra}. A barra tinha 1\,048\,576 células, distribuídas igualmente; cada processo possuía 524\,288 células locais e duas fantasmas. A metade esquerda começou com temperatura 1, e a metade direita com 0. Foram executados 1\,000 passos com coeficiente 0,2, em cinco execuções do programa.
+O job 2109344 foi executado na partição \texttt{intel-512} do NPAD, com dois processos em nós distintos, uma CPU por processo. O programa foi compilado com \texttt{mpicc -std=c11 -O3 -Wall -Wextra}. A barra tinha 1\,048\,576 células, distribuídas igualmente; cada processo possuía 524\,288 células locais e duas fantasmas. A metade esquerda começou com temperatura 1, e a metade direita com 0. Foram executados 1\,000 passos com coeficiente 0,2, em cinco execuções do programa.
 
 Em cada execução, as três versões foram medidas nessa ordem, com a mesma condição inicial. O intervalo de \texttt{MPI\_Wtime} abrange os passos da simulação e a barreira final; não inclui alocação, inicialização da barra nem redução da soma final. A soma global foi impressa como verificação simples de consistência entre versões. Para comparar os tempos, usa-se a mediana das cinco execuções.
 
@@ -59,16 +130,16 @@ Em cada execução, as três versões foram medidas nessa ordem, com a mesma con
 \toprule
 Execução & \texttt{Send/Recv} (s) & \texttt{Isend/Irecv+Wait} (s) & \texttt{Isend/Irecv+Test} (s) \\
 \midrule
-1 & 0,884255 & 0,884492 & 1,550740 \\
-2 & 0,884811 & 0,886287 & 1,544192 \\
-3 & 2,960670 & 2,945100 & 5,853447 \\
-4 & 0,891343 & 0,890119 & 1,561927 \\
-5 & 0,896484 & 0,896494 & 1,564830 \\
+1 & 0,506098 & 0,498725 & 0,680938 \\
+2 & 0,520909 & 0,505166 & 0,682729 \\
+3 & 0,486050 & 0,479143 & 0,677186 \\
+4 & 0,517211 & 0,490103 & 0,678906 \\
+5 & 0,519315 & 0,500133 & 0,677699 \\
 \midrule
-Mediana & 0,891343 & 0,890119 & 1,561927 \\
+Mediana & 0,517211 & 0,498725 & 0,678906 \\
 \bottomrule
 \end{tabular}
-\caption{Tempos do job 2109332. A soma final impressa foi 524\,272,535328 em todas as versões e execuções.}
+\caption{Tempos do job 2109344. A soma final impressa foi 524\,272,535328 em todas as versões e execuções.}
 \label{tab:tempos}
 \end{table}
 
@@ -86,16 +157,16 @@ Mediana & 0,891343 & 0,890119 & 1,561927 \\
     grid=major,
     bar width=28pt
 ]
-\addplot+[fill=primaryblue] coordinates {(1,0.891343) (2,0.890119) (3,1.561927)};
+\addplot+[fill=primaryblue] coordinates {(1,0.517211) (2,0.498725) (3,0.678906)};
 \end{axis}
 \end{tikzpicture}
 \caption{Mediana das cinco execuções para cada versão.}
 \label{fig:medianas}
 \end{figure}
 
-As medianas das versões bloqueante e não bloqueante seguida de espera diferem em cerca de 0,14\%, sem ganho relevante nesta medição. A versão com \texttt{MPI\_Test} teve mediana aproximadamente 75\% maior que a bloqueante: a sobreposição implementada não trouxe ganho neste caso. Uma hipótese é que o custo dos testes periódicos e sua interação com o cálculo superem o tempo de comunicação ocultado; este experimento não isolou esses custos. Cada borda contém apenas um \texttt{double} (8 bytes) e os processos estavam no mesmo nó, condições que podem limitar o benefício da sobreposição.
+As medianas das versões bloqueante e não bloqueante seguida de espera diferem em aproximadamente 3,6\%, com menor tempo para a versão com \texttt{MPI\_Isend}/\texttt{MPI\_Irecv} e \texttt{MPI\_Wait}. A versão com \texttt{MPI\_Test} teve mediana aproximadamente 31\% maior que a bloqueante: a sobreposição implementada não trouxe ganho neste caso. Uma hipótese é que o custo dos testes periódicos e sua interação com o cálculo superem o tempo de comunicação ocultado; este experimento não isolou esses custos. Cada borda contém apenas um \texttt{double} (8 bytes), portanto a comunicação entre nós é dominada por mensagens pequenas e latência.
 
-A terceira execução foi mais lenta nas três versões. A tabela a mantém, e a mediana reduz sua influência na comparação; os dados não permitem determinar sua causa. A soma final igual é uma verificação global, não uma comparação célula a célula.
+As cinco execuções apresentaram valores próximos, sem uma execução discrepante como no teste anterior. A soma final igual é uma verificação global, não uma comparação célula a célula.
 
 \appendix
 \clearpage
