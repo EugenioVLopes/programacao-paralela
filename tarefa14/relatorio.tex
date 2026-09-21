@@ -3,6 +3,7 @@
 \usepackage[brazil]{babel}
 \usepackage{amsmath,float,listings,xcolor,geometry,pgfplots}
 \pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows.meta,decorations.pathreplacing}
 \geometry{headheight=23pt,top=2cm,bottom=2cm,left=2.5cm,right=2.5cm}
 \setlength{\parskip}{0.5em}
 \setlength{\parindent}{0pt}
@@ -52,6 +53,43 @@ O programa não usa esses dois modos.
 O job 2109294 foi executado na partição \texttt{intel-512} do NPAD, em um nó identificado no log como \texttt{r1i3n15}. O Slurm reservou duas tarefas, uma CPU por tarefa. O programa foi compilado no job com \texttt{mpicc -std=c11 -O3 -Wall -Wextra} e iniciado com \texttt{mpirun -np 2}. O estado final foi \texttt{COMPLETED}, código \texttt{0:0}, em cinco segundos.
 
 Para cada tamanho, ambos os processos alocam e preenchem um buffer. Uma \texttt{MPI\_Barrier} os sincroniza antes da medida. O processo 0 mede, com \texttt{MPI\_Wtime}, 10\,000 pares consecutivos de \texttt{MPI\_Send}/\texttt{MPI\_Recv}. Alocação, preenchimento, barreira, impressão e finalização do MPI ficam fora do intervalo. O tempo médio é o tempo total dividido por 10\,000 e corresponde à ida e volta completa, não a uma comunicação em apenas uma direção. Houve uma execução por tamanho; não foram medidas repetições independentes nem dispersão.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm,>=Stealth,font=\small]
+\node[draw,fill=blue!10,minimum width=30mm,align=center] at (0,0)
+    {Rank 0\\buffer próprio};
+\node[draw,fill=orange!20,minimum width=30mm,align=center] at (7,0)
+    {Rank 1\\buffer próprio};
+\draw[->,gray] (0,-0.55) -- (0,-7.1);
+\draw[->,gray] (7,-0.55) -- (7,-7.1);
+\draw[dashed] (-1.1,-1) -- (8.1,-1)
+    node[midway,above,fill=white] {\texttt{MPI\_Barrier}};
+\node[anchor=east,font=\footnotesize] at (-0.15,-1.65) {$t_0=\texttt{MPI\_Wtime()}$};
+\draw[rounded corners,dashed] (-1.2,-2.1) rectangle (8.2,-5.6);
+\node[fill=white,font=\footnotesize] at (3.5,-2.1) {Repetir 10\,000 vezes para cada tamanho $m$};
+\draw[->,thick,color=primaryblue] (0,-2.9) -- (7,-3.5)
+    node[midway,above,sloped] {Ida: $m$ bytes};
+\node[anchor=east,font=\footnotesize] at (-0.1,-2.9) {Send};
+\node[anchor=west,font=\footnotesize] at (7.1,-3.5) {Recv};
+\draw[->,thick,color=primaryblue] (7,-4.3) -- (0,-4.9)
+    node[midway,above,sloped] {Volta: os mesmos $m$ bytes};
+\node[anchor=west,font=\footnotesize] at (7.1,-4.3) {Send};
+\node[anchor=east,font=\footnotesize] at (-0.1,-4.9) {Recv};
+\node[anchor=east,font=\footnotesize] at (-0.15,-6.2) {$t_1=\texttt{MPI\_Wtime()}$};
+\draw[decorate,decoration={brace,amplitude=5pt}] (8.7,-1.65) -- (8.7,-6.2)
+    node[midway,right=8pt,align=center,font=\footnotesize] {Intervalo\\medido\\no rank 0};
+\node[align=center] at (3.5,-7.65)
+    {$T_{\mathrm{total}}=t_1-t_0$\qquad
+     $\overline{T}_{\mathrm{ida\ e\ volta}}=\dfrac{T_{\mathrm{total}}}{10\,000}$};
+\end{tikzpicture}
+\caption{Sequência do ping-pong para um tamanho de mensagem. O tempo avança para baixo, sem escala; as setas indicam transferências, não a duração das chamadas. Os dois ranks executaram no mesmo nó, com espaços de endereçamento separados.}
+\label{fig:pingpong}
+\end{figure}
+
+A Figura~\ref{fig:pingpong} mostra por que a ordem das chamadas permite a troca: o primeiro envio do rank 0 encontra um recebimento no rank 1; na resposta, os papéis se invertem. O rank 1 reutiliza seu buffer após receber a mensagem. Assim, o protocolo não exige que o MPI armazene temporariamente dois envios sem recebimentos correspondentes.
+
+Cada repetição transfere $m$ bytes na ida e $m$ bytes na volta. Portanto, o tempo médio apresentado na tabela e no gráfico corresponde ao par completo, incluindo os custos das chamadas MPI. A barreira fica antes de $t_0$; o cronômetro do rank 0 termina após receber a última resposta. O experimento não mede separadamente o tempo de uma única direção.
 
 \section{Resultados}
 A Tabela~\ref{tab:tempos} reproduz os valores do arquivo \texttt{tarefa14-2109294.out}. A Figura~\ref{fig:tempo} representa o tempo médio por troca; como o número de trocas é constante, o tempo total tem a mesma tendência.
