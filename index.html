@@ -29,14 +29,11 @@
 </head>
 <body>
   <nav class="top-nav">
-    <div style="display: flex; gap: 16px; align-items: center;">
-      <strong>DCA3703: Programação Paralela</strong>
-    </div>
+    <strong>DCA3703: Programação Paralela</strong>
     <button class="theme-toggle-btn" onclick="toggleTheme()">Alternar tema</button>
   </nav>
 
   <header>
-    <div class="lesson-badge">DCA3703 &bull; UFRN</div>
     <h1>Programação Paralela</h1>
     <div class="metadata">
       Atividades práticas, lições e relatórios &bull; Prof. Samuel Xavier de Souza
@@ -46,13 +43,12 @@
   <main>
     <section id="sobre">
       <p>
-        Materiais da disciplina DCA3703 (Programação Paralela) do curso de Engenharia de Computação da UFRN. Cada tarefa reúne teoria, prática, referência rápida e quizzes em um único material HTML e relatório em LaTeX.
+        Materiais da disciplina DCA3703 (Programação Paralela) do curso de Engenharia de Computação da UFRN. As tarefas 01 a 13 têm lições HTML; as tarefas 14 e 15 têm slides, código C e relatório.
       </p>
     </section>
 
     <section id="tarefas">
-      <h2>Tarefas</h2>
-
+      <h2 style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;">Tarefas</h2>
       <div style="display: flex; flex-direction: column; gap: 18px; margin-top: 1.2em;">
 
         <!-- Tarefa 01 -->
@@ -227,20 +223,24 @@
 
     <section id="tarefa12">
       <div class="source-card">
-        <h3>Tarefa 12: escalabilidade no NPAD</h3>
-        <span class="lesson-badge">Em andamento · piloto executado</span>
-        <p>Cinco versões da difusão viscosa, escalabilidade forte e fraca, scripts Slurm e coleta para o PaScal Viewer.</p>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h3 style="margin: 0; font-size: 1.2rem;">Tarefa 12: escalabilidade no NPAD</h3>
+          <span class="lesson-badge" style="margin: 0; background-color: var(--success-bg); color: var(--success);">Concluída</span>
+        </div>
+        <p>Quatro versões da difusão viscosa, escalabilidade forte e fraca, scripts Slurm e coleta para o PaScal Viewer.</p>
         <p><a href="lessons/0012-tarefa12-escalabilidade-npad.html">Material 12</a> ·
           <a href="lessons/0012-tarefa12-escalabilidade-npad.html#referencia-rapida">Referência rápida</a> ·
           <a href="assets/guia-comandos-npad.md">Executar no NPAD</a> ·
-          <a href="tarefa12/relatorio.pdf">Relatório preliminar</a></p>
+          <a href="tarefa12/relatorio.pdf">Relatório PDF</a></p>
       </div>
     </section>
 
     <section id="tarefa13">
       <div class="source-card">
-        <h3>Tarefa 13: afinidade de threads e NUMA</h3>
-        <span class="lesson-badge">Concluída · job 2107610</span>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h3 style="margin: 0; font-size: 1.2rem;">Tarefa 13: afinidade de threads e NUMA</h3>
+          <span class="lesson-badge" style="margin: 0; background-color: var(--success-bg); color: var(--success);">Concluída</span>
+        </div>
         <p>Quatro configurações novas de <code>OMP_PROC_BIND</code> e <code>OMP_PLACES</code>, medidas com o mesmo código e comparadas no PaScal Viewer.</p>
         <p><a href="lessons/0013-tarefa13-afinidade-numa.html">Material 13</a> ·
           <a href="lessons/0013-tarefa13-afinidade-numa.html#referencia-rapida">Referência rápida</a> ·
@@ -251,8 +251,10 @@
 
     <section id="tarefa14">
       <div class="source-card">
-        <h3>Tarefa 14: programação em memória distribuída</h3>
-        <span class="lesson-badge">MPI</span>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h3 style="margin: 0; font-size: 1.2rem;">Tarefa 14: programação em memória distribuída</h3>
+          <span class="lesson-badge" style="margin: 0; background-color: var(--success-bg); color: var(--success);">Concluída</span>
+        </div>
         <p>Troca de mensagens entre exatamente dois processos, medição com <code>MPI_Wtime</code> e gráfico de tempo em função do tamanho da mensagem.</p>
         <p><a href="tarefa14/slides.html">Slides</a> · <a href="tarefa14/tarefa14.slurm">Script Slurm</a> · <a href="tarefa14/tarefa14.c">Código C</a> · <a href="tarefa14/relatorio.pdf">Relatório PDF</a></p>
       </div>
@@ -260,12 +262,15 @@
 
     <section id="tarefa15">
       <div class="source-card">
-        <h3>Tarefa 15: sobreposição de computação e comunicação</h3>
-        <span class="lesson-badge">MPI</span>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h3 style="margin: 0; font-size: 1.2rem;">Tarefa 15: sobreposição de computação e comunicação</h3>
+          <span class="lesson-badge" style="margin: 0; background-color: var(--success-bg); color: var(--success);">Concluída</span>
+        </div>
         <p>Difusão de calor 1D distribuída e comparação de comunicação bloqueante, não bloqueante e com <code>MPI_Test</code>.</p>
-        <p><a href="tarefa15/tarefa15.c">Código C</a> · <a href="tarefa15/tarefa15.slurm">Script Slurm</a> · <a href="tarefa15/relatorio.pdf">Relatório PDF</a></p>
+        <p><a href="tarefa15/tarefa15.c">Código C</a> · <a href="tarefa15/tarefa15.slurm">Script Slurm</a> · <a href="tarefa15/slides.html">Slides</a> · <a href="tarefa15/relatorio.pdf">Relatório PDF</a></p>
       </div>
     </section>
+
   </main>
 
   <footer class="footer-nav" style="margin-top: 4em;">

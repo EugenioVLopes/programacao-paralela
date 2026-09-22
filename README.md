@@ -2,19 +2,7 @@
 
 Implementações, relatórios e lições práticas da disciplina DCA3703 (Programação Paralela) da Universidade Federal do Rio Grande do Norte (UFRN), ministrada pelo Prof. Samuel Xavier de Souza.
 
----
-
-## Portal de lições
-
-Os materiais de estudo podem ser acessados diretamente no GitHub Pages:
-
 🔗 **[https://eugeniovlopes.github.io/programacao-paralela/](https://eugeniovlopes.github.io/programacao-paralela/)**
-
-*(Para visualização local, abra [`index.html`](index.html) no navegador)*
-
----
-
-## Mapeamento de tarefas
 
 Cada tarefa tem um material HTML único com teoria, prática, referência rápida e quizzes, além do código C e relatório em LaTeX.
 
@@ -31,10 +19,10 @@ Cada tarefa tem um material HTML único com teoria, prática, referência rápid
 | 09 | Listas, critical nomeado e locks | [Material 09](https://eugeniovlopes.github.io/programacao-paralela/lessons/0009-tarefa09-critical-locks.html) | [`tarefa09/`](tarefa09/) e [PDF](tarefa09/relatorio.pdf) |
 | 10 | Comparativo atomic, critical e reduction | [Material 10](https://eugeniovlopes.github.io/programacao-paralela/lessons/0010-tarefa10-atomic-critical-reduction.html) | [`tarefa10/`](tarefa10/) e [PDF](tarefa10/relatorio.pdf) |
 | 11 | Particionamento de dados e balanceamento de carga | [Material 11](https://eugeniovlopes.github.io/programacao-paralela/lessons/0011-tarefa11-difusao-schedule.html) · [Extra: visualização 3D](https://eugeniovlopes.github.io/programacao-paralela/lessons/0011-tarefa11-difusao-schedule.html#visualizacao-3d) | [`tarefa11/`](tarefa11/) · [PDF](tarefa11/relatorio.pdf) · [Extras](tarefa11/extras/) |
-| 12 | Escalabilidade no NPAD e PaScal Viewer (em andamento) | [Material 12](https://eugeniovlopes.github.io/programacao-paralela/lessons/0012-tarefa12-escalabilidade-npad.html) | [`tarefa12/`](tarefa12/) e [PDF preliminar](tarefa12/relatorio.pdf) |
+| 12 | Escalabilidade no NPAD e PaScal Viewer | [Material 12](https://eugeniovlopes.github.io/programacao-paralela/lessons/0012-tarefa12-escalabilidade-npad.html) | [`tarefa12/`](tarefa12/) e [PDF](tarefa12/relatorio.pdf) |
 | 13 | Afinidade de threads e NUMA | [Material 13](https://eugeniovlopes.github.io/programacao-paralela/lessons/0013-tarefa13-afinidade-numa.html) · [Referência rápida](https://eugeniovlopes.github.io/programacao-paralela/lessons/0013-tarefa13-afinidade-numa.html#referencia-rapida) | [`tarefa13/`](tarefa13/) · [PDF](tarefa13/relatorio.pdf) · [código-base](tarefa12/v4_numa.c) |
 | 14 | Programação em memória distribuída com MPI | [Slides](https://eugeniovlopes.github.io/programacao-paralela/tarefa14/slides.html) | [`tarefa14/`](tarefa14/) · [PDF](tarefa14/relatorio.pdf) |
-| 15 | Sobreposição de computação e comunicação com MPI | — | [`tarefa15/`](tarefa15/) · [PDF](tarefa15/relatorio.pdf) |
+| 15 | Sobreposição de computação e comunicação com MPI | [Slides](https://eugeniovlopes.github.io/programacao-paralela/tarefa15/slides.html) | [`tarefa15/`](tarefa15/) · [PDF](tarefa15/relatorio.pdf) |
 
 ---
 
