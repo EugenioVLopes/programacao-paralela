@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tarefa 15 · Sobreposição de computação e comunicação</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap');
+/* === FIXED 16:9 STAGE === */
+/* ===========================================
+   FIXED 16:9 STAGE: MANDATORY BASE STYLES
+   Include this ENTIRE file in every presentation.
+   Slides are authored at 1920Ã1080 and scaled as a whole.
+   =========================================== */
+
+/* 1. Lock the browser viewport */
+html,
+body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: var(--stage-bg, #000);
+}
+
+/* 2. Full-window deck viewport */
+.deck-viewport {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: var(--stage-bg, #000);
+}
+
+/* 3. Fixed 16:9 design canvas.
+   JavaScript sets transform: translate(...) scale(...). */
+.deck-stage {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    transform-origin: 0 0;
+    background: var(--slide-bg, #fff);
+}
+
+/* 4. Slides stack inside the fixed stage.
+   Content must be laid out at 1920Ã1080, not reflowed per device. */
+.slide {
+    position: absolute;
+    inset: 0;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    display: block;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    background: var(--slide-bg, #fff);
+}
+
+.slide.active,
+.slide.visible {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    z-index: 1;
+}
+
+/* 5. Keep media inside authored slide bounds */
+img,
+video,
+canvas,
+svg {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* 6. Presentation chrome stays outside the slide design system */
+.deck-controls {
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    transform: translateX(-50%);
+    z-index: 1000;
+}
+
+/* 7. Print one fixed-size slide per page */
+@media print {
+    html,
+    body {
+        width: 1920px;
+        height: auto;
+        overflow: visible;
+        background: #fff;
+    }
+
+    .deck-viewport {
+        position: static;
+        overflow: visible;
+        background: #fff;
+    }
+
+    .deck-stage {
+        position: static;
+        width: auto;
+        height: auto;
+        transform: none !important;
+        background: none;
+    }
+
+    .slide {
+        position: relative;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        width: 1920px;
+        height: 1080px;
+        break-after: page;
+        page-break-after: always;
+    }
+
+    .slide:last-child {
+        break-after: auto;
+        page-break-after: auto;
+    }
+
+    .deck-controls {
+        display: none !important;
+    }
+}
+
+/* 8. Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.2s !important;
+    }
+}
+
+/* === WHITEBOARD THEME === */
+:root{--slide-bg:#fffdf8;--stage-bg:#e9e7e2;--ink:#1e1e1e;--accent:#1971c2;--muted:#495057;--blue:#e7f5ff;--yellow:#fff3bf;--green:#d3f9d8;--red:#ffe3e3;font-family:'Patrick Hand',cursive;color:var(--ink)}
+*{box-sizing:border-box}
+.slide{padding:72px 96px 86px;color:var(--ink);background:radial-gradient(#d0d5da 1.3px,transparent 1.3px) 0 0/34px 34px,var(--slide-bg)}
+.kicker{display:inline-block;color:var(--accent);font-size:27px;letter-spacing:2px;margin-bottom:18px}
+h1,h2,h3,p{margin-top:0}h1{font-size:104px;line-height:1.3;margin:10px 0 26px}h2{font-size:68px;line-height:1.3;margin:0 0 30px;max-width:1700px}h3{font-size:39px;line-height:1.3;margin:0 0 10px}
+p,li{font-size:34px;line-height:1.5}.lead{font-size:46px;line-height:1.5}.small{font-size:26px;color:var(--muted)}.big{font-size:62px;line-height:1.3}.accent{color:var(--accent)}.green-text{color:#2b8a3e}
+.content{height:765px}.content.fit-content{height:auto}.cols{display:grid;grid-template-columns:1fr 1fr;gap:36px}.three{display:grid;grid-template-columns:repeat(3,1fr);gap:26px}.three+.box{margin-top:28px}
+.box,.statement,pre,.formula,table,.rank-card{border:3px solid var(--ink);border-radius:22px 17px 25px 15px/16px 24px 18px 26px;box-shadow:4px 5px 0 #cbd3d8}
+.box{background:var(--blue);padding:25px 30px}.box.yellow,.rank-card.yellow{background:var(--yellow)}.box.green,.rank-card.green{background:var(--green)}.box.red{background:var(--red)}.box p:last-child{margin-bottom:0}
+.statement{background:var(--yellow);font-size:58px;line-height:1.4;padding:30px 42px;margin:24px 0 35px}
+.formula{background:var(--blue);font-size:57px;padding:22px 32px;margin:20px 0}.formula em{font-style:normal;color:var(--accent)}
+pre{background:#fff;font:30px/1.45 'DejaVu Sans Mono',monospace;white-space:pre-wrap;padding:25px 32px;margin:18px 0 28px}
+code{font-family:'DejaVu Sans Mono',monospace;font-size:.76em}
+.math{font-family:Georgia,serif;font-style:italic}.arrow{color:var(--accent);font-size:62px;text-align:center}
+.process-row{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin:34px 0}.rank-card{background:var(--blue);padding:24px 20px;text-align:center;font-size:35px}.rank-card strong{display:block;font-size:48px;font-weight:normal}.rank-card .chips{margin-top:13px}
+.chips{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}.chip{display:inline-block;border:2px solid var(--ink);border-radius:12px 8px 11px 9px;background:#fff;padding:6px 14px;min-width:60px;text-align:center;font-size:31px}.chip.blue{background:var(--blue)}.chip.yellow{background:var(--yellow)}.chip.green{background:var(--green)}
+.sequence{display:flex;align-items:stretch;gap:15px;margin:32px 0}.sequence .box{flex:1;text-align:center}.sequence .arrow{align-self:center}
+.sequence .box{font-size:34px}
+table{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;background:#fff;font-size:32px}th,td{padding:11px 25px;text-align:right;border-bottom:2px dashed #adb5bd}th:first-child,td:first-child{text-align:left}th{background:var(--blue);font-weight:normal}tr:nth-child(even) td{background:#f8f9fa}tbody tr:last-child td{border-bottom:0}.best{color:#2b8a3e;font-weight:bold}
+.line{height:3px;background:var(--ink);margin:28px 0}.callout{font-size:28px;color:var(--muted);margin-top:18px}.sources{display:flex;gap:18px;flex-wrap:wrap;margin-top:45px}
+a{color:var(--accent);text-underline-offset:5px}.sources a,.deck-controls button,.deck-controls a,.edit-toggle{background:#fff;color:var(--ink);border:2px solid var(--ink);border-radius:14px 9px 13px 10px;box-shadow:2px 3px 0 #cbd3d8;font:25px 'Patrick Hand',cursive;text-decoration:none;padding:5px 15px;cursor:pointer}
+.sources a:hover,.deck-controls a:hover,.deck-controls button:hover{background:var(--blue)}button:focus-visible,a:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
+footer{position:absolute;left:96px;right:96px;bottom:32px;border-top:2px dashed #868e96;padding-top:8px;display:flex;justify-content:space-between;color:var(--muted);font-size:23px}
+.deck-controls{display:flex;align-items:center;gap:9px;bottom:10px;max-width:calc(100vw - 20px);overflow-x:auto;white-space:nowrap;background:var(--slide-bg);color:var(--ink);border:2px solid var(--ink);border-radius:17px 12px 18px 11px;padding:7px 10px;font-size:22px}
+@media(max-width:600px){.deck-controls{gap:8px;padding:5px 8px;font-size:21px}.deck-controls a{display:none}.deck-controls button{font-size:21px;padding:4px 13px}}
+.reveal{opacity:0;transform:translateY(16px);transition:opacity .4s ease-out,transform .4s ease-out}.visible .reveal{opacity:1;transform:none}.visible .reveal.delay1{transition-delay:.12s}.visible .reveal.delay2{transition-delay:.24s}.visible .reveal.delay3{transition-delay:.36s}
+.edit-hotzone{position:fixed;top:0;left:0;width:80px;height:80px;z-index:1001}.edit-toggle{position:fixed;top:12px;left:12px;opacity:0;pointer-events:none;z-index:1002}.edit-toggle.show,.edit-toggle.active{opacity:1;pointer-events:auto}[contenteditable=true]{outline:2px dashed var(--accent)}#editStatus{position:fixed;right:15px;top:12px;z-index:1002;background:var(--slide-bg);color:var(--ink);font-size:19px}
+@media print{.edit-hotzone,.edit-toggle,#editStatus{display:none}.reveal{opacity:1!important;transform:none!important}@page{size:1920px 1080px;margin:0}}
+/* === TASK 15: HALOS, EXECUTION ORDER AND MEASURED TIMES === */
+.title-slide h1{font-size:84px}
+.halo{display:flex;gap:16px;margin:45px 0;align-items:stretch}
+.halo>div{border:3px solid var(--ink);border-radius:15px 10px;background:var(--yellow);padding:22px;text-align:center;font-size:42px;min-width:170px}
+.halo .ghost{border-style:dashed;background:var(--blue)}.halo .interior{flex:1;background:var(--green)}.halo small{font-size:28px}
+.execution{display:flex;gap:15px;align-items:center;margin:30px 0;font-size:29px}
+.execution strong{width:220px;flex-shrink:0;font-size:33px}
+.execution span{border:3px solid var(--ink);border-radius:15px 10px;padding:22px 25px;background:#fff;text-align:center;flex:1}
+.execution .comm{background:var(--yellow)}.execution .compute{background:var(--green)}
+.timing-chart{display:block;width:100%;height:510px;margin-bottom:20px}
+
+/* Interactive MPI walkthrough, in the deck's authored 1920 × 1080 space. */
+#cell-demo{padding-top:48px}
+#cell-demo h2{font-size:54px;margin-bottom:10px}
+.demo-intro{font-size:26px;margin-bottom:14px}
+.demo-layout{display:grid;grid-template-columns:960px 1fr;gap:32px}
+.demo-rank{border-top:2px dashed #868e96;padding:7px 0 8px}
+.demo-rank h3{font-size:26px;margin:0 0 5px;display:flex;justify-content:space-between}
+.demo-rank h3 small{font-size:23px;font-weight:normal;color:var(--muted)}
+.demo-row{display:grid;grid-template-columns:105px repeat(6,1fr);gap:8px;align-items:center;margin:6px 0}
+.demo-label{font:22px 'DejaVu Sans Mono',monospace}
+.demo-cell{border:2px solid var(--ink);border-radius:9px 6px;text-align:center;padding:3px 0;font:21px/1.15 'DejaVu Sans Mono',monospace;font-variant-numeric:tabular-nums;transition:background-color .25s ease-out}
+.demo-cell small{display:block;font:17px/1.2 'Patrick Hand',cursive;margin-top:3px}
+.demo-cell.ghost{border-style:dashed}
+.demo-cell.pending{background:#f1f3f5;color:var(--muted)}
+.demo-cell.reading{outline:3px solid var(--accent);outline-offset:1px}
+.demo-cell.writing{outline:4px solid #2b8a3e;outline-offset:1px}
+.demo-cell.arrived{border-color:var(--accent);border-width:3px}
+.demo-row:last-child .demo-cell small{display:none}
+.demo-layout > div > .small{font-size:21px!important;line-height:1.25;margin-bottom:0}
+.demo-empty{text-align:center;font-size:21px;color:var(--muted)}
+.demo-code{margin:0;padding:16px 18px;font:20px/1.32 'DejaVu Sans Mono',monospace;white-space:pre-wrap;box-shadow:none;border-radius:12px}
+.demo-code code{font:inherit}
+.demo-code [data-phase]{display:block;padding:4px 8px;border-radius:5px}
+.demo-code .code-active{background:var(--yellow);outline:2px solid #8a6500}
+.demo-code-title{font-size:27px;margin-bottom:9px}
+.demo-legend{font-size:24px;margin:9px 0 0}
+.demo-status{display:flex;align-items:baseline;gap:22px;margin-top:18px;border-top:2px solid var(--ink);padding-top:12px}
+.demo-status strong{font-size:34px;white-space:nowrap;color:var(--accent)}
+.demo-status p{font-size:28px;line-height:1.3;margin:0}
+.demo-controls{display:flex;align-items:center;gap:14px;margin-top:17px}
+.demo-controls button{font:27px 'Patrick Hand',cursive;padding:9px 20px;border:2px solid var(--ink);border-radius:10px;background:#fff;cursor:pointer}
+.demo-controls button:hover{background:var(--blue)}
+.demo-controls button:disabled{opacity:.45;cursor:default}
+.demo-controls #demo-forward{background:var(--yellow)}
+#demo-step{font-size:27px;margin-left:auto;font-variant-numeric:tabular-nums}
+#demo-equation{font:20px/1.5 'DejaVu Sans Mono',monospace;min-height:35px;margin-top:8px}
+@media print{.demo-controls{display:none}}
+</style>
+</head>
+<body>
+<!-- === SLIDE STAGE === -->
+<div class="deck-viewport"><main class="deck-stage" id="deckStage">
+<!-- === SLIDE 1: Sobreposição de computação e comunicação === -->
+<section class="slide title-slide active" aria-label="Sobreposição de computação e comunicação">
+<div class="kicker">TAREFA 15 / MPI</div><h1 data-edit>Sobreposição de computação<br>e comunicação</h1>
+<div class="content fit-content"><div class="statement reveal" data-edit>Calcular o interior enquanto as bordas chegam.</div><div class="sequence reveal delay1"><div class="box">Trocar bordas</div><span class="arrow">⇄</span><div class="box yellow">Calcular células</div></div><p data-edit>Difusão de calor em uma barra distribuída entre processos MPI.</p><p class="small">DCA3703 · Eugenio Vitor Lopes dos Santos</p></div>
+<footer><span>DCA3703 · Tarefa 15</span><span>1 / 15</span></footer>
+</section>
+<!-- === SLIDE 2: Cada célula depende de três valores === -->
+<section class="slide" aria-label="Cada célula depende de três valores">
+<div class="kicker">O PROBLEMA</div><h2 data-edit>Cada célula depende de três valores</h2>
+<div class="content fit-content"><div class="formula reveal"><span class="math">uᵢⁿ⁺¹ = uᵢⁿ + 0,2 (uᵢ₋₁ⁿ − 2uᵢⁿ + uᵢ₊₁ⁿ)</span></div><div class="three reveal delay1"><div class="box"><h3>Vizinha esquerda</h3><p class="big math">uᵢ₋₁ⁿ</p></div><div class="box yellow"><h3>Célula atual</h3><p class="big math">uᵢⁿ</p></div><div class="box"><h3>Vizinha direita</h3><p class="big math">uᵢ₊₁ⁿ</p></div></div><p class="lead reveal delay2" data-edit>Se a vizinha pertence a outro processo, seu valor precisa chegar por mensagem.</p></div>
+<footer><span>DCA3703 · Tarefa 15</span><span>2 / 15</span></footer>
+</section>
+<!-- === SLIDE 3: Duas células extras guardam as bordas === -->
+<section class="slide" aria-label="Duas células extras guardam as bordas">
+<div class="kicker">PARTIÇÃO DA BARRA</div><h2 data-edit>Duas células extras guardam as bordas</h2>
+<div class="content fit-content"><p class="lead reveal" data-edit>MPI usa processos com memórias separadas: cada rank guarda m células próprias e duas células fantasma.</p><div class="halo reveal delay1"><div class="ghost">0<br><small>fantasma</small></div><div>1<br><small>borda</small></div><div class="interior">2 · 3 · … · m−1<br><small>interior local</small></div><div>m<br><small>borda</small></div><div class="ghost">m+1<br><small>fantasma</small></div></div><div class="cols reveal delay2"><div class="box"><h3 data-edit>Interior</h3><p data-edit>Usa apenas valores que já estão na memória local.</p></div><div class="box yellow"><h3 data-edit>Bordas</h3><p data-edit>As células 1 e m precisam dos valores recebidos dos vizinhos.</p></div></div><p class="small">Nas extremidades globais: vizinho MPI_PROC_NULL e célula fantasma em zero.</p></div>
+<footer><span>DCA3703 · Tarefa 15</span><span>3 / 15</span></footer>
+</section>
+<!-- === SLIDE 4: Ler o passo atual, escrever o próximo === -->
+<section class="slide" aria-label="Ler o passo atual, escrever o próximo">
+<div class="kicker">CÓDIGO COMUM</div><h2 data-edit>Ler o passo atual, escrever o próximo</h2>
+<div class="content fit-content"><div class="cols reveal"><div class="box"><h3>current</h3><p data-edit>Fonte de todos os valores do passo n. Também contém os buffers dos envios.</p></div><div class="box yellow"><h3>next</h3><p data-edit>Destino dos valores do passo n+1. O cálculo não modifica os dados enviados.</p></div></div><pre class="reveal delay1">next[i] = current[i] + COEFFICIENT *
+    (current[i - 1] - 2.0 * current[i] + current[i + 1]);</pre><p class="lead reveal delay2" data-edit>Ao terminar o passo, os ponteiros são trocados. Isso evita copiar toda a barra.</p></div>
+<footer><span>DCA3703 · Tarefa 15</span><span>4 / 15</span></footer>
+</section>
+<!-- === SLIDE 5: Trocar primeiro, calcular depois === -->
+<section class="slide" aria-label="Trocar primeiro, calcular depois">
+<div class="kicker">VERSÃO 1 / SEND + RECV</div><h2 data-edit>Trocar primeiro, calcular depois</h2>
+<div class="content fit-content"><div class="sequence reveal"><div class="box yellow"><h3>Comunicar</h3><p>Send → Recv<br>Send → Recv</p></div><span class="arrow">→</span><div class="box green"><h3>Calcular</h3><p>células 1 até m</p></div></div><pre class="reveal delay1">MPI_Send(&current[count], 1, MPI_DOUBLE, right, 0, MPI_COMM_WORLD);
+MPI_Recv(&current[0], 1, MPI_DOUBLE, left, 0,
+         MPI_COMM_WORLD, MPI_STATUS_IGNORE);</pre><p data-edit>Depois, envia a borda esquerda e recebe a borda direita. Só então atualiza todas as células locais.</p><p class="small">Trecho da primeira direção de troca. A cadeia termina em MPI_PROC_NULL nas extremidades.</p></div>
+<footer><span>DCA3703 · Tarefa 15</span><span>5 / 15</span></footer>
+</section>
+<!-- === SLIDE 6: Não bloqueante, mas com espera imediata === -->
+<section class="slide" aria-label="Não bloqueante, mas com espera imediata">
+<div class="kicker">VERSÃO 2 / ISEND + IRECV + WAIT</div><h2 data-edit>Não bloqueante, mas com espera imediata</h2>
+<div class="content fit-content"><div class="sequence reveal"><div class="box"><h3>Iniciar</h3><p>2 Irecv<br>2 Isend</p></div><span class="arrow">→</span><div class="box yellow"><h3>Esperar</h3><p>4 Wait</p></div><span class="arrow">→</span><div class="box green"><h3>Calcular</h3><p>células 1 até m</p></div></div><pre class="reveal delay1">for (int i = 0; i &lt; 4; ++i)
+    MPI_Wait(&requests[i], MPI_STATUS_IGNORE);
+
+for (int i = 1; i &lt;= count; ++i)
+    update(next, current, i);</pre><p class="lead" data-edit>As operações são iniciadas sem esperar, mas o cálculo só começa depois das quatro conclusões.</p></div>
+<footer><span>DCA3703 · Tarefa 15</span><span>6 / 15</span></footer>
+</section>
+<!-- === SLIDE 7: O interior oferece trabalho independente === -->
+<section class="slide" aria-label="O interior oferece trabalho independente">
+<div class="kicker">VERSÃO 3 / ISEND + IRECV + TEST</div><h2 data-edit>O interior oferece trabalho independente</h2>
+<div class="content fit-content"><div class="sequence reveal"><div class="box"><h3>Iniciar</h3><p>Irecv + Isend</p></div><span class="arrow">→</span><div class="box green"><h3>Interior</h3><p>calcular + Test</p></div><span class="arrow">→</span><div class="box yellow"><h3>Bordas</h3><p>após receber</p></div></div><div class="cols reveal delay1"><div class="box"><h3 data-edit>Enquanto calcula</h3><p data-edit>Atualiza i = 2 até m−1 e consulta recebimentos pendentes a cada 1024 índices.</p></div><div class="box yellow"><h3 data-edit>Ao terminar o interior</h3><p data-edit>Espera recepções ainda pendentes, calcula as bordas e espera os dois envios.</p></div></div></div>
+<footer><span>DCA3703 · Tarefa 15</span><span>7 / 15</span></footer>
+</section>
+<!-- === INTERACTIVE WALKTHROUGH === -->
+<section class="slide" id="cell-demo" aria-label="Células e código, passo a passo">
+<h2>Células e código, passo a passo</h2>
+<p class="demo-intro">3 processos · 4 células por processo · α = 0,2 · malha didática, sem escala de tempo real.</p>
+<div class="demo-layout">
+<div><div id="demo-ranks"></div>
+<p class="demo-legend">Tracejado: halo (cópia do vizinho) · azul: leitura · verde: escrita<br>Temperatura: branco = 0; amarelo = 1. Valores arredondados a 3 casas.</p>
+<div id="demo-equation"></div></div>
+<div><p class="demo-code-title">Versão 3 · <a href="tarefa15.c">trechos de overlap() e main()</a></p>
+<pre class="demo-code"><code><span data-phase="1">MPI_Irecv(/* halo esquerdo, req. 0 */);
+MPI_Irecv(/* halo direito, req. 1 */);
+MPI_Isend(/* borda direita, req. 2 */);
+MPI_Isend(/* borda esquerda, req. 3 */);</span><span data-phase="2">for (int i = 2; i &lt; count; ++i) {
+    update(next, current, i);
+    /* Test a cada 1024 índices */
+}</span><span data-phase="3">if (!received_left) MPI_Wait(/* 0 */);
+if (!received_right) MPI_Wait(/* 1 */);</span><span data-phase="4">update(next, current, 1);
+update(next, current, count);</span><span data-phase="5">MPI_Wait(/* envio 2 */);
+MPI_Wait(/* envio 3 */);</span><span data-phase="6">double *temporary = current;
+current = next;
+next = temporary;</span></code></pre>
+<p class="small" style="font-size:23px;margin-top:10px">Argumentos MPI abreviados. Nesta malha, i = 2 e 3: não há chamada a Test; as recepções são concluídas por Wait.</p></div>
+</div>
+<div class="demo-status" role="status" aria-live="polite"><strong id="demo-phase"></strong><p id="demo-explanation"></p></div>
+<div class="demo-controls" aria-label="Controles da simulação"><button id="demo-back" type="button">Etapa anterior</button><button id="demo-forward" type="button">Próxima etapa</button><button id="demo-reset" type="button">Reiniciar</button><span id="demo-step"></span></div>
+<noscript><p>Ative JavaScript para avançar as células. O código ao lado descreve a sequência.</p></noscript>
+<footer><span>DCA3703 · Tarefa 15</span><span>8 / 15</span></footer>
+</section>
+<!-- === SLIDE 8: Consultar não é garantir a conclusão === -->
+<section class="slide" aria-label="Consultar não é garantir a conclusão">
+<div class="kicker">MPI_TEST</div><h2 data-edit>Consultar não é garantir a conclusão</h2>
+<div class="content fit-content"><pre class="reveal">if (i % 1024 == 0) {
+    if (!received_left)
+        MPI_Test(&requests[0], &received_left, MPI_STATUS_IGNORE);
+    if (!received_right)
+        MPI_Test(&requests[1], &received_right, MPI_STATUS_IGNORE);
+}</pre><div class="cols reveal delay1"><div class="box"><h3 data-edit>Flag verdadeira</h3><p data-edit>O recebimento terminou. O buffer já contém os dados recebidos.</p></div><div class="box yellow"><h3 data-edit>Flag falsa</h3><p data-edit>A operação segue pendente. MPI_Wait garante sua conclusão antes de usar a borda.</p></div></div><p class="small reveal delay2" data-edit>Irecv prepara o buffer antes dos Isend; iniciar a operação não significa que o dado já chegou.</p></div>
+<footer><span>DCA3703 · Tarefa 15</span><span>9 / 15</span></footer>
+</section>
+<!-- === SLIDE 9: Onde cada versão espera? === -->
+<section class="slide" aria-label="Onde cada versão espera?">
+<div class="kicker">COMPARAÇÃO</div><h2 data-edit>Onde cada versão espera?</h2>
+<div class="content fit-content"><div class="execution reveal"><strong>Send/Recv</strong><span class="comm">Trocar bordas</span><span class="compute">Calcular todas</span></div><div class="execution reveal delay1"><strong>+ Wait</strong><span>Iniciar</span><span class="comm">Esperar tudo</span><span class="compute">Calcular todas</span></div><div class="execution reveal delay2"><strong>+ Test</strong><span>Iniciar</span><span class="compute">Interior + Test</span><span class="comm">Recepções*</span><span class="compute">Bordas</span><span class="comm">Envios</span></div><p class="small">* Espera apenas os recebimentos ainda pendentes. Sequência lógica, sem escala de tempo.</p><div class="statement reveal delay3" data-edit>A versão com Test cria uma oportunidade de sobreposição; o ganho precisa ser medido.</div></div>
+<footer><span>DCA3703 · Tarefa 15</span><span>10 / 15</span></footer>
+</section>
+<!-- === SLIDE 10: O tempo inclui os 1000 passos === -->
+<section class="slide" aria-label="O tempo inclui os 1000 passos">
+<div class="kicker">CRONÔMETRO</div><h2 data-edit>O tempo inclui os 1000 passos</h2>
+<div class="content fit-content"><pre class="reveal">MPI_Barrier(MPI_COMM_WORLD);
+double begin = MPI_Wtime();
+/* 1000 passos: troca de bordas, cálculo e troca de ponteiros */
+MPI_Barrier(MPI_COMM_WORLD);
+double elapsed = MPI_Wtime() - begin;</pre><div class="cols reveal delay1"><div class="box green"><h3 data-edit>Dentro do intervalo</h3><p data-edit>Comunicação, cálculo, consultas ou esperas e a barreira final.</p></div><div class="box yellow"><h3 data-edit>Fora do intervalo</h3><p data-edit>Alocação, inicialização e redução da soma final.</p></div></div><p class="small" data-edit>O rank 0 imprime seu tempo. Cada versão reinicia a barra com a mesma condição inicial.</p></div>
+<footer><span>DCA3703 · Tarefa 15</span><span>11 / 15</span></footer>
+</section>
+<!-- === SLIDE 11: O ambiente que produziu os dados === -->
+<section class="slide" aria-label="O ambiente que produziu os dados">
+<div class="kicker">NPAD / JOBS 2116320–2116324</div><h2 data-edit>O ambiente que produziu os dados</h2>
+<div class="content fit-content"><div class="three reveal"><div class="box"><h3>2 a 12 processos</h3><p>1 processo por nó<br>1 CPU por processo<br>partição intel-128</p></div><div class="box yellow"><h3>1.048.576 células</h3><p>87.381 a 524.288 locais<br>1000 passos<br>coeficiente 0,2</p></div><div class="box green"><h3>10 execuções</h3><p>mesma ordem:<br>Send/Recv → Wait → Test</p></div></div><pre class="reveal delay1">mpicc -std=c11 -O3 -Wall -Wextra -o tarefa15-${SLURM_JOB_ID}.bin tarefa15.c
+mpirun -np $SLURM_NTASKS ./tarefa15-${SLURM_JOB_ID}.bin</pre><p data-edit>Inicialização: metade esquerda em 1 e metade direita em 0. Cada halo transfere um double por direção. Os avisos OpenFabrics foram preservados nas saídas.</p></div>
+<footer><span>DCA3703 · Tarefa 15</span><span>12 / 15</span></footer>
+</section>
+<!-- === SLIDE 12: Cinco configurações, dez execuções === -->
+<section class="slide" aria-label="Cinco configurações, dez execuções">
+<div class="kicker">RESULTADOS</div><h2 data-edit>Cinco configurações, dez execuções</h2>
+<div class="content fit-content"><table class="reveal"><thead><tr><th>Proc./nós</th><th>Send/Recv</th><th>+ Wait</th><th>+ Test</th></tr></thead><tbody><tr><td>2</td><td>0,601704</td><td class="best">0,595326</td><td>0,914577</td></tr><tr><td>4</td><td>0,341695</td><td class="best">0,320561</td><td>0,452932</td></tr><tr><td>8</td><td>0,168256</td><td class="best">0,158681</td><td>0,233792</td></tr><tr><td>10</td><td>0,141879</td><td class="best">0,132283</td><td>0,188951</td></tr><tr><td>12</td><td>0,125474</td><td class="best">0,107324</td><td>0,155934</td></tr></tbody></table><p class="small">Medianas em segundos. Cada linha reúne dez execuções com um processo por nó.</p><div class="box reveal delay1"><p data-edit>A soma final foi 524.272,535328 em todas as versões e configurações. É uma verificação global, não célula a célula.</p></div></div>
+<footer><span>DCA3703 · Tarefa 15</span><span>13 / 15</span></footer>
+</section>
+<!-- === SLIDE 13: A comunicação não bloqueante não garantiu ganho === -->
+<section class="slide" aria-label="A comunicação não bloqueante não garantiu ganho">
+<div class="kicker">COMUNICAÇÃO MPI</div><h2 data-edit>A comunicação não bloqueante não garantiu ganho</h2>
+<div class="content fit-content"><svg class="timing-chart reveal" viewBox="0 0 1600 510" role="img" aria-labelledby="chartTitle chartDesc"><title id="chartTitle">Medianas do tempo por configuração</title><desc id="chartDesc">Linhas mostram Send/Recv, Isend/Irecv com Wait e Isend/Irecv com Test para 2, 4, 8, 10 e 12 processos.</desc><g stroke="#adb5bd" stroke-dasharray="6 7"><path d="M220 50 H1450"/><path d="M220 126 H1450"/><path d="M220 202 H1450"/><path d="M220 278 H1450"/><path d="M220 354 H1450"/><path d="M220 430 H1450"/></g><g stroke="#1e1e1e" stroke-width="3"><path d="M220 50 V430 H1450"/></g><g font-size="28" fill="#1e1e1e"><text x="155" y="60">1,0</text><text x="155" y="136">0,8</text><text x="155" y="212">0,6</text><text x="155" y="288">0,4</text><text x="155" y="364">0,2</text><text x="170" y="440">0,0</text><text text-anchor="middle" x="220" y="468">2</text><text text-anchor="middle" x="527" y="468">4</text><text text-anchor="middle" x="835" y="468">8</text><text text-anchor="middle" x="1142" y="468">10</text><text text-anchor="middle" x="1450" y="468">12</text><text text-anchor="middle" x="835" y="505">Processos e nós · mediana do tempo (s)</text></g><polyline fill="none" stroke="#1971c2" stroke-width="6" points="220,201 527,300 835,366 1142,376 1450,382"/><polyline fill="none" stroke="#2b8a3e" stroke-width="6" points="220,204 527,308 835,370 1142,380 1450,389"/><polyline fill="none" stroke="#e67700" stroke-width="6" points="220,82 527,258 835,341 1142,358 1450,371"/><g fill="#1971c2"><circle cx="220" cy="201" r="8"/><circle cx="527" cy="300" r="8"/><circle cx="835" cy="366" r="8"/><circle cx="1142" cy="376" r="8"/><circle cx="1450" cy="382" r="8"/></g><g fill="#2b8a3e"><circle cx="220" cy="204" r="8"/><circle cx="527" cy="308" r="8"/><circle cx="835" cy="370" r="8"/><circle cx="1142" cy="380" r="8"/><circle cx="1450" cy="389" r="8"/></g><g fill="#e67700"><circle cx="220" cy="82" r="8"/><circle cx="527" cy="258" r="8"/><circle cx="835" cy="341" r="8"/><circle cx="1142" cy="358" r="8"/><circle cx="1450" cy="371" r="8"/></g><g font-size="28" fill="#1e1e1e"><line x1="1030" y1="35" x2="1080" y2="35" stroke="#1971c2" stroke-width="6"/><text x="1090" y="44">Send/Recv</text><line x1="1220" y1="35" x2="1270" y2="35" stroke="#2b8a3e" stroke-width="6"/><text x="1280" y="44">+ Wait</text><line x1="1380" y1="35" x2="1430" y2="35" stroke="#e67700" stroke-width="6"/><text x="1440" y="44">+ Test</text></g></svg><div class="cols reveal delay1"><div class="box green"><p data-edit>+ Wait teve a menor mediana em todas as configurações.</p></div><div class="box yellow"><p data-edit>+ Test permaneceu mais lento, apesar da possibilidade de sobreposição.</p></div></div></div>
+<footer><span>DCA3703 · Tarefa 15</span><span>14 / 15</span></footer>
+</section>
+<!-- === SLIDE 14: Sobrepor é uma possibilidade, não uma garantia === -->
+<section class="slide" aria-label="Sobrepor é uma possibilidade, não uma garantia">
+<div class="kicker">CONCLUSÃO</div><h2 data-edit>Sobrepor é uma possibilidade, não uma garantia</h2>
+<div class="content fit-content"><div class="cols reveal"><div class="box"><h3 data-edit>O que foi observado</h3><p data-edit>Isend/Irecv + Wait teve a menor mediana. A troca não bloqueante não trouxe vantagem automática.</p></div><div class="box yellow"><h3 data-edit>O que ficou em aberto</h3><p data-edit>O custo dos testes e o progresso interno do MPI não foram isolados. Os avisos OpenFabrics caracterizam o ambiente.</p></div></div><div class="statement reveal delay1" data-edit>Irecv prepara o destino; MPI_Test consulta; MPI_Wait garante a conclusão. Só há ganho quando o cálculo independente cobre a comunicação.</div><div class="sources"><a href="tarefa15.c">Código C</a><a href="relatorio.pdf">Relatório PDF</a><a href="../index.html">Índice da disciplina</a></div></div>
+<footer><span>DCA3703 · Tarefa 15</span><span>15 / 15</span></footer>
+</section>
+</main></div>
+<!-- === NAVIGATION AND INLINE EDITOR === -->
+<nav class="deck-controls" aria-label="Navegação dos slides"><button id="previous" aria-label="Slide anterior">←</button><span id="counter" aria-live="polite"></span><a href="#3">Bordas</a><a href="#8">Células</a><a href="#10">Versões</a><a href="#13">Dados</a><a href="#15">Conclusão</a><button id="next" aria-label="Próximo slide">→</button></nav>
+<div class="edit-hotzone" aria-hidden="true"></div><button class="edit-toggle" id="editToggle" aria-pressed="false">Editar (E)</button><span id="editStatus" role="status"></span>
+<script>
+/* === PRESENTATION CONTROLLER === */
+class SlidePresentation {
+  constructor(){
+    this.stage=document.getElementById('deckStage');
+    this.slides=[...document.querySelectorAll('.slide')];
+    this.fields=[...document.querySelectorAll('[data-edit]')];
+    this.current=0;this.editing=false;this.wheelLocked=false;
+    this.scale();window.addEventListener('resize',()=>this.scale());
+    this.restoreEdits();
+    this.show(Number(location.hash.slice(1))-1||0);
+    window.addEventListener('hashchange',()=>this.show(Number(location.hash.slice(1))-1||0));
+    document.getElementById('previous').onclick=()=>this.show(this.current-1);
+    document.getElementById('next').onclick=()=>this.show(this.current+1);
+    document.addEventListener('keydown',event=>this.onKey(event));
+    let touchStart=0;
+    this.stage.addEventListener('touchstart',event=>touchStart=event.target.closest('#cell-demo')?null:event.touches[0].clientX,{passive:true});
+    this.stage.addEventListener('touchend',event=>{if(touchStart===null)return;let delta=event.changedTouches[0].clientX-touchStart;if(Math.abs(delta)>50)this.show(this.current+(delta<0?1:-1))},{passive:true});
+    window.addEventListener('wheel',event=>{if(this.wheelLocked||this.editing)return;this.wheelLocked=true;this.show(this.current+(event.deltaY>0?1:-1));setTimeout(()=>this.wheelLocked=false,500)},{passive:true});
+    this.setupEditing();
+  }
+  scale(){const factor=Math.min(innerWidth/1920,innerHeight/1080);this.stage.style.transform='translate('+(innerWidth-1920*factor)/2+'px,'+(innerHeight-1080*factor)/2+'px) scale('+factor+')'}
+  show(index){this.current=Math.max(0,Math.min(index,this.slides.length-1));this.slides.forEach((slide,i)=>{slide.classList.toggle('active',i===this.current);slide.classList.toggle('visible',i===this.current);slide.inert=i!==this.current;slide.setAttribute('aria-hidden',String(i!==this.current))});document.getElementById('counter').textContent=(this.current+1)+' / '+this.slides.length;if(location.hash!=='#'+(this.current+1))history.replaceState(null,'','#'+(this.current+1))}
+  onKey(event){if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'&&this.editing){event.preventDefault();this.save();return}if(event.target.isContentEditable||event.target.closest('button,a,input,select'))return;if(event.key.toLowerCase()==='e'){this.toggleEdit();return}if(['ArrowRight','ArrowDown','PageDown',' '].includes(event.key)){event.preventDefault();this.show(this.current+1)}if(['ArrowLeft','ArrowUp','PageUp'].includes(event.key)){event.preventDefault();this.show(this.current-1)}}
+  restoreEdits(){this.fields.forEach((field,i)=>{const value=localStorage.getItem('tarefa15-slide-edit-'+i);if(value!==null)field.textContent=value;field.addEventListener('input',()=>localStorage.setItem('tarefa15-slide-edit-'+i,field.textContent))})}
+  setupEditing(){const button=document.getElementById('editToggle'),zone=document.querySelector('.edit-hotzone');button.onclick=()=>this.toggleEdit();zone.onclick=()=>this.toggleEdit();let timer;[button,zone].forEach(element=>{element.onmouseenter=()=>{clearTimeout(timer);button.classList.add('show')};element.onmouseleave=()=>{timer=setTimeout(()=>{if(!this.editing)button.classList.remove('show')},400)}})}
+  toggleEdit(){this.editing=!this.editing;this.fields.forEach(field=>field.contentEditable=this.editing?'true':'false');const button=document.getElementById('editToggle');button.classList.toggle('active',this.editing);button.setAttribute('aria-pressed',String(this.editing));button.textContent=this.editing?'Concluir edição':'Editar (E)';document.getElementById('editStatus').textContent=this.editing?'Clique no texto · Ctrl+S baixa o HTML':''}
+  save(){const copy=document.documentElement.cloneNode(true);copy.querySelectorAll('[contenteditable]').forEach(field=>field.removeAttribute('contenteditable'));const button=copy.querySelector('#editToggle');button.classList.remove('active','show');button.textContent='Editar (E)';button.setAttribute('aria-pressed','false');copy.querySelector('#editStatus').textContent='';const serialized=new XMLSerializer().serializeToString(copy);const url=URL.createObjectURL(new Blob(['<!doctype html>\n'+serialized],{type:'text/html;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download='tarefa15-slides.html';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+}
+new SlidePresentation();
+
+/* Each phase exposes the same old-time stencil; communication copies values.
+   The example deliberately uses four cells per rank, so no 1024-index Test fires. */
+(() => {
+  const root = document.getElementById('cell-demo');
+  const frames = [Array.from({length:12}, (_, i) => i < 6 ? 1 : 0)];
+  let iteration = 0, phase = 0;
+  const phases = [
+    ['Estado inicial', 'Cada rank tem memória própria. A metade esquerda começa em 1; a direita, em 0. Halos externos ficam em zero.'],
+    ['1 · Iniciar trocas', 'Irecv prepara os halos; Isend envia cópias das bordas. “?” indica um halo ainda indisponível para leitura.'],
+    ['2 · Calcular interior', 'Índices locais 2 e 3 usam apenas current do próprio rank e escrevem em next, enquanto as mensagens podem progredir.'],
+    ['3 · Receber halos', 'Wait conclui as recepções pendentes. Os halos agora contêm cópias das bordas vizinhas do passo n.'],
+    ['4 · Calcular bordas', 'Índices 1 e 4 podem usar os halos recebidos. Todos os valores de next pertencem ao mesmo passo n + 1.'],
+    ['5 · Concluir envios', 'Wait conclui os dois envios antes de reutilizar os buffers. Iniciar Isend não libera imediatamente sua memória.'],
+    ['6 · Trocar ponteiros', 'next torna-se current, sem copiar a barra. O antigo current será sobrescrito no próximo passo; seus valores estão ocultos.']
+  ];
+  const format = value => value.toFixed(3).replace('.', ',');
+  function render() {
+    const current = frames[iteration];
+    const next = current.map((v, i) => v + .2 * ((current[i-1] ?? 0) - 2*v + (current[i+1] ?? 0)));
+    const shown = phase === 6 ? next : current;
+    const target = phase === 2 ? 5 : phase === 4 ? 7 : -10;
+    function cell(value, label, classes = '') {
+      const color = value === null ? '' : `background:rgb(255,${Math.round(255-12*value)},${Math.round(255-100*value)})`;
+      return `<div class="demo-cell ${classes}${value === null ? ' pending' : ''}" style="${color}">${value === null ? '?' : format(value)}<small>${label}</small></div>`;
+    }
+    document.getElementById('demo-ranks').innerHTML = [0,1,2].map(rank => {
+      const base = rank*4;
+      let top = '<span class="demo-label">current</span>';
+      for (let local = 0; local < 6; local++) {
+        const global = base+local-1, ghost = local === 0 || local === 5;
+        const external = global < 0 || global >= 12;
+        const ready = phase >= 3 && phase < 6;
+        const value = external ? 0 : ghost && !ready ? null : shown[global];
+        const label = ghost ? (external ? 'fixo: 0' : `← rank ${local === 0 ? rank-1 : rank+1}`) : `i = ${local}`;
+        const reading = rank === 1 && Math.abs(global-target) <= 1;
+        top += cell(value, label, `${ghost ? 'ghost ' : ''}${ghost && ready && !external ? 'arrived ' : ''}${reading ? 'reading' : ''}`);
+      }
+      let bottom = '<span class="demo-label">next</span><span class="demo-empty">halo</span>';
+      for (let local = 1; local <= 4; local++) {
+        const global = base+local-1;
+        const calculated = phase >= 2 && phase < 6 && ((local === 2 || local === 3) || phase >= 4);
+        bottom += cell(calculated ? next[global] : null, `i = ${local}`, global === target ? 'writing' : '');
+      }
+      bottom += '<span class="demo-empty">halo</span>';
+      return `<div class="demo-rank"><h3>Rank ${rank}<small>células globais ${base}–${base+3} · memória separada</small></h3><div class="demo-row">${top}</div><div class="demo-row">${bottom}</div></div>`;
+    }).join('');
+    root.querySelectorAll('[data-phase]').forEach(block => {
+      const active = Number(block.dataset.phase) === phase;
+      block.classList.toggle('code-active', active);
+      if (active) block.setAttribute('aria-current', 'step'); else block.removeAttribute('aria-current');
+    });
+    document.getElementById('demo-phase').textContent = phases[phase][0];
+    document.getElementById('demo-explanation').textContent = phases[phase][1];
+    document.getElementById('demo-step').textContent = `Passo n = ${iteration + (phase === 6 ? 1 : 0)} · etapa ${phase} / 6`;
+    document.getElementById('demo-back').disabled = iteration === 0 && phase === 0;
+    document.getElementById('demo-forward').textContent = phase === 6 ? 'Iniciar próximo passo' : 'Próxima etapa';
+    document.getElementById('demo-equation').textContent = target < 0 ? 'next[i] = current[i] + 0,2 × (esq. − 2 × atual + dir.)' :
+      `Rank 1 · i=${target-3}: ${format(current[target])} + 0,2 × (${format(current[target-1])} − 2 × ${format(current[target])} + ${format(current[target+1])}) = ${format(next[target])}`;
+    if (phase === 6) frames[iteration+1] = next;
+  }
+  document.getElementById('demo-forward').onclick = () => {if (phase === 6) {iteration++; phase = 1;} else phase++; render();};
+  document.getElementById('demo-back').onclick = () => {if (phase === 1 && iteration > 0) {iteration--; phase = 6;} else phase = Math.max(0, phase-1); render();};
+  document.getElementById('demo-reset').onclick = () => {iteration = 0; phase = 0; frames.length = 1; render();};
+  render();
+})();
+
+</script>
+</body></html>

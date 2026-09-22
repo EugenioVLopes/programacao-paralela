@@ -119,27 +119,27 @@ Na versão com \texttt{MPI\_Wait}, os quatro pedidos são concluídos antes da p
 Os pedidos \texttt{requests[0]} e \texttt{requests[1]} acompanham os recebimentos; os pedidos \texttt{requests[2]} e \texttt{requests[3]}, os envios. Enquanto um envio estiver pendente, seu buffer em \texttt{current} não pode ser alterado. Escrever os resultados em \texttt{next} permite calcular sem modificar esse buffer. A espera pelos envios ao final libera sua reutilização nos passos seguintes; só então o programa troca os ponteiros dos dois vetores.
 
 \section{Experimento}
-O job 2109344 foi executado na partição \texttt{intel-512} do NPAD, com dois processos em nós distintos, uma CPU por processo. O programa foi compilado com \texttt{mpicc -std=c11 -O3 -Wall -Wextra}. A barra tinha 1\,048\,576 células, distribuídas igualmente; cada processo possuía 524\,288 células locais e duas fantasmas. A metade esquerda começou com temperatura 1, e a metade direita com 0. Foram executados 1\,000 passos com coeficiente 0,2, em cinco execuções do programa.
+Foram executados cinco jobs no NPAD, na partição \texttt{intel-128}: 2116320, 2116321, 2116322, 2116323 e 2116324. Cada job usou um processo MPI por nó e uma CPU por processo, com, respectivamente, 2, 4, 8, 10 e 12 processos e nós. A barra permaneceu fixa em 1\,048\,576 células, portanto o número de células locais variou de 524\,288 a 87\,381. O programa foi compilado com \texttt{mpicc -std=c11 -O3 -Wall -Wextra} e executou 1\,000 passos com coeficiente 0,2.
 
-Em cada execução, as três versões foram medidas nessa ordem, com a mesma condição inicial. O intervalo de \texttt{MPI\_Wtime} abrange os passos da simulação e a barreira final; não inclui alocação, inicialização da barra nem redução da soma final. A soma global foi impressa como verificação simples de consistência entre versões. Para comparar os tempos, usa-se a mediana das cinco execuções.
+A metade esquerda começou com temperatura 1 e a metade direita com 0. Em cada job foram feitas dez execuções do programa. Em cada execução, as três versões foram medidas nessa ordem e com a mesma condição inicial. O intervalo de \texttt{MPI\_Wtime} abrange os passos da simulação e a barreira final; não inclui inicialização do MPI, compilação, alocação, inicialização da barra nem redução da soma final. As saídas registraram avisos de inicialização do dispositivo OpenFabrics; nenhum transporte foi explicitamente excluído nesta medição.
+
+A variação de processos e nós foi usada para observar o comportamento das trocas de halo em diferentes quantidades de trabalho local. O foco da análise é a comparação direta entre as três estratégias de comunicação MPI.
 
 \section{Resultados}
 \begin{table}[H]
 \centering
 \begin{tabular}{crrr}
 \toprule
-Execução & \texttt{Send/Recv} (s) & \texttt{Isend/Irecv+Wait} (s) & \texttt{Isend/Irecv+Test} (s) \\
+Processos/nós & \texttt{Send/Recv} (s) & \texttt{Isend/Irecv+Wait} (s) & \texttt{Isend/Irecv+Test} (s) \\
 \midrule
-1 & 0,506098 & 0,498725 & 0,680938 \\
-2 & 0,520909 & 0,505166 & 0,682729 \\
-3 & 0,486050 & 0,479143 & 0,677186 \\
-4 & 0,517211 & 0,490103 & 0,678906 \\
-5 & 0,519315 & 0,500133 & 0,677699 \\
-\midrule
-Mediana & 0,517211 & 0,498725 & 0,678906 \\
+2 & 0,601704 & 0,595326 & 0,914577 \\
+4 & 0,341695 & 0,320561 & 0,452932 \\
+8 & 0,168256 & 0,158681 & 0,233792 \\
+10 & 0,141879 & 0,132283 & 0,188951 \\
+12 & 0,125474 & 0,107324 & 0,155934 \\
 \bottomrule
 \end{tabular}
-\caption{Tempos do job 2109344. A soma final impressa foi 524\,272,535328 em todas as versões e execuções.}
+\caption{Medianas das dez execuções por configuração. Como foi usado um processo por nó, a coluna também indica a quantidade de nós. A soma final foi 524\,272,535328 em todas as versões.}
 \label{tab:tempos}
 \end{table}
 
@@ -147,26 +147,31 @@ Mediana & 0,517211 & 0,498725 & 0,678906 \\
 \centering
 \begin{tikzpicture}
 \begin{axis}[
-    ybar, width=0.9\textwidth, height=6cm,
-    ymin=0, ymax=1.8,
+    width=0.9\textwidth, height=7cm,
+    ymin=0, ymax=1.0,
+    xlabel={Processos e nós},
     ylabel={Mediana do tempo (s)},
-    xtick={1,2,3},
-    xticklabels={\texttt{Send/Recv},\texttt{Isend/Irecv+Wait},\texttt{Isend/Irecv+Test}},
-    x tick label style={font=\small},
-    nodes near coords,
+    xtick={2,4,8,10,12},
     grid=major,
-    bar width=28pt
+    legend style={at={(0.98,0.98)},anchor=north east,font=\small}
 ]
-\addplot+[fill=primaryblue] coordinates {(1,0.517211) (2,0.498725) (3,0.678906)};
+\addplot+[mark=*] coordinates {(2,0.601704) (4,0.341695) (8,0.168256) (10,0.141879) (12,0.125474)};
+\addplot+[mark=square*] coordinates {(2,0.595326) (4,0.320561) (8,0.158681) (10,0.132283) (12,0.107324)};
+\addplot+[mark=triangle*] coordinates {(2,0.914577) (4,0.452932) (8,0.233792) (10,0.188951) (12,0.155934)};
+\legend{\texttt{Send/Recv},\texttt{Isend/Irecv+Wait},\texttt{Isend/Irecv+Test}}
 \end{axis}
 \end{tikzpicture}
-\caption{Mediana das cinco execuções para cada versão.}
+\caption{Medianas das dez execuções para cada configuração de processos e nós.}
 \label{fig:medianas}
 \end{figure}
 
-As medianas das versões bloqueante e não bloqueante seguida de espera diferem em aproximadamente 3,6\%, com menor tempo para a versão com \texttt{MPI\_Isend}/\texttt{MPI\_Irecv} e \texttt{MPI\_Wait}. A versão com \texttt{MPI\_Test} teve mediana aproximadamente 31\% maior que a bloqueante: a sobreposição implementada não trouxe ganho neste caso. Uma hipótese é que o custo dos testes periódicos e sua interação com o cálculo superem o tempo de comunicação ocultado; este experimento não isolou esses custos. Cada borda contém apenas um \texttt{double} (8 bytes), portanto a comunicação entre nós é dominada por mensagens pequenas e latência.
+A versão \texttt{Isend/Irecv+Wait} apresentou o menor tempo mediano em todas as configurações. A versão bloqueante ficou muito próxima dela, enquanto a versão com \texttt{MPI\_Test} permaneceu mais lenta. Portanto, neste experimento, iniciar as operações não bloqueantes e esperar antes do cálculo foi mais favorável que consultar periodicamente os recebimentos durante o cálculo interno.
 
-As cinco execuções apresentaram valores próximos, sem uma execução discrepante como no teste anterior. A soma final igual é uma verificação global, não uma comparação célula a célula.
+A versão com \texttt{MPI\_Test} cria uma oportunidade de sobreposição, mas essa oportunidade não trouxe ganho observado. Cada troca de halo contém apenas um \texttt{double} por direção, de modo que a latência e o custo das operações de comunicação têm importância relativa. As consultas periódicas também introduzem trabalho adicional; o experimento não isolou esses custos nem mediu o progresso interno do MPI.
+
+Quando a quantidade de processos e nós aumenta, o tempo total diminui porque cada processo calcula menos células. Essa tendência não deve ser interpretada isoladamente como melhoria da comunicação: a configuração altera simultaneamente a quantidade de trabalho local e o número de vizinhos envolvidos. Com um processo por nó, as trocas entre vizinhos usam a rede entre nós; assim, os resultados servem para comparar as estratégias sob diferentes granulosidades de trabalho, não para separar o efeito exclusivo do número de nós.
+
+A soma final idêntica em todas as execuções é uma verificação global de consistência, não uma comparação célula a célula. Os avisos OpenFabrics caracterizam o ambiente de execução; como a inicialização do MPI está fora do intervalo cronometrado, o experimento não isolou eventual influência desses diagnósticos sobre o desempenho medido.
 
 \appendix
 \clearpage
