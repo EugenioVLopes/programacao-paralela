@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tarefa 11 · Particionamento de dados e balanceamento de carga</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap');
+
+/* === FIXED 16:9 STAGE === */
+/* ===========================================
+   FIXED 16:9 STAGE: MANDATORY BASE STYLES
+   Include this ENTIRE file in every presentation.
+   Slides are authored at 1920×1080 and scaled as a whole.
+   =========================================== */
+
+/* 1. Lock the browser viewport */
+html,
+body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: var(--stage-bg, #000);
+}
+
+/* 2. Full-window deck viewport */
+.deck-viewport {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: var(--stage-bg, #000);
+}
+
+/* 3. Fixed 16:9 design canvas.
+   JavaScript sets transform: translate(...) scale(...). */
+.deck-stage {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    transform-origin: 0 0;
+    background: var(--slide-bg, #fff);
+}
+
+/* 4. Slides stack inside the fixed stage.
+   Content must be laid out at 1920×1080, not reflowed per device. */
+.slide {
+    position: absolute;
+    inset: 0;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    display: block;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    background: var(--slide-bg, #fff);
+}
+
+.slide.active,
+.slide.visible {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    z-index: 1;
+}
+
+/* 5. Keep media inside authored slide bounds */
+img,
+video,
+canvas,
+svg {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* 6. Presentation chrome stays outside the slide design system */
+.deck-controls {
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    transform: translateX(-50%);
+    z-index: 1000;
+}
+
+/* 7. Print one fixed-size slide per page */
+@media print {
+    html,
+    body {
+        width: 1920px;
+        height: auto;
+        overflow: visible;
+        background: #fff;
+    }
+
+    .deck-viewport {
+        position: static;
+        overflow: visible;
+        background: #fff;
+    }
+
+    .deck-stage {
+        position: static;
+        width: auto;
+        height: auto;
+        transform: none !important;
+        background: none;
+    }
+
+    .slide {
+        position: relative;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        width: 1920px;
+        height: 1080px;
+        break-after: page;
+        page-break-after: always;
+    }
+
+    .slide:last-child {
+        break-after: auto;
+        page-break-after: auto;
+    }
+
+    .deck-controls {
+        display: none !important;
+    }
+}
+
+/* 8. Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.2s !important;
+    }
+}
+
+/* === WHITEBOARD THEME === */
+:root{--slide-bg:#fffdf8;--stage-bg:#e9e7e2;--ink:#1e1e1e;--accent:#1971c2;--muted:#495057;--blue:#e7f5ff;--yellow:#fff3bf;--green:#d3f9d8;--red:#ffe3e3;font-family:'Patrick Hand',cursive;color:var(--ink)}
+*{box-sizing:border-box}
+.slide{padding:72px 96px 86px;color:var(--ink);background:radial-gradient(#d0d5da 1.3px,transparent 1.3px) 0 0/34px 34px,var(--slide-bg)}
+.kicker{display:inline-block;color:var(--accent);font-size:27px;letter-spacing:1px;margin-bottom:18px}
+h1,h2,h3,p{margin-top:0}h1{font-size:82px;line-height:1.3;margin:10px 0 26px}h2{font-size:68px;line-height:1.3;margin:0 0 30px;max-width:1700px}h3{font-size:39px;line-height:1.3;margin:0 0 10px}
+p,li{font-size:34px;line-height:1.5}.lead{font-size:46px;line-height:1.5}.small{font-size:26px;color:var(--muted)}.big{font-size:62px;line-height:1.3}.accent{color:var(--accent)}.green-text{color:#2b8a3e}
+.content{height:765px}.content.fit-content{height:auto}.cols{display:grid;grid-template-columns:1fr 1fr;gap:36px}.three{display:grid;grid-template-columns:repeat(3,1fr);gap:26px}.three+.box{margin-top:28px}
+.box,.statement,pre,.formula,table{border:3px solid var(--ink);border-radius:22px 17px 25px 15px/16px 24px 18px 26px;box-shadow:4px 5px 0 #cbd3d8}
+.box{background:var(--blue);padding:25px 30px}.box.yellow{background:var(--yellow)}.box.green{background:var(--green)}.box.red{background:var(--red)}.box p:last-child{margin-bottom:0}
+.statement{background:var(--yellow);font-size:58px;line-height:1.4;padding:30px 42px;margin:24px 0 35px}
+.formula{background:var(--blue);font-size:52px;padding:22px 32px;margin:20px 0}.formula em{font-style:normal;color:var(--accent)}
+pre{background:#fff;font:29px/1.45 'DejaVu Sans Mono',monospace;white-space:pre-wrap;padding:25px 32px;margin:18px 0 28px}
+code{font-family:'DejaVu Sans Mono',monospace;font-size:.76em}
+.math{font-family:Georgia,serif;font-style:italic}.arrow{color:var(--accent);font-size:62px;text-align:center}
+.chips{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}.chip{display:inline-block;border:2px solid var(--ink);border-radius:12px 8px 11px 9px;background:#fff;padding:6px 14px;min-width:60px;text-align:center;font-size:31px}.chip.blue{background:var(--blue)}.chip.yellow{background:var(--yellow)}.chip.green{background:var(--green)}
+.sequence{display:flex;align-items:stretch;gap:15px;margin:32px 0}.sequence .box{flex:1;text-align:center}.sequence .arrow{align-self:center}.sequence .box{font-size:34px}
+.process-row{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin:34px 0}.rank-card{border:3px solid var(--ink);border-radius:22px 17px 25px 15px/16px 24px 18px 26px;box-shadow:4px 5px 0 #cbd3d8;background:var(--blue);padding:24px 20px;text-align:center;font-size:35px}.rank-card.yellow{background:var(--yellow)}.rank-card strong{display:block;font-size:48px;font-weight:normal}.rank-card .chips{margin-top:13px}
+.schedule-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}.schedule-grid .box{min-height:335px}
+.stencil-row{display:grid;grid-template-columns:repeat(5,1fr);gap:18px;align-items:center;margin:24px 0}.stencil-row .box{text-align:center;font-size:28px;padding:20px 12px}
+.compact-code{font-size:25px}
+.validation-layout{display:grid;grid-template-columns:1.08fr .92fr;gap:28px;align-items:center;height:675px}.validation-layout img{display:block;width:100%;max-height:660px;object-fit:contain;border:2px solid #cbd3d8;border-radius:12px;background:#fff}
+.chart-layout{display:grid;grid-template-columns:1.5fr .8fr;gap:28px;align-items:center;height:675px}.chart-layout img{display:block;width:100%;max-height:640px;object-fit:contain;border:2px solid #cbd3d8;border-radius:12px;background:#fff}
+.flow{display:flex;align-items:center;justify-content:center;gap:18px;margin:42px 0}.flow .box{width:360px;min-height:180px;text-align:center}.flow .arrow{font-size:54px}
+table{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;background:#fff;font-size:29px}th,td{padding:10px 20px;text-align:right;border-bottom:2px dashed #adb5bd}th:first-child,td:first-child{text-align:left}th{background:var(--blue);font-weight:normal}tr:nth-child(even) td{background:#f8f9fa}tbody tr:last-child td{border-bottom:0}.best{color:#2b8a3e;font-weight:bold}
+.line{height:3px;background:var(--ink);margin:28px 0}.callout{font-size:28px;color:var(--muted);margin-top:18px}.sources{display:flex;gap:18px;flex-wrap:wrap;margin-top:42px}
+a{color:var(--accent);text-underline-offset:5px}.sources a,.deck-controls button,.deck-controls a,.edit-toggle{background:#fff;color:var(--ink);border:2px solid var(--ink);border-radius:14px 9px 13px 10px;box-shadow:2px 3px 0 #cbd3d8;font:25px 'Patrick Hand',cursive;text-decoration:none;padding:5px 15px;cursor:pointer}
+.sources a:hover,.deck-controls a:hover,.deck-controls button:hover{background:var(--blue)}button:focus-visible,a:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
+footer{position:absolute;left:96px;right:96px;bottom:32px;border-top:2px dashed #868e96;padding-top:8px;display:flex;justify-content:space-between;color:var(--muted);font-size:23px}
+.deck-controls{display:flex;align-items:center;gap:9px;bottom:10px;max-width:calc(100vw - 20px);overflow-x:auto;white-space:nowrap;background:var(--slide-bg);color:var(--ink);border:2px solid var(--ink);border-radius:17px 12px 18px 11px;padding:7px 10px;font-size:22px}
+@media(max-width:600px){.deck-controls{gap:8px;padding:5px 8px;font-size:21px}.deck-controls a{display:none}.deck-controls button{font-size:21px;padding:4px 13px}}
+.reveal{opacity:0;transform:translateY(16px);transition:opacity .4s ease-out,transform .4s ease-out}.visible .reveal{opacity:1;transform:none}.visible .reveal.delay1{transition-delay:.12s}.visible .reveal.delay2{transition-delay:.24s}.visible .reveal.delay3{transition-delay:.36s}
+.edit-hotzone{position:fixed;top:0;left:0;width:80px;height:80px;z-index:1001}.edit-toggle{position:fixed;top:12px;left:12px;opacity:0;pointer-events:none;z-index:1002}.edit-toggle.show,.edit-toggle.active{opacity:1;pointer-events:auto}[contenteditable=true]{outline:2px dashed var(--accent)}#editStatus{position:fixed;right:15px;top:12px;z-index:1002;background:var(--slide-bg);color:var(--ink);font-size:19px}
+@media print{.edit-hotzone,.edit-toggle,#editStatus{display:none}.reveal{opacity:1!important;transform:none!important}@page{size:1920px 1080px;margin:0}}
+</style>
+</head>
+<body>
+<!-- === SLIDE STAGE === -->
+<div class="deck-viewport"><main class="deck-stage" id="deckStage">
+
+<!-- === SLIDE 01: TITLE === -->
+<section class="slide active" aria-label="Particionamento de dados e balanceamento de carga">
+  <div class="kicker">TAREFA 11 / OPENMP</div>
+  <h1 data-edit>Particionamento de dados<br>e balanceamento de carga</h1>
+  <div class="statement reveal" data-edit>A mesma difusão. Sete formas de repartir o trabalho.</div>
+  <div class="sequence reveal delay1" aria-hidden="true">
+    <div class="box">Campo atual</div><span class="arrow">→</span>
+    <div class="box yellow">Stencil 5 pontos</div><span class="arrow">→</span>
+    <div class="box green">Campo seguinte</div>
+  </div>
+  <p class="small" data-edit>DCA3703 · Eugenio Vitor Lopes dos Santos</p>
+  <footer><span>Programação Paralela · UFRN</span><span>1 / 19</span></footer>
+</section>
+
+<!-- === SLIDE 02: PHYSICAL MODEL === -->
+<section class="slide" aria-label="Modelo viscoso simplificado">
+  <div class="kicker">O PROBLEMA</div><h2 data-edit>O modelo considera só a viscosidade</h2>
+  <div class="content">
+    <div class="formula reveal"><span class="math">∂u/∂t = ν∇²u</span></div>
+    <div class="cols">
+      <div class="box reveal delay1"><h3 data-edit>O que evolui</h3><p data-edit>Um campo de velocidade em uma malha bidimensional. A viscosidade espalha variações locais ao longo do tempo.</p></div>
+      <div class="box yellow reveal delay2"><h3 data-edit>Escopo do cálculo</h3><p data-edit>Pressão, advecção e forças externas ficam de fora. A simulação é o caso viscoso do enunciado, não um solver completo de Navier–Stokes.</p></div>
+    </div>
+  </div><footer><span>DCA3703 · Tarefa 11</span><span>2 / 19</span></footer>
+</section>
+
+<!-- === SLIDE 03: DISCRETIZATION === -->
+<section class="slide" aria-label="Stencil de cinco pontos">
+  <div class="kicker">DIFERENÇAS FINITAS</div><h2 data-edit>Uma célula combina cinco valores</h2>
+  <div class="content">
+    <div class="formula reveal"><span class="math">uᵢⱼⁿ⁺¹ = uᵢⱼⁿ + r (uᵢ₋₁ⱼⁿ + uᵢ₊₁ⱼⁿ + uᵢⱼ₋₁ⁿ + uᵢⱼ₊₁ⁿ − 4uᵢⱼⁿ)</span></div>
+    <div class="stencil-row reveal delay1" aria-label="Vizinho acima, abaixo, esquerda, centro e direita">
+      <div class="box">acima<br><strong>uᵢ₋₁,ⱼ</strong></div>
+      <div class="box yellow">esquerda<br><strong>uᵢ,ⱼ₋₁</strong></div>
+      <div class="box green">centro<br><strong>uᵢ,ⱼ</strong></div>
+      <div class="box yellow">direita<br><strong>uᵢ,ⱼ₊₁</strong></div>
+      <div class="box">abaixo<br><strong>uᵢ₊₁,ⱼ</strong></div>
+    </div>
+    <div class="formula reveal delay2"><span class="math">r = νΔt/h² = 0,1 × 0,2 / 1² = 0,02</span></div>
+    <p class="small" data-edit>O stencil atualiza só as células internas; as bordas permanecem fixas.</p>
+  </div><footer><span>DCA3703 · Tarefa 11</span><span>3 / 19</span></footer>
+</section>
+
+<!-- === SLIDE 04: VALIDATION FIELDS === -->
+<section class="slide" aria-label="Campos usados na validação">
+  <div class="kicker">VALIDAÇÃO DO MODELO</div><h2 data-edit>Três campos verificam o cálculo</h2>
+  <div class="validation-layout">
+    <img class="reveal" src="visualizacao_difusao.png" alt="Campo gaussiano no início e após 500 passos; a perturbação se espalha e seu pico diminui de 0,100 para 0,092.">
+    <div>
+      <div class="box reveal delay1"><h3 data-edit>Campo nulo</h3><p data-edit>Permanece em zero. Não há valor que inicie a difusão.</p></div>
+      <div class="box yellow reveal delay2"><h3 data-edit>Campo constante</h3><p data-edit>Permanece constante porque o laplaciano discreto é zero.</p></div>
+      <div class="box green reveal delay3"><h3 data-edit>Perturbação gaussiana</h3><p data-edit>Espalha-se suavemente; após 500 passos, o pico cai de 0,100 para 0,092.</p></div>
+    </div>
+  </div>
+  <footer><span>DCA3703 · Tarefa 11</span><span>4 / 19</span></footer>
+</section>
+
+<!-- === SLIDE 05: TWO BUFFERS === -->
+<section class="slide" aria-label="Dois campos evitam misturar instantes">
+  <div class="kicker">ESTADO DO CÁLCULO</div><h2 data-edit>Um passo lê u e escreve v</h2>
+  <div class="content">
+    <div class="cols reveal">
+      <div class="box"><h3 data-edit>u · passo n</h3><p data-edit>Fonte de todos os valores do stencil deste passo. Nenhuma célula de u muda durante a varredura.</p></div>
+      <div class="box green"><h3 data-edit>v · passo n + 1</h3><p data-edit>Destino das células atualizadas. Cada posição interna tem um único escritor.</p></div>
+    </div>
+    <pre class="reveal delay1">v[i * N + j] = u[i * N + j] + r *
+  (u[(i - 1) * N + j] + u[(i + 1) * N + j] +
+   u[i * N + j - 1] + u[i * N + j + 1] -
+   4.0 * u[i * N + j]);</pre>
+    <div class="statement reveal delay2" data-edit>Depois do passo, trocar os ponteiros evita copiar a malha inteira.</div>
+  </div><footer><span>DCA3703 · Tarefa 11</span><span>5 / 19</span></footer>
+</section>
+
+<!-- === SLIDE 06: DEPENDENCIES === -->
+<section class="slide" aria-label="Dependências entre células e passos">
+  <div class="kicker">DEPENDÊNCIAS</div><h2 data-edit>As células são independentes dentro do passo</h2>
+  <div class="content">
+    <div class="three reveal">
+      <div class="box"><h3 data-edit>Leitura comum</h3><p data-edit>Várias threads consultam u. Nenhuma escreve nele durante a varredura.</p></div>
+      <div class="box green"><h3 data-edit>Saídas distintas</h3><p data-edit>Cada par (i,j) grava uma posição diferente de v.</p></div>
+      <div class="box yellow"><h3 data-edit>RAW entre passos</h3><p data-edit>O próximo passo precisa ler as saídas já concluídas do passo atual.</p></div>
+    </div>
+    <div class="formula reveal delay1"><span class="math">passo n → todas as células internas → passo n + 1</span></div>
+    <p class="lead reveal delay2" data-edit>O espaço da malha pode ser repartido. A sequência temporal precisa continuar ordenada.</p>
+  </div><footer><span>DCA3703 · Tarefa 11</span><span>6 / 19</span></footer>
+</section>
+
+<!-- === SLIDE 07: SHARED OPENMP LOOP === -->
+<section class="slide" aria-label="Estrutura comum às versões paralelas">
+  <div class="kicker">ESTRUTURA COMUM</div><h2 data-edit>Distribuir o laço espacial; sincronizar cada passo</h2>
+  <div class="content">
+    <pre class="compact-code reveal">#pragma omp parallel
+{
+  for (int t = 0; t &lt; num_passos; ++t) {
+    #pragma omp for schedule(...)
+    for (int i = 1; i &lt; N - 1; ++i)
+      for (int j = 1; j &lt; N - 1; ++j)
+        atualizar(u, v, i, j);
+
+    #pragma omp single
+    trocar_ponteiros(&amp;u, &amp;v);
+  }
+}</pre>
+    <div class="cols reveal delay1">
+      <div class="box"><h3 data-edit>Barreira de omp for</h3><p data-edit>As threads terminam todas as células antes que o campo atual seja trocado.</p></div>
+      <div class="box yellow"><h3 data-edit>Single e sua barreira</h3><p data-edit>Uma thread troca u e v; a barreira implícita mantém todas as threads no mesmo passo.</p></div>
+    </div>
+  </div><footer><span>DCA3703 · Tarefa 11</span><span>7 / 19</span></footer>
+</section>
+
+<!-- === SLIDE 08: SCHEDULE POLICIES === -->
+<section class="slide" aria-label="Três políticas de schedule">
+  <div class="kicker">SCHEDULE</div><h2 data-edit>O escalonador decide quem recebe cada chunk</h2>
+  <div class="content">
+    <div class="schedule-grid reveal">
+      <div class="box"><h3 data-edit>static</h3><p data-edit>Reparte as iterações antes do laço. A thread mantém sua parcela sem solicitar novos chunks.</p></div>
+      <div class="box yellow"><h3 data-edit>dynamic, 16</h3><p data-edit>Entrega chunks de 16 iterações sob demanda. Quem termina pede outro ao escalonador.</p></div>
+      <div class="box green"><h3 data-edit>guided, 16</h3><p data-edit>Começa com chunks maiores, reduz o tamanho ao longo do laço e respeita 16 como mínimo.</p></div>
+    </div>
+    <div class="statement reveal delay1" data-edit>Mais redistribuição pode equilibrar carga variável; também pode aumentar a coordenação.</div>
+    <p class="small reveal delay2" data-edit>Nesta malha, cada célula executa o mesmo stencil. A carga por célula é uniforme.</p>
+  </div><footer><span>DCA3703 · Tarefa 11</span><span>8 / 19</span></footer>
+</section>
+
+<!-- === SLIDE 09: STATIC DISTRIBUTION === -->
+<section class="slide" aria-label="schedule static por linhas">
+  <div class="kicker">STATIC · POR LINHAS</div><h2 data-edit>static divide linhas antes de começar</h2>
+  <div class="content">
+    <p class="lead reveal" data-edit>Exemplo ilustrativo: 8 linhas internas para 4 threads.</p>
+    <div class="process-row reveal delay1">
+      <div class="rank-card"><strong>Thread 0</strong><div class="chips"><span class="chip blue">0</span><span class="chip blue">1</span></div></div>
+      <div class="rank-card yellow"><strong>Thread 1</strong><div class="chips"><span class="chip yellow">2</span><span class="chip yellow">3</span></div></div>
+      <div class="rank-card green"><strong>Thread 2</strong><div class="chips"><span class="chip green">4</span><span class="chip green">5</span></div></div>
+      <div class="rank-card"><strong>Thread 3</strong><div class="chips"><span class="chip">6</span><span class="chip">7</span></div></div>
+    </div>
+    <pre class="reveal delay2">#pragma omp for schedule(static)
+for (int i = 1; i &lt; N - 1; ++i)
+  for (int j = 1; j &lt; N - 1; ++j)
+    atualizar(u, v, i, j);</pre>
+    <p class="small" data-edit>A atribuição mostrada é um exemplo de blocos contíguos; a figura não representa um tempo medido.</p>
+  </div><footer><span>DCA3703 · Tarefa 11</span><span>9 / 19</span></footer>
+</section>
+
+<!-- === SLIDE 10: DYNAMIC AND GUIDED === -->
+<section class="slide" aria-label="Chunks dinâmicos e guiados">
+  <div class="kicker">DYNAMIC · GUIDED</div><h2 data-edit>Redistribuir tem um custo de coordenação</h2>
+  <div class="content">
+    <div class="cols">
+      <div class="box reveal"><h3 data-edit>dynamic</h3><div class="sequence"><span class="chip">T0: C0</span><span class="chip">T1: C1</span></div><p data-edit>Chunks do mesmo tamanho são requisitados conforme cada thread termina. Útil quando o custo das iterações varia.</p></div>
+      <div class="box green reveal delay1"><h3 data-edit>guided</h3><div class="sequence"><span class="chip green">C0 grande</span><span class="chip yellow">C1 menor</span><span class="chip">…</span><span class="chip">≥ 16</span></div><p data-edit>Começa com blocos maiores e reduz as solicitações conforme o trabalho restante diminui.</p></div>
+    </div>
+    <div class="statement reveal delay2" data-edit>O stencil tem carga regular; redistribuir cada poucas células pode custar mais do que ajuda.</div>
+  </div><footer><span>DCA3703 · Tarefa 11</span><span>10 / 19</span></footer>
+</section>
+
+<!-- === SLIDE 11: COLLAPSE === -->
+<section class="slide" aria-label="collapse altera a unidade distribuída">
+  <div class="kicker">COLLAPSE(2)</div><h2 data-edit>Combinar laços muda o tamanho real do chunk</h2>
+  <div class="content">
+    <div class="cols reveal">
+      <div class="box"><h3 data-edit>Sem collapse</h3><p class="big">16 linhas</p><p data-edit>Com schedule(dynamic,16), cada iteração do laço externo é uma linha de 510 células.</p><p class="big math">16 × 510 = 8.160 células</p></div>
+      <div class="box yellow"><h3 data-edit>Com collapse(2)</h3><p class="big">16 células</p><p data-edit>Os dois laços formam um único espaço; cada iteração lógica é uma célula.</p><p class="big math">16 iterações = 16 células</p></div>
+    </div>
+    <pre class="reveal delay1">#pragma omp for schedule(dynamic, 16)
+/* chunk: 16 linhas */
+
+#pragma omp for collapse(2) schedule(dynamic, 16)
+/* chunk: 16 células */</pre>
+    <p class="small reveal delay2" data-edit>O valor 16 é contado nas iterações do espaço distribuído, não em bytes nem em operações aritméticas.</p>
+  </div><footer><span>DCA3703 · Tarefa 11</span><span>11 / 19</span></footer>
+</section>
+
+<!-- === SLIDE 12: VARIANTS === -->
+<section class="slide" aria-label="Variantes comparadas">
+  <div class="kicker">SETE VERSÕES</div><h2 data-edit>Uma alteração de distribuição por versão</h2>
+  <div class="content">
+    <table class="reveal"><thead><tr><th>Versão</th><th>Schedule</th><th>collapse</th><th>Chunk contado em</th></tr></thead><tbody>
+      <tr><td>v0</td><td>Sequencial</td><td>—</td><td>—</td></tr>
+      <tr><td>v1</td><td>static</td><td>—</td><td>linhas</td></tr>
+      <tr><td>v2</td><td>static</td><td>(2)</td><td>células</td></tr>
+      <tr><td>v3</td><td>dynamic, 16</td><td>—</td><td>linhas</td></tr>
+      <tr><td>v4</td><td>dynamic, 16</td><td>(2)</td><td>células</td></tr>
+      <tr><td>v5</td><td>guided, 16</td><td>(2)</td><td>células</td></tr>
+      <tr><td>v6</td><td>guided, 16</td><td>—</td><td>linhas</td></tr>
+    </tbody></table>
+    <p class="small reveal delay1" data-edit>O stencil, a malha e a evolução temporal são comuns. A unidade distribuída muda entre linhas e células.</p>
+  </div><footer><span>DCA3703 · Tarefa 11</span><span>12 / 19</span></footer>
+</section>
+
+<!-- === SLIDE 13: EXPERIMENT CONFIGURATION === -->
+<section class="slide" aria-label="Configuração do experimento">
+  <div class="kicker">EXPERIMENTO</div><h2 data-edit>Condições usadas na medição</h2>
+  <div class="content">
+    <div class="three reveal">
+      <div class="box"><h3>Malha</h3><p>512 × 512<br>500 passos</p></div>
+      <div class="box yellow"><h3>Threads</h3><p>1 · 2 · 4 · 8 · 14<br>5 repetições</p></div>
+      <div class="box green"><h3>Compilação</h3><p>GCC 13.3.0<br><code>-O2 -Wall -Wextra</code><br><code>-fopenmp -lm</code></p></div>
+    </div>
+    <div class="box reveal delay1"><h3 data-edit>Ambiente</h3><p data-edit>Intel Core i7-14700HX sob WSL2. As repetições tiveram intervalo de um segundo.</p></div>
+    <p class="small reveal delay2" data-edit>As medianas resumem cinco execuções por configuração. A malha permaneceu fixa enquanto o número de threads variou.</p>
+  </div><footer><span>DCA3703 · Tarefa 11</span><span>13 / 19</span></footer>
+</section>
+
+<!-- === SLIDE 14: TIMED REGION === -->
+<section class="slide" aria-label="O intervalo cronometrado">
+  <div class="kicker">CRONÔMETRO</div><h2 data-edit>O tempo cobre o stencil e suas sincronizações</h2>
+  <div class="content">
+    <div class="flow reveal">
+      <div class="box yellow"><h3>Fora</h3><p>alocação<br>inicialização</p></div><span class="arrow">→</span>
+      <div class="box green"><h3>Dentro</h3><p>stencil<br>barreiras<br>troca de ponteiros</p></div><span class="arrow">→</span>
+      <div class="box yellow"><h3>Fora</h3><p>diagnósticos<br>exportação</p></div>
+    </div>
+    <div class="formula reveal delay1"><code>omp_get_wtime()</code> mede a região de evolução temporal</div>
+    <p class="lead reveal delay2" data-edit>Os valores comparam o laço completo. Não isolam o custo de schedule, barreiras ou acesso à memória.</p>
+  </div><footer><span>DCA3703 · Tarefa 11</span><span>14 / 19</span></footer>
+</section>
+
+<!-- === SLIDE 15: VALIDATION PARALLEL === -->
+<section class="slide" aria-label="Validação das versões paralelas">
+  <div class="kicker">EQUIVALÊNCIA NUMÉRICA</div><h2 data-edit>A paralelização preserva o campo calculado</h2>
+  <div class="content">
+    <div class="cols reveal">
+      <div class="box green"><h3 data-edit>Estados de teste</h3><p data-edit>Os campos nulo e constante não mudaram. A perturbação gaussiana se difundiu como esperado.</p></div>
+      <div class="box"><h3 data-edit>Comparação</h3><p data-edit>As seis versões paralelas reproduziram o campo de referência sequencial com 1, 2 e 4 threads.</p></div>
+    </div>
+    <div class="statement reveal delay1" data-edit>A barreira entre passos mantém a dependência temporal; a distribuição só muda quem calcula cada célula.</div>
+    <p class="small reveal delay2" data-edit>A comparação usa os campos completos exportados, além dos diagnósticos mínimo, pico e soma.</p>
+  </div><footer><span>DCA3703 · Tarefa 11</span><span>15 / 19</span></footer>
+</section>
+
+<!-- === SLIDE 16: TIMING TABLE === -->
+<section class="slide" aria-label="Tempos medianos medidos">
+  <div class="kicker">RESULTADOS · SEGUNDOS</div><h2 data-edit>Tempos medianos por quantidade de threads</h2>
+  <div class="content">
+    <table class="reveal"><thead><tr><th>Estratégia</th><th>1</th><th>2</th><th>4</th><th>8</th><th>14</th></tr></thead><tbody>
+      <tr><td>Sequencial</td><td>0,0818</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+      <tr><td>static</td><td>0,0726</td><td>0,0420</td><td>0,0263</td><td>0,0155</td><td>0,0159</td></tr>
+      <tr><td>static + collapse</td><td>0,1554</td><td>0,0881</td><td>0,0573</td><td>0,0327</td><td>0,0299</td></tr>
+      <tr><td>dynamic</td><td>0,1087</td><td>0,0740</td><td>0,0444</td><td>0,0244</td><td>0,0219</td></tr>
+      <tr><td>dynamic + collapse</td><td>0,2693</td><td>0,4002</td><td>0,3510</td><td>0,3252</td><td>0,3364</td></tr>
+      <tr><td>guided + collapse</td><td>0,1207</td><td>0,0784</td><td>0,0429</td><td>0,0172</td><td>0,0166</td></tr>
+      <tr><td>guided</td><td>0,0696</td><td>0,0403</td><td>0,0222</td><td class="best">0,0141</td><td>0,0159</td></tr>
+    </tbody></table>
+    <p class="small reveal delay1" data-edit>Medianas de cinco repetições. Entre as contagens mostradas, o destaque é guided com 8 threads. A menor mediana da varredura foi 0,0133 s com guided e 9 threads.</p>
+  </div><footer><span>DCA3703 · Tarefa 11</span><span>16 / 19</span></footer>
+</section>
+
+<!-- === SLIDE 17: SCALING CURVE === -->
+<section class="slide" aria-label="Tempos ao variar o número de threads">
+  <div class="kicker">CURVA DE DESEMPENHO</div><h2 data-edit>static e guided atingem mínimos entre 8 e 9 threads</h2>
+  <div class="chart-layout">
+    <img class="reveal" src="tempo_execucao_log_plot.png" alt="Gráfico em escala logarítmica do tempo de execução das versões conforme o número de threads, de 1 a 14.">
+    <div>
+      <div class="box green reveal delay1"><h3 data-edit>Observado</h3><p data-edit>guided por linhas teve a menor mediana global. static por linhas ficou próxima em parte das contagens.</p></div>
+      <div class="box yellow reveal delay2"><h3 data-edit>Em 14 threads</h3><p data-edit>static e guided terminaram em 0,0159 s. Guided atingiu o mínimo observado antes, com 9 threads.</p></div>
+    </div>
+  </div><footer><span>DCA3703 · Tarefa 11</span><span>17 / 19</span></footer>
+</section>
+
+<!-- === SLIDE 18: COMPARISON AT 14 THREADS === -->
+<section class="slide" aria-label="Comparação das estratégias com 14 threads">
+  <div class="kicker">COMPARAÇÃO · 14 THREADS</div><h2 data-edit>Chunks de poucas células foram lentos nesta configuração</h2>
+  <div class="chart-layout">
+    <img class="reveal" src="estrategias_14_threads.png" alt="Gráfico de barras dos tempos medianos das seis estratégias paralelas com 14 threads.">
+    <div>
+      <div class="box reveal delay1"><h3 data-edit>dynamic + collapse</h3><p class="big">0,3364 s</p><p data-edit>O chunk de 16 corresponde a 16 células após collapse(2).</p></div>
+      <div class="box yellow reveal delay2"><h3 data-edit>guided e static</h3><p data-edit>Ambas por linhas: 0,0159 s com 14 threads.</p></div>
+      <p class="small reveal delay3" data-edit>Os tempos não isolam a coordenação do escalonador de outros custos.</p>
+    </div>
+  </div><footer><span>DCA3703 · Tarefa 11</span><span>18 / 19</span></footer>
+</section>
+
+<!-- === SLIDE 19: CONCLUSION AND LINKS === -->
+<section class="slide" aria-label="Conclusão da Tarefa 11">
+  <div class="kicker">CONCLUSÃO</div><h2 data-edit>A granularidade precisa combinar com o trabalho</h2>
+  <div class="statement reveal" data-edit>guided por linhas teve a menor mediana; static por linhas foi competitiva.</div>
+  <div class="cols reveal delay1">
+      <div class="box green"><h3 data-edit>Resultado observado</h3><p data-edit>Guided por linhas atingiu 0,0133 s com 9 threads. As versões validaram a mesma evolução do campo.</p></div>
+    <div class="box yellow"><h3 data-edit>Limite da explicação</h3><p data-edit>O chunk fino em dynamic + collapse coincide com tempos altos. O experimento não mediu separadamente o custo do escalonador.</p></div>
+  </div>
+  <div class="sources reveal delay2"><a href="v0_seq.c">Código sequencial</a><a href="v1_static.c">Código OpenMP</a><a href="relatorio.pdf">Relatório PDF</a><a href="../index.html">Índice da disciplina</a></div>
+  <footer><span>DCA3703 · Tarefa 11</span><span>19 / 19</span></footer>
+</section>
+
+</main></div>
+
+<!-- === CONTROLS AND INLINE EDITING === -->
+<nav class="deck-controls" aria-label="Navegação dos slides"><button id="previous" aria-label="Slide anterior">←</button><span id="counter" aria-live="polite"></span><a href="#3">Stencil</a><a href="#8">Schedule</a><a href="#16">Resultados</a><a href="#19">Conclusão</a><button id="next" aria-label="Próximo slide">→</button></nav>
+<div class="edit-hotzone" aria-hidden="true"></div><button class="edit-toggle" id="editToggle" aria-pressed="false">Editar (E)</button><span id="editStatus" role="status"></span>
+
+<!-- === PRESENTATION CONTROLLER === -->
+<script>
+class SlidePresentation {
+  constructor(){
+    this.stage=document.getElementById('deckStage');
+    this.slides=[...document.querySelectorAll('.slide')];
+    this.fields=[...document.querySelectorAll('[data-edit]')];
+    this.current=0;this.editing=false;this.wheelLocked=false;
+    this.scale();window.addEventListener('resize',()=>this.scale());
+    this.restoreEdits();
+    this.show(Number(location.hash.slice(1))-1||0);
+    window.addEventListener('hashchange',()=>this.show(Number(location.hash.slice(1))-1||0));
+    document.getElementById('previous').onclick=()=>this.show(this.current-1);
+    document.getElementById('next').onclick=()=>this.show(this.current+1);
+    document.addEventListener('keydown',event=>this.onKey(event));
+    let touchStart=0;
+    this.stage.addEventListener('touchstart',event=>touchStart=event.touches[0].clientX,{passive:true});
+    this.stage.addEventListener('touchend',event=>{let delta=event.changedTouches[0].clientX-touchStart;if(Math.abs(delta)>50)this.show(this.current+(delta<0?1:-1))},{passive:true});
+    window.addEventListener('wheel',event=>{if(this.wheelLocked||this.editing)return;this.wheelLocked=true;this.show(this.current+(event.deltaY>0?1:-1));setTimeout(()=>this.wheelLocked=false,500)},{passive:true});
+    this.setupEditing();
+  }
+  scale(){const factor=Math.min(innerWidth/1920,innerHeight/1080);this.stage.style.transform='translate('+(innerWidth-1920*factor)/2+'px,'+(innerHeight-1080*factor)/2+'px) scale('+factor+')'}
+  show(index){this.current=Math.max(0,Math.min(index,this.slides.length-1));this.slides.forEach((slide,i)=>{slide.classList.toggle('active',i===this.current);slide.classList.toggle('visible',i===this.current)});document.getElementById('counter').textContent=(this.current+1)+' / '+this.slides.length;if(location.hash!=='#'+(this.current+1))history.replaceState(null,'','#'+(this.current+1))}
+  onKey(event){if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'&&this.editing){event.preventDefault();this.save();return}if(event.target.isContentEditable||event.target.closest('button,a,input,select'))return;if(event.key.toLowerCase()==='e'){this.toggleEdit();return}if(['ArrowRight','ArrowDown','PageDown',' '].includes(event.key)){event.preventDefault();this.show(this.current+1)}if(['ArrowLeft','ArrowUp','PageUp'].includes(event.key)){event.preventDefault();this.show(this.current-1)}}
+  restoreEdits(){this.fields.forEach((field,i)=>{const value=localStorage.getItem('tarefa11-slide-edit-'+i);if(value!==null)field.innerHTML=value;field.addEventListener('input',()=>localStorage.setItem('tarefa11-slide-edit-'+i,field.innerHTML))})}
+  setupEditing(){const button=document.getElementById('editToggle'),zone=document.querySelector('.edit-hotzone');button.onclick=()=>this.toggleEdit();zone.onclick=()=>this.toggleEdit();let timer;[button,zone].forEach(element=>{element.onmouseenter=()=>{clearTimeout(timer);button.classList.add('show')};element.onmouseleave=()=>{timer=setTimeout(()=>{if(!this.editing)button.classList.remove('show')},400)}})}
+  toggleEdit(){this.editing=!this.editing;this.fields.forEach(field=>field.contentEditable=this.editing?'true':'false');const button=document.getElementById('editToggle');button.classList.toggle('active',this.editing);button.setAttribute('aria-pressed',String(this.editing));button.textContent=this.editing?'Concluir edição':'Editar (E)';document.getElementById('editStatus').textContent=this.editing?'Clique no texto · Ctrl+S baixa o HTML':''}
+  save(){const copy=document.documentElement.cloneNode(true);copy.querySelectorAll('[contenteditable]').forEach(field=>field.removeAttribute('contenteditable'));const button=copy.querySelector('#editToggle');button.classList.remove('active','show');button.textContent='Editar (E)';button.setAttribute('aria-pressed','false');copy.querySelector('#editStatus').textContent='';const url=URL.createObjectURL(new Blob(['<!doctype html>\n'+copy.outerHTML],{type:'text/html;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download='tarefa11-slides.html';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+}
+new SlidePresentation();
+</script>
+</body>
+</html>
