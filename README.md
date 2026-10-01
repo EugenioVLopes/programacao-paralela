@@ -23,6 +23,7 @@ Cada tarefa tem um material HTML único com teoria, prática, referência rápid
 | 13 | Afinidade de threads e NUMA | [Material 13](https://eugeniovlopes.github.io/programacao-paralela/lessons/0013-tarefa13-afinidade-numa.html) · [Referência rápida](https://eugeniovlopes.github.io/programacao-paralela/lessons/0013-tarefa13-afinidade-numa.html#referencia-rapida) | [`tarefa13/`](tarefa13/) · [PDF](tarefa13/relatorio.pdf) · [código-base](tarefa12/v4_numa.c) |
 | 14 | Programação em memória distribuída com MPI | [Slides](https://eugeniovlopes.github.io/programacao-paralela/tarefa14/slides.html) | [`tarefa14/`](tarefa14/) · [PDF](tarefa14/relatorio.pdf) |
 | 15 | Sobreposição de computação e comunicação com MPI | [Slides](https://eugeniovlopes.github.io/programacao-paralela/tarefa15/slides.html) | [`tarefa15/`](tarefa15/) · [PDF](tarefa15/relatorio.pdf) |
+| 18 | Soma de vetores entre CPU e GPU em OpenMP | — | [`tarefa18/`](tarefa18/) · [PDF](tarefa18/relatorio.pdf) |
 
 ---
 

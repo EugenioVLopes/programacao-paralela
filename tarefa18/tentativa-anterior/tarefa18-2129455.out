@@ -1,0 +1,39 @@
+tarefa18.c: In function ‘main’:
+tarefa18.c:57: warning: ignoring #pragma omp loop [-Wunknown-pragmas]
+ #pragma omp loop
+ 
+N=1000000 repeticao=1
+N=1000000 dispositivos=0 na_gpu=0 err_cpu=0 err_gpu=0
+init: 0.016s cpu: 0.013489s gpu: 0.001986s
+N=1000000 repeticao=2
+N=1000000 dispositivos=0 na_gpu=0 err_cpu=0 err_gpu=0
+init: 0.023s cpu: 0.013458s gpu: 0.001211s
+N=1000000 repeticao=3
+N=1000000 dispositivos=0 na_gpu=0 err_cpu=0 err_gpu=0
+init: 0.018s cpu: 0.020151s gpu: 0.001571s
+tarefa18.c: In function ‘main’:
+tarefa18.c:57: warning: ignoring #pragma omp loop [-Wunknown-pragmas]
+ #pragma omp loop
+ 
+N=10000000 repeticao=1
+N=10000000 dispositivos=0 na_gpu=0 err_cpu=0 err_gpu=0
+init: 0.024s cpu: 0.016561s gpu: 0.018087s
+N=10000000 repeticao=2
+N=10000000 dispositivos=0 na_gpu=0 err_cpu=0 err_gpu=0
+init: 0.023s cpu: 0.012760s gpu: 0.005500s
+N=10000000 repeticao=3
+N=10000000 dispositivos=0 na_gpu=0 err_cpu=0 err_gpu=0
+init: 0.026s cpu: 0.015571s gpu: 0.005324s
+tarefa18.c: In function ‘main’:
+tarefa18.c:57: warning: ignoring #pragma omp loop [-Wunknown-pragmas]
+ #pragma omp loop
+ 
+N=50000000 repeticao=1
+N=50000000 dispositivos=0 na_gpu=0 err_cpu=0 err_gpu=0
+init: 0.064s cpu: 0.024098s gpu: 0.033514s
+N=50000000 repeticao=2
+N=50000000 dispositivos=0 na_gpu=0 err_cpu=0 err_gpu=0
+init: 0.066s cpu: 0.018618s gpu: 0.038531s
+N=50000000 repeticao=3
+N=50000000 dispositivos=0 na_gpu=0 err_cpu=0 err_gpu=0
+init: 0.081s cpu: 0.040119s gpu: 0.027108s

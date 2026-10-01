@@ -1,0 +1,174 @@
+\documentclass[11pt,letterpaper]{article}
+\usepackage{../assets/scientific_report}
+\usepackage[brazil]{babel}
+\usepackage{xurl}
+\usepackage{amsmath,float,listings,xcolor,geometry,pgfplots}
+\pgfplotsset{compat=1.18}
+\geometry{headheight=23pt,top=2cm,bottom=2cm,left=2.5cm,right=2.5cm}
+\setlength{\parskip}{0.5em}
+\setlength{\parindent}{0pt}
+\setlength{\emergencystretch}{4em}
+\lstset{language=C,basicstyle=\ttfamily\footnotesize,keywordstyle=\color{blue}\bfseries,commentstyle=\color{green!60!black},numbers=left,numberstyle=\tiny\color{gray},numbersep=8pt,frame=single,breaklines=true,showstringspaces=false}
+\hypersetup{pdftitle={Tarefa 18: Comparando soma de vetores entre CPU e GPU em OpenMP},pdfauthor={Eugenio Vitor Lopes dos Santos}}
+
+\begin{document}
+\pagestyle{plain}
+\begin{center}
+{\LARGE\bfseries Comparando soma de vetores entre CPU e GPU em OpenMP}\\[0.4em]
+{\normalsize Eugenio Vitor Lopes dos Santos}\\[0.3em]
+{\small DCA3703, Programação Paralela, Universidade Federal do Rio Grande do Norte}
+\end{center}
+
+
+
+\section{Enunciado}
+Fazer os exercícios de adição de vetores, \texttt{vadd.c}, dos slides 27 e 48 do tutorial de programação de GPUs com OpenMP em um dos nós com GPU do NPAD. Comparar os tempos de execução somente na CPU e com o uso da GPU. Reportar o progresso, apresentando os problemas encontrados e as soluções adotadas.
+
+\section{Fundamentação Teórica}
+\begin{itemize}
+\item \textbf{Paralelismo de dados:} a soma de vetores aplica a mesma operação, $c_i=a_i+b_i$, a todos os elementos. Cada iteração escreve em uma posição distinta, permitindo executar o laço em paralelo sem dependência entre iterações.
+
+\item \textbf{CPU e GPU:} a CPU possui núcleos voltados à execução de tarefas variadas; a GPU explora muitas operações concorrentes sobre dados. Na soma de vetores, ambas podem distribuir os elementos entre suas unidades de execução, mas o uso da GPU acrescenta custos de lançamento e movimentação de dados.
+
+\item \textbf{\texttt{\#pragma omp parallel for}:} cria uma região paralela e distribui as iterações de um laço entre as threads OpenMP da CPU. Neste experimento, é usada na inicialização, na soma da versão CPU e na verificação dos resultados.
+
+\item \textbf{\texttt{\#pragma omp target}:} encaminha a execução de uma região para um dispositivo alvo. Os dados usados nessa região precisam estar disponíveis na memória do dispositivo, por meio de mapeamento explícito ou implícito.
+
+\item \textbf{Cláusula \texttt{map}:} controla a associação dos dados entre hospedeiro e dispositivo. O tipo \texttt{to} copia dados para o dispositivo; \texttt{from} copia os resultados para o hospedeiro; e \texttt{tofrom} permite cópias nos dois sentidos. Na implementação medida, os três vetores da soma receberam mapeamento implícito \texttt{tofrom}.
+
+\item \textbf{Diretivas \texttt{teams} e \texttt{loop}:} \texttt{teams} cria um conjunto de times de threads, enquanto \texttt{loop} indica que as iterações podem ser executadas concorrentemente e permite ao compilador organizar sua distribuição. A combinação \texttt{target teams loop} é usada para executar a soma na GPU.
+
+\item \textbf{Cláusula \texttt{reduction}:} mantém uma contribuição privada por thread e combina essas contribuições ao final. Na verificação, \texttt{reduction(+:err)} soma as contagens de erros sem atualizações concorrentes ao mesmo contador.
+
+\item \textbf{\texttt{OMP\_TARGET\_OFFLOAD}:} controla o comportamento das regiões destinadas ao dispositivo. O valor \texttt{MANDATORY} exige offload quando a região solicita execução no dispositivo. A consulta \texttt{omp\_is\_initial\_device()} complementa essa configuração, indicando se a região executou no hospedeiro.
+
+\item \textbf{Transferência de dados e intensidade aritmética:} a soma realiza apenas uma adição por elemento, lendo duas entradas e escrevendo uma saída. Essa pequena quantidade de cálculo em relação aos dados movimentados pode tornar as transferências relevantes para o tempo total. Por isso, o tempo da região \texttt{target}, que inclui cópias e sincronização, deve ser distinguido do tempo isolado do kernel.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[x=1cm,y=1cm,>=latex,font=\small,
+    etapa/.style={draw,align=center,text width=2.1cm,minimum height=1cm},
+    cpu/.style={etapa,fill=lightblue},
+    copia/.style={etapa,fill=lightorange},
+    gpu/.style={etapa,fill=lightgreen}]
+\node[anchor=west,font=\small\bfseries] at (-1.2,0.95) {Versão CPU};
+\node[cpu] (ci) at (0,0) {Inicializar\\na CPU};
+\node[cpu] (cs) at (6,0) {Somar na CPU\\\texttt{c = a + b}};
+\node[cpu] (cv) at (12,0) {Verificar\\na CPU};
+\draw[->,thick] (ci) -- (cs);
+\draw[->,thick] (cs) -- (cv);
+\draw[thick] (4.8,-0.7) -- (4.8,-0.9) -- (7.2,-0.9) -- (7.2,-0.7);
+\node at (6,-1.2) {Tempo da soma};
+
+\node[anchor=west,font=\small\bfseries] at (-1.2,-1.9) {Versão GPU};
+\node[cpu] (gi) at (0,-2.9) {Inicializar\\na CPU};
+\node[copia] (ida) at (3,-2.9) {Copiar $a,b,c$\\CPU $\rightarrow$ GPU};
+\node[gpu] (gs) at (6,-2.9) {Somar na GPU\\\texttt{c = a + b}};
+\node[copia] (volta) at (9,-2.9) {Copiar $a,b,c$\\GPU $\rightarrow$ CPU};
+\node[cpu] (gv) at (12,-2.9) {Verificar\\na CPU};
+\draw[->,thick] (gi) -- (ida);
+\draw[->,thick] (ida) -- (gs);
+\draw[->,thick] (gs) -- (volta);
+\draw[->,thick] (volta) -- (gv);
+\draw[thick] (1.8,-3.6) -- (1.8,-3.8) -- (10.2,-3.8) -- (10.2,-3.6);
+\node[align=center] at (6,-4.25) {Tempo da soma: transferências, cálculo e sincronização};
+\end{tikzpicture}
+\caption{Etapas das duas versões, sem escala de tempo. O mapeamento implícito \texttt{tofrom} da implementação medida prevê cópias dos três vetores nos dois sentidos. Inicialização e verificação permanecem na CPU.}
+\label{fig:fluxo}
+\end{figure}
+
+\section{Experimento}
+\subsection{Código comum e alteração entre versões}
+Os programas derivam do \texttt{vadd.c} do tutorial, escrito por Tim Mattson em 2017. Ambos usam $N=10\,000\,000$ e quatro vetores de \texttt{float}: entradas \texttt{a} e \texttt{b}, saída \texttt{c} e referência \texttt{res}. São inicializados com \texttt{a[i] = (float)i}, \texttt{b[i] = 2.0*(float)i}, \texttt{c[i] = 0.0} e \texttt{res[i] = i + 2*i}.
+
+A inicialização e a verificação permanecem na CPU nas duas versões. A verificação conta os elementos cujo erro ao quadrado excede $10^{-7}$; a cláusula \texttt{reduction(+:err)} combina as contagens das threads sem acesso concorrente ao mesmo contador.
+
+Na versão CPU, o laço da soma usa:
+
+\begin{minipage}{\linewidth}
+\begin{lstlisting}
+#pragma omp parallel for
+for (int i=0; i<N; i++) {
+    c[i] = a[i] + b[i];
+}
+\end{lstlisting}
+\end{minipage}
+
+Na versão GPU, somente a diretiva desse laço muda:
+\begin{lstlisting}
+#pragma omp target teams loop
+\end{lstlisting}
+
+Antes dos intervalos medidos, a versão GPU executa uma região \texttt{target} que consulta \texttt{omp\_is\_initial\_device()}. O programa encerra com erro se essa região executar na CPU. A configuração também define \texttt{OMP\_TARGET\_OFFLOAD=MANDATORY}. Essa região inicial confirma a execução no dispositivo e inicializa o runtime GPU; seu custo fica fora dos tempos apresentados.
+
+\subsection{Configuração e medição}
+O experimento foi executado no NPAD, na partição \texttt{gpu-8-v100}, com oito CPUs alocadas e uma GPU Tesla V100-SXM2 de 16 GB. O processador do nó era um Intel Xeon E5-2683 v4.
+
+Cada versão foi executada cinco vezes, com $N=10\,000\,000$ e oito threads na CPU. Foram usadas as afinidades \texttt{OMP\_PLACES=cores} e \texttt{OMP\_PROC\_BIND=close}. A compilação utilizou NVIDIA HPC SDK 24.11 com otimização \texttt{-O3}:
+\begin{lstlisting}[language=bash]
+nvc -O3 -mp=multicore vadd_cpu.c -o vadd_cpu
+nvc -O3 -mp=gpu -Minfo=mp vadd_gpu.c -o vadd_gpu
+\end{lstlisting}
+
+Os tempos foram medidos com \texttt{clock\_gettime(CLOCK\_MONOTONIC)}, separando inicialização, soma e verificação. O total corresponde à soma desses intervalos. Na GPU, o tempo da soma inclui transferências e sincronização; a inicialização do runtime fica fora da medição. Os resultados apresentam a mediana das cinco execuções.
+
+\section{Progresso, problemas e soluções}
+A tentativa anterior, job 2129455, usou GCC e não reconheceu dispositivos OpenMP, registrando \texttt{na\_gpu=0}. Apesar de produzir tempos e zero erros, essa execução não demonstrou uso da GPU. Seus arquivos foram preservados como registro do problema e seus tempos foram excluídos da comparação. A solução adotada foi carregar \texttt{compilers/nvidia/nvhpc/24.11}, compilar com \texttt{-mp=gpu} e exigir confirmação do dispositivo.
+
+Os quatro vetores locais ocupam aproximadamente 160 MB na pilha. Para manter a alocação do código original, foi usado \texttt{ulimit -s unlimited} e \texttt{OMP\_STACKSIZE=256M}. Não houve falha de pilha na execução medida.
+
+\section{Resultados}
+As dez execuções apresentaram zero erros. Em todas as cinco execuções da versão GPU, o programa detectou um dispositivo OpenMP e confirmou execução fora do hospedeiro. A Tabela~\ref{tab:tempos} apresenta as medianas das cinco repetições por versão. O total é a mediana dos totais impressos, não a soma das medianas dos três intervalos.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lrrr}
+\toprule
+Intervalo & CPU (s) & GPU (s) & Speedup \\
+\midrule
+Inicialização & 0,020963 & 0,020564 & 1,019 \\
+Soma & 0,003680 & 0,041005 & 0,090 \\
+Verificação & 0,002175 & 0,002007 & 1,084 \\
+Total dos intervalos & 0,026641 & 0,064948 & 0,410 \\
+\bottomrule
+\end{tabular}
+\caption{Medianas de cinco execuções com $N=10\,000\,000$. Na versão GPU, inicialização e verificação continuam na CPU. Speedup: $T_{\mathrm{CPU}}/T_{\mathrm{GPU}}$.}
+\label{tab:tempos}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    ybar,bar width=18pt,width=0.88\textwidth,height=6cm,
+    ymin=0,ymax=75,ylabel={Mediana do tempo (ms)},
+    symbolic x coords={Inicializacao,Soma,Verificacao,Total},
+    xtick=data,xticklabels={Inicialização,Soma,Verificação,Total},
+    ymajorgrids=true,
+    legend style={at={(0.02,0.98)},anchor=north west,font=\small}
+]
+\addplot coordinates {(Inicializacao,20.963) (Soma,3.680) (Verificacao,2.175) (Total,26.641)};
+\addplot coordinates {(Inicializacao,20.564) (Soma,41.005) (Verificacao,2.007) (Total,64.948)};
+\legend{CPU,Versão GPU}
+\end{axis}
+\end{tikzpicture}
+\caption{Comparação dos intervalos medidos. O tempo da soma na GPU inclui transferências e sincronização.}
+\label{fig:tempos}
+\end{figure}
+
+A CPU apresentou o menor tempo mediano de soma e de total. A soma na versão GPU demorou aproximadamente 11,1 vezes o tempo da CPU, enquanto o total dos intervalos foi aproximadamente 2,4 vezes maior. Inicialização e verificação ficaram próximas entre as versões, pois ambas executam essas etapas na CPU.
+
+O resultado mostra que o offload de uma única soma, nesta implementação e carga, não compensou os custos incluídos na região \texttt{target}. O compilador informou mapeamento implícito \texttt{tofrom} para os três vetores. Cada vetor ocupa 40 MB; esse mapeamento prevê cópias de entrada e saída, inclusive para dados que a soma apenas lê ou apenas escreve. O tempo chamado de computação, portanto, também abrange movimentação de dados e não deve ser interpretado como duração isolada do kernel.
+
+A baixa quantidade de cálculo por elemento e as transferências oferecem uma explicação plausível para o resultado, mas o experimento não mediu esses custos separadamente. Não é possível quantificar sua contribuição individual nem concluir que a GPU seja mais lenta em outras cargas ou em uma implementação que mantenha dados no dispositivo. Escalabilidade forte e fraca também não foram medidas.
+
+\appendix
+\clearpage
+\section*{Anexo A: Código CPU}
+\lstinputlisting{vadd_cpu.c}
+
+\clearpage
+\section*{Anexo B: Código GPU}
+\lstinputlisting{vadd_gpu.c}
+\end{document}
